@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ADR 0020 · Scope Guest Access to the Booking or Package — Seraya Psikologi Docs</title>
+<link rel="stylesheet" href="../assets/main.css">
+</head>
+<body>
+<header class="site">
+<h1>Seraya Psikologi — Documentation</h1>
+<p class="lede">Booking and payment MVP · Implementation baseline · 96 ADR</p>
+</header>
+<nav class="crumbs"><a href="../index.html">Home</a> › ADR 0020 · Scope Guest Access to the Booking or Package</nav>
+<main>
+<h1 id="20-scope-guest-access-to-the-booking-or-package">20. Scope Guest Access to the Booking or Package</h1>
+<h2 id="status">Status</h2>
+<p>Accepted for the MVP working model; email is the primary automated channel for ClientAccess. WhatsApp is optional flexible manual support under ADR 0066, not an automated fallback/source of lifecycle truth. Token lifetime is resolved by ADR 0046: one-time token 15 minutes, scoped session 30 minutes. Replay protection, rate limits, revocation, recovery, and account linking remain open.</p>
+<h2 id="context">Context</h2>
+<p>Guest clients need to return later to schedule remaining SessionEntitlement units without being forced into a Google account. A raw Booking ID or permanent link would create an enumeration/data-exposure risk, while a full account requirement adds first-booking friction.</p>
+<h2 id="decision">Decision</h2>
+<p>Use verified magic link or OTP access scoped to the relevant Booking/package. The access capability may show and mutate only actions allowed for that Booking/package, such as scheduling an unused entitlement and viewing appointment status. Cancellation/reschedule requests route to WhatsApp/manual support rather than self-service mutation. It must not expose a global Client record or other bookings.</p>
+<p>Email is the primary automated channel for ClientAccess. WhatsApp is optional flexible manual support under ADR 0066 and is not an automated lifecycle source. Token lifetime is resolved by ADR 0046; rate limits, replay protection, revocation, recovery, and optional account linking remain open.</p>
+<h2 id="consequences">Consequences</h2>
+<p>Positive:</p>
+<ul>
+<li>package follow-up works for guest clients;</li>
+<li>access scope is narrower than a full account;</li>
+<li>Google is not a prerequisite;</li>
+<li>package operations can be audited against ClientAccess context.</li>
+</ul>
+<p>Costs and constraints:</p>
+<ul>
+<li>notification delivery becomes part of access reliability;</li>
+<li>token/OTP security, rate limits, and enumeration resistance are required;</li>
+<li>a lost/changed contact path needs recovery policy;</li>
+<li>staff support must avoid revealing package data before verification.</li>
+</ul>
+<h2 id="open-follow-up">Open follow-up</h2>
+<p>Define rate limits, replay protection, logout/revocation/recovery behavior, and whether clients may link a UserAccount later.</p>
+</main>
+<footer class="site">
+<p><a href="../index.html">Index</a> · <a href="../adr/index.html">All ADR</a> · <a href="../baseline/index.html">Baseline docs</a></p>
+<p>Generated from <code>/home/jar/output/psychology-research/seraya-psikologi-domain/</code> · Round 6 closure · 2026-08-31</p>
+</footer>
+</body>
+</html>

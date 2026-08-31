@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ADR 0054 · Correct Appointment Outcomes Through Admin-only Events — Seraya Psikologi Docs</title>
+<link rel="stylesheet" href="../assets/main.css">
+</head>
+<body>
+<header class="site">
+<h1>Seraya Psikologi — Documentation</h1>
+<p class="lede">Booking and payment MVP · Implementation baseline · 96 ADR</p>
+</header>
+<nav class="crumbs"><a href="../index.html">Home</a> › ADR 0054 · Correct Appointment Outcomes Through Admin-only Events</nav>
+<main>
+<h1 id="54-correct-appointment-outcomes-through-admin-only-events">54. Correct Appointment Outcomes Through Admin-only Events</h1>
+<h2 id="status">Status</h2>
+<p>Accepted for the MVP working model; correction authority is Admin-only and audited, while restored-entitlement expiry is resolved by ADR 0062. Exact correction window, allowed transition matrix, second approval, and client-facing outcome visibility remain open.</p>
+<h2 id="context">Context</h2>
+<p>Appointment outcomes drive SessionEntitlement consumption, no-show handling, reporting, reminders, and possible refund/credit decisions. Mutating a completed/no-show value in place would erase why the balance changed.</p>
+<h2 id="decision">Decision</h2>
+<p>Psychologist or Admin may mark the initial <code>completed</code>/<code>no_show</code> outcome. After an outcome exists, only an authorized Admin may create an append-only OutcomeCorrection event with old/new outcome, reason/category, actor/time, affected entitlement/refund/reporting effects, and correction lineage. The original outcome remains immutable history. Correction must be idempotent and apply entitlement/refund adjustments atomically.</p>
+<p>No outcome or correction stores clinical notes, diagnosis, assessment results, or treatment details.</p>
+<h2 id="consequences">Consequences</h2>
+<p>Positive:</p>
+<ul>
+<li>psychologists can finish routine operational work;</li>
+<li>sensitive balance-changing corrections are controlled;</li>
+<li>history remains auditable;</li>
+<li>downstream reminders/reporting can recompute safely.</li>
+</ul>
+<p>Costs and constraints:</p>
+<ul>
+<li>transition matrix and correction window are required;</li>
+<li>admin UI must show old/new outcome and consequences;</li>
+<li>correction may require RefundAction/entitlement reversal;</li>
+<li>duplicate correction commands must not double-adjust state.</li>
+</ul>
+<h2 id="open-follow-up">Open follow-up</h2>
+<p>Define allowed transitions/window, whether correction requires second admin approval, client-facing outcome visibility, and the exact RefundAction/entitlement effects for an expired restored unit. Restoration expiry policy is resolved by ADR 0062.</p>
+</main>
+<footer class="site">
+<p><a href="../index.html">Index</a> · <a href="../adr/index.html">All ADR</a> · <a href="../baseline/index.html">Baseline docs</a></p>
+<p>Generated from <code>/home/jar/output/psychology-research/seraya-psikologi-domain/</code> · Round 6 closure · 2026-08-31</p>
+</footer>
+</body>
+</html>

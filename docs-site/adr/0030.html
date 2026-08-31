@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ADR 0030 · Allow Editors to Publish CMS Content Directly — Seraya Psikologi Docs</title>
+<link rel="stylesheet" href="../assets/main.css">
+</head>
+<body>
+<header class="site">
+<h1>Seraya Psikologi — Documentation</h1>
+<p class="lede">Booking and payment MVP · Implementation baseline · 96 ADR</p>
+</header>
+<nav class="crumbs"><a href="../index.html">Home</a> › ADR 0030 · Allow Editors to Publish CMS Content Directly</nav>
+<main>
+<h1 id="30-allow-editors-to-publish-cms-content-directly">30. Allow Editors to Publish CMS Content Directly</h1>
+<h2 id="status">Status</h2>
+<p>Accepted for the MVP working model; exact content types, fields, media handling, and admin rollback authority remain open.</p>
+<h2 id="context">Context</h2>
+<p>The MVP has an Editor role and needs a lightweight CMS for public service/team/FAQ/editorial content. Requiring a separate review state would slow the small team if the user intentionally grants editors publishing authority. Direct publish still needs attribution, revision history, and rollback to avoid untraceable public changes.</p>
+<h2 id="decision">Decision</h2>
+<p>ContentEntry supports draft, published, and archived states. An Editor may directly publish content within the content domain. Every create/edit/publish/archive operation creates a ContentRevision/audit record with actor, timestamp, and status transition. Admin retains operational oversight and rollback/disable authority. Content entities cannot contain client, payment, booking, or clinical records.</p>
+<h2 id="consequences">Consequences</h2>
+<p>Positive:</p>
+<ul>
+<li>small team can publish without an extra approval bottleneck;</li>
+<li>public content remains attributable and reversible;</li>
+<li>editor permissions stay separate from operational/PII access;</li>
+<li>content lifecycle is simple enough for MVP.</li>
+</ul>
+<p>Costs and constraints:</p>
+<ul>
+<li>editor training and content standards matter;</li>
+<li>accidental publication needs rollback and audit;</li>
+<li>media/SEO/cache invalidation need explicit behavior;</li>
+<li>admin cannot rely on review state as a safety net.</li>
+</ul>
+<h2 id="open-follow-up">Open follow-up</h2>
+<p>Define supported content types, required fields, slug/version behavior, media storage, rollback semantics, cache invalidation, and whether profile/service facts require admin lock fields.</p>
+</main>
+<footer class="site">
+<p><a href="../index.html">Index</a> · <a href="../adr/index.html">All ADR</a> · <a href="../baseline/index.html">Baseline docs</a></p>
+<p>Generated from <code>/home/jar/output/psychology-research/seraya-psikologi-domain/</code> · Round 6 closure · 2026-08-31</p>
+</footer>
+</body>
+</html>

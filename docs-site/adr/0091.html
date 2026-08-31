@@ -1,0 +1,362 @@
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ADR 0091 · Capacity Overlap and TransitionBuffer Placement — Seraya Psikologi Docs</title>
+<link rel="stylesheet" href="../assets/main.css">
+</head>
+<body>
+<header class="site">
+<h1>Seraya Psikologi — Documentation</h1>
+<p class="lede">Booking and payment MVP · Implementation baseline · 96 ADR</p>
+</header>
+<nav class="crumbs"><a href="../index.html">Home</a> › ADR 0091 · Capacity Overlap and TransitionBuffer Placement</nav>
+<main>
+<h1 id="91-capacity-overlap-and-transitionbuffer-placement">91. Capacity Overlap and TransitionBuffer Placement</h1>
+<h2 id="status">Status</h2>
+<p>Accepted for MVP. Closes <code>TBC-CAPACITY-01</code> and <code>TBC-BUFFER-01</code> from <code>PRD-GUIDELINE-REVIEW.md</code> (Round 1 P1-02). Implements the overlap detection mechanism and buffer placement left open by <code>ADR 0013-offering-specific-slots.md</code> and <code>ADR 0041-transition-buffer.md</code>. Production launch still requires <code>TBC-STACK-01</code> (Worker + D1 vs Supabase + Postgres) to be closed before any migration is executed; this ADR is schema-shape-stable across both stacks but the exact DDL syntax in §6 is written for the Postgres family. D1/SQLite equivalent is documented in §7.</p>
+<h2 id="ringkasan-eksekutif-bahasa-indonesia">Ringkasan eksekutif (Bahasa Indonesia)</h2>
+<ul>
+<li><strong>Granularitas candidate slot tetap 30 menit</strong>, dengan sesi 60 menit occupying 2 slot berurutan dan TransitionBuffer 15 menit occupying 0 atau 1 slot tambahan di tiap sisi. 30 dipilih di atas 15 dan 60 karena: (a) 15-menit grid dengan sesi 60 menit + buffer 15 menit menghasilkan 6 slot kandidat untuk satu sesi, dengan kombinasi overlap yang sangat banyak; (b) 60-menit grid hanya memungkinkan sesi back-to-back tanpa ruang untuk buffer atau persiapan psikolog; (c) 30-menit grid menghasilkan 3 slot untuk satu sesi (60 + 2×15) yang manageable dan membiarkan slot adjacent legitimate untuk offering berbeda yang tidak overlap setelah buffer.</li>
+<li><strong>Unit atomik kapasitas adalah <code>CapacityReservation</code></strong>, bukan <code>AvailabilitySlot</code>. Sebuah <code>CapacityReservation</code> dibuat saat <code>SlotHold</code> aktif atau <code>Appointment</code> confirmed, dan membawa interval <code>[starts_at, ends_at)</code> yang sudah termasuk buffer di kedua sisi. Invariant: untuk satu psikolog, dua reservation dengan <code>state ∈ {hold_active, confirmed}</code> <strong>tidak boleh overlap</strong> ketika interval <code>starts_at..(ends_at + 2×transition_buffer_minutes)</code> mereka overlap.</li>
+<li><strong>TransitionBuffer placement: simetris mengelilingi appointment</strong> (<code>[start − buffer, end + buffer)</code>). Bukan before-only (yang membiarkan sesi back-to-back tanpa persiapan) atau after-only (yang membiarkan psikolog mulai sesi berikutnya tanpa transisi). Definisi operasionalnya: reservation interval yang disimpan adalah <code>[starts_at, ends_at)</code> sesi ditambah buffer di kedua sisi untuk deteksi overlap; slot display tetap menampilkan jam sesi saja.</li>
+<li><strong>Concurrency enforcement: app-level precheck + database constraint</strong>. App-level precheck (<code>SELECT ... FOR UPDATE</code> di Postgres; transactional read di D1) memberikan error yang ramah; database constraint <code>EXCLUDE USING GIST</code> (atau <code>UNIQUE</code> indexed range di D1) menjadi hard guarantee.</li>
+<li><strong>Tidak ada lagi TBC untuk capacity overlap atau buffer placement</strong> di Slice 1 availability atau Slice 2 hold. Yang masih TBC adalah arsitektur stack (P0-01), intake/minor/eligibility (P0-04), couple participant (P0-03), dan payment expiry/TTL (P1-03) — di luar cakupan ADR ini.</li>
+</ul>
+<h2 id="context">Context</h2>
+<p><code>ADR 0013</code> sudah memutuskan bahwa <code>AvailabilitySlot</code> milik satu psikolog dan satu <code>ServiceOffering</code>, dan bahwa active <code>SlotHold</code> serta confirmed <code>Appointment</code> untuk psikolog yang sama tidak boleh overlap tanpa membedakan offering. <code>ADR 0041</code> sudah memutuskan TransitionBuffer 15 menit dengan admin-configurable per offering, di-snapshot pada transaction, dan diterapkan pada generation, SlotHold, Appointment overlap check, dan reschedule slot claim.</p>
+<p>Ticket #3 (<code>vault/Projects/Seraya Psikologi/Tickets/Ticket 03 — Capacity overlap &amp; TransitionBuffer.md</code>) mengangkat dua keputusan yang masih terbuka:</p>
+<ol>
+<li>
+<p><strong>Granularitas slot kandidat.</strong> 15 menit menghasilkan kandidat banyak (6 slot untuk satu sesi 60-menit dengan buffer 15-menit) dan memungkinkan kombinasi overlap antar offering yang sulit dibatasi. 60 menit tidak menyisakan ruang untuk buffer. 30 menit menjadi grid terkecil yang (a) membagi sesi 60-menit menjadi tepat 2 unit, (b) membiarkan TransitionBuffer 15-menit menjadi 0 atau 1 slot tambahan, dan (c) membolehkan psikolog yang sama memegang dua sesi adjacent di offering berbeda tanpa semu kecuali buffer overlap.</p>
+</li>
+<li>
+<p><strong>Mekanisme deteksi overlap.</strong> Guide saat ini hanya meminta <code>unique active hold per slot</code> (<code>IMPLEMENTATION-GUIDE.md §8.2</code>). Unique-per-slot tidak cukup karena: (a) satu psikolog dapat memiliki dua <code>AvailabilitySlot</code> untuk offering berbeda dengan <code>[starts_at, ends_at)</code> yang sama; (b) <code>EXISTS</code>-style race pada saat <code>CreateSlotHold</code> dapat memasukkan dua hold sebelum unique constraint sempat di-check.</p>
+</li>
+<li>
+<p><strong>Placement TransitionBuffer.</strong> <code>ADR 0041</code> line 33–35 masih membuka before/after/both. Tiga kandidat:<br />
+   - <strong>before-only</strong>: sesi 10:00–11:00 + buffer 09:45–10:00. Sesi berikutnya 11:00–12:00 masih boleh di-claim oleh psikolog lain jika psikolog ini tidak klaim, tetapi tidak ada waktu untuk psikolog melakukan transisi ke 11:00. Tidak aman untuk psikolog.<br />
+   - <strong>after-only</strong>: sesi 10:00–11:00 + buffer 11:00–11:15. Psikolog tidak punya waktu untuk prep sebelum 10:00. Tidak aman untuk psikolog.<br />
+   - <strong>both / simetris mengelilingi appointment</strong>: interval efektif <code>[start − buffer, end + buffer)</code>. Reservation disimpan dengan <code>starts_at = session_start − buffer</code> dan <code>ends_at = session_end + buffer</code> atau dengan <code>ends_at = session_end + 2×buffer</code> dan deteksi overlap dilakukan pada <code>starts_at − buffer .. ends_at</code> — kedua formulation equivalent untuk overlap detection. Placement simetris menjamin psikolog mendapat transisi sebelum dan sesudah, dan mencegah sesi back-to-back untuk psikolog yang sama.</p>
+</li>
+</ol>
+<p>Round 3 <code>PRD-GUIDELINE-REVIEW.md</code> (Non-Teknis menang pada konflik bisnis) tidak menyentuh placement ini, sehingga keputusan ada di tangan tim teknis berdasarkan implikasi operasional untuk psikolog.</p>
+<h2 id="diskusi-multi-perspektif">Diskusi multi-perspektif</h2>
+<h3 id="privacy-klinisetis">Privacy (klinis/etis)</h3>
+<ul>
+<li>Overlap detection pada level psikolog + waktu (bukan per offering) menjamin tidak ada cross-offering double booking yang dapat membocorkan availability satu klien ke klien lain melalui availability inference. Sesi A untuk klien X (offering individual) dan sesi B untuk klien Y (offering couple) untuk psikolog yang sama pada jam yang sama akan terdeteksi sebagai overlap dan di-reject, meskipun offering berbeda.</li>
+<li>TransitionBuffer tidak berisi data klinis. Snapshotting <code>transition_buffer_minutes</code> pada <code>OfferSnapshot</code> dan <code>CapacityReservation</code> adalah operational metadata; tidak ada perubahan sign-off konsent atau wording konsent.</li>
+<li>Couple package (3 appointment A/B/joint) menggunakan model <code>BookingParticipant</code>/<code>AppointmentParticipant</code> dari <code>ADR 0090</code>. Overlap detection untuk couple mengikuti model yang sama: dua <code>Appointment</code> untuk psikolog yang sama tidak boleh overlap setelah buffer.</li>
+</ul>
+<h3 id="operations-adminfinance">Operations (admin/finance)</h3>
+<ul>
+<li>Admin workspace perlu menampilkan effective buffer per offering (diwariskan dari <code>Service</code> atau override pada <code>ServiceOffering</code> per <code>ADR 0043</code>) dan effective reservation interval di Admin UI. Tidak ada perubahan alur cancellation/refund.</li>
+<li>Slot generation (90-day rolling, <code>ADR 0040</code>) menghasilkan <code>AvailabilitySlot</code> pada grid 30-menit; <code>CapacityReservation</code> dibuat on-demand saat <code>SlotHold</code> aktif atau <code>Appointment</code> confirmed, bukan saat slot generation. Ini memisahkan "candidate capacity" (AvailabilitySlot) dari "claimed capacity" (CapacityReservation).</li>
+<li>Late-payment reacquisition (<code>ADR 0059</code>) tetap menggunakan atomic claim — membuat <code>CapacityReservation</code> baru dan reject jika overlap. Tidak ada perubahan pada path reconciliation.</li>
+<li>Couple package launch-deferred sampai <code>TBC-COUPLE-LAUNCH-01</code> ditutup, tetapi model capacity overlap yang diputuskan di ADR ini sudah kompatibel dengan <code>ADR 0090</code>.</li>
+</ul>
+<h3 id="engineering-aggregate-schema">Engineering (aggregate &amp; schema)</h3>
+<h4 id="mengapa-capacityreservation-bukan-langsung-di-availabilityslot">Mengapa <code>CapacityReservation</code> bukan langsung di <code>AvailabilitySlot</code>?</h4>
+<p><code>AvailabilitySlot</code> adalah representasi kandidat bookable capacity. Ia harus tetap bisa di-generate/di-withdraw secara massal saat <code>AvailabilityRule/Exception</code> berubah (<code>ADR 0061</code>). Jika uniqueness overlap ditempatkan langsung di <code>AvailabilitySlot</code>, maka:</p>
+<ul>
+<li>Regeneration harus membuat/mutate banyak row untuk satu perubahan aturan;</li>
+<li>Status hold/confirmed harus di-track sebagai kolom <code>state</code> di <code>AvailabilitySlot</code> yang bercampur dengan metadata slot;</li>
+<li>Couple participant (<code>ADR 0090</code>) yang membutuhkan dua <code>Appointment</code> dari satu <code>Booking</code> akan sulit dimodelkan tanpa reservation terpisah per appointment.</li>
+</ul>
+<p><code>CapacityReservation</code> adalah agregat yang merepresentasikan "slot waktu yang sedang di-claim" untuk psikolog tertentu. Ia child-of <code>Booking</code> (untuk <code>SlotHold</code>-backed) atau child-of <code>Appointment</code> (untuk confirmed). Granularitas:</p>
+<ul>
+<li><code>CapacityReservation</code> untuk SlotHold: 1 row per <code>Booking</code> selama hold aktif. State <code>hold_active</code>. Ends_at = booking hold expiry + 2×buffer; reservation auto-released saat hold expiry.</li>
+<li><code>CapacityReservation</code> untuk confirmed Appointment: 1 row per <code>Appointment</code>. State <code>confirmed</code>. Ends_at = appointment_end + 2×buffer.</li>
+</ul>
+<p>Kedua tipe reservation ini share satu unique/overlap constraint pada <code>(psychologist_id, time_range, state)</code>.</p>
+<h4 id="mengapa-placement-simetris-bukan-before-only-atau-after-only">Mengapa placement simetris, bukan before-only atau after-only?</h4>
+<p>Before-only membuat sesi back-to-back tanpa transisi (misal 10:00–11:00 dan 11:00–12:00 untuk psikolog yang sama) tanpa waktu untuk psikolog melakukan catatan pasca-sesi dan prep untuk sesi berikutnya. After-only membuat psikolog tidak punya waktu untuk prep sebelum sesi. Simetris mengelilingi appointment memastikan psikolog mendapat transisi sebelum dan sesudah, dan dua sesi adjacent tanpa gap akan terdeteksi sebagai overlap.</p>
+<p>Untuk menawarkan konsistensi display: UI menampilkan jam <code>[starts_at + buffer, ends_at − buffer)</code> (jam sesi saja). Reservation internal mencakup buffer.</p>
+<h4 id="mengapa-30-menit-bukan-15-atau-60">Mengapa 30 menit, bukan 15 atau 60?</h4>
+<ul>
+<li><strong>15 menit</strong>: grid 15-menit × sesi 60-menit = 4 slot dasar. Dengan TransitionBuffer 15-menit di kedua sisi, satu sesi membutuhkan 6 slot (08:00 sesi → reservation 08:45–10:15 jika grid 15-menit starting 00:00). Granularitas ini menghasilkan banyak kandidat yang harus di-filter saat generation, dan banyak kombinasi overlap yang harus di-check saat hold.</li>
+<li><strong>30 menit</strong>: grid 30-menit × sesi 60-menit = 2 slot dasar. Dengan TransitionBuffer 15-menit di kedua sisi, satu sesi membutuhkan 3 slot (08:00 sesi → reservation 08:45–10:15 mencakup slot 08:30–09:00, 09:00–09:30, 09:30–10:00). Manageable.</li>
+<li><strong>60 menit</strong>: grid 60-menit tidak menyisakan ruang untuk buffer atau sesi adjacent. Tidak implementable untuk 15-menit buffer.</li>
+</ul>
+<p>30 menit adalah pilihan yang balance antara granularity operasional (psikolog tidak di-block dari slot adjacent legitimate) dan kemampuan teknis (constraint check pada 3-slot block per sesi).</p>
+<h4 id="mengapa-app-level-db-constraint-bukan-salah-satu-saja">Mengapa app-level + DB constraint, bukan salah satu saja?</h4>
+<ul>
+<li><strong>DB constraint only</strong>: error dari DB constraint tidak ramah untuk UI; transaction sudah terjadi dan rollback overhead tidak perlu; tidak ada actionable message untuk klien.</li>
+<li><strong>App-level only</strong>: race condition antara dua <code>CreateSlotHold</code> concurrent untuk slot overlap dapat lolos karena TOCTOU. Pada Postgres, <code>SELECT ... FOR UPDATE</code> di dalam transaction memberikan serialization point; pada D1 (SQLite), transaksi serial per database membuat race tetap mungkin tanpa explicit constraint.</li>
+<li><strong>Both</strong>: app-level precheck dengan <code>SELECT ... FOR UPDATE</code> (Postgres) atau transactional read (D1) menolak hold kedua sebelum DB write; DB constraint sebagai hard guarantee untuk race yang lolos dari app-level (misal cross-process, cross-worker). Best practice untuk capacity-critical systems.</li>
+</ul>
+<h2 id="decision">Decision</h2>
+<h3 id="1-granularitas-candidate-slot-30-menit">1. Granularitas candidate slot: <strong>30 menit</strong></h3>
+<ul>
+<li><code>AvailabilitySlot</code> di-generate pada grid 30-menit, anchored ke jam <code>:00</code> atau <code>:30</code> di timezone <code>Asia/Jakarta</code>.</li>
+<li>Sesi 60-menit occupying 2 slot berurutan. TransitionBuffer 15-menit occupying 0 atau 1 slot tambahan di tiap sisi, tergantung alignment grid.</li>
+<li><code>starts_at</code> slot adalah inclusive (mis. <code>08:00:00</code>, <code>08:30:00</code>). <code>ends_at</code> adalah exclusive.</li>
+<li>Slot yang tidak valid (mis. psikolog tidak available pada Sabtu) tetap di-generate tetapi di-mark <code>withdrawn</code>/<code>unavailable</code> per <code>ADR 0061</code>.</li>
+</ul>
+<h3 id="2-capacity-uniqueness-model-capacityreservation-table-dengan-canonical-overlap-detection">2. Capacity uniqueness model: <strong><code>CapacityReservation</code> table</strong> dengan canonical overlap detection</h3>
+<p>Model final:</p>
+<pre><code>CapacityReservation(
+  id                     uuid PRIMARY KEY,
+  psychologist_id        uuid NOT NULL,
+  booking_id             uuid,                 -- NULL jika bukan dari Booking
+  appointment_id         uuid,                 -- NULL jika bukan confirmed Appointment
+  reservation_kind       enum NOT NULL,        -- 'hold' | 'confirmed'
+  state                  enum NOT NULL,        -- 'hold_active' | 'confirmed' | 'released' | 'cancelled' | 'expired'
+  starts_at              timestamptz NOT NULL, -- = session_start_at (UI-displayed)
+  ends_at                timestamptz NOT NULL, -- = session_end_at (UI-displayed)
+  buffer_minutes         int  NOT NULL,        -- snapshot from ServiceOffering
+  created_at             timestamptz NOT NULL,
+  released_at            timestamptz,
+  release_reason         enum,                 -- 'hold_expired' | 'booking_cancelled' | 'appointment_cancelled' | 'admin_override'
+  version                int  NOT NULL DEFAULT 1
+)
+</code></pre>
+<p>Canonical overlap detection: untuk satu <code>psychologist_id</code>, dua <code>CapacityReservation</code> dengan <code>state ∈ {hold_active, confirmed}</code> overlap jika interval <code>starts_at .. ends_at + (2 × buffer_minutes)</code> mereka overlap (Postgres: <code>tstzrange(starts_at, ends_at + (buffer_minutes || ' minutes')::interval, '[)')</code>; D1/SQLite: explicit <code>WHERE</code> clause atau trigger-based check).</p>
+<p>Decision: gunakan <strong>app-level precheck + DB constraint</strong>, dengan DB constraint sebagai hard guarantee. Pada Postgres, ini adalah <code>EXCLUDE USING GIST</code>; pada D1/SQLite, ini adalah trigger <code>BEFORE INSERT/UPDATE</code> yang menolak overlap.</p>
+<h3 id="3-transitionbuffer-placement-simetris-mengelilingi-appointment">3. TransitionBuffer placement: <strong>simetris mengelilingi appointment</strong></h3>
+<ul>
+<li>Reservation interval efektif untuk overlap detection: <code>[starts_at, ends_at + (2 × buffer_minutes))</code>.</li>
+<li>UI menampilkan <code>[starts_at, ends_at)</code> saja (jam sesi).</li>
+<li>Definisi operasional: "tidak ada dua reservation untuk psikolog yang sama yang claim waktu preparation/transition/transit yang sama."</li>
+<li>Per-offering buffer di-snapshot pada <code>CapacityReservation.buffer_minutes</code> mengikuti <code>OfferSnapshot</code> per <code>ADR 0042</code>.</li>
+</ul>
+<h3 id="4-concurrency-enforcement-app-level-db-constraint">4. Concurrency enforcement: <strong>app-level + DB constraint</strong></h3>
+<ul>
+<li><strong>App-level precheck</strong> di dalam transaction: query existing <code>CapacityReservation</code> untuk <code>psychologist_id</code> dengan <code>state ∈ {hold_active, confirmed}</code> yang overlap dengan interval efektif baru. Jika ditemukan, return typed failure <code>capacity_overlap</code>.</li>
+<li><strong>DB constraint</strong>:</li>
+<li>Postgres: <code>EXCLUDE USING GIST (psychologist_id WITH =, tstzrange(starts_at, ends_at + (buffer_minutes || ' minutes')::interval * 2, '[)') WITH &amp;&amp;) WHERE (state IN ('hold_active', 'confirmed'))</code>.</li>
+<li>D1/SQLite: <code>CREATE TRIGGER capacity_reservation_no_overlap BEFORE INSERT ON capacity_reservation ...</code> yang melakukan explicit overlap check pada row existing.</li>
+</ul>
+<h3 id="5-definisi-no-overlap-di-level-psikolog-waktu">5. Definisi "no overlap" di level psikolog + waktu</h3>
+<p>Invariant: untuk satu <code>psychologist_id</code>, tidak ada dua <code>CapacityReservation</code> dengan <code>state ∈ {hold_active, confirmed}</code> yang memiliki <code>effective_range = [starts_at, ends_at + 2 × buffer_minutes)</code> overlap. <code>effective_range</code> overlap terdeteksi via <code>range_overlap(a, b) = a.lower &lt; b.upper AND b.lower &lt; a.upper</code>.</p>
+<p>Definisi ini berlaku untuk semua kombinasi:</p>
+<ul>
+<li><code>hold_active</code> vs <code>hold_active</code>: di-reject jika overlap. Atomic claim.</li>
+<li><code>hold_active</code> vs <code>confirmed</code>: di-reject jika overlap. Hold kedua gagal.</li>
+<li><code>confirmed</code> vs <code>confirmed</code>: di-reject jika overlap. Appointment kedua gagal.</li>
+<li><code>confirmed</code> vs <code>released/expired/cancelled</code>: allowed (history tidak memblokir).</li>
+<li>Reservation dengan <code>psychologist_id</code> berbeda: allowed (psikolog berbeda tidak conflict).</li>
+</ul>
+<h3 id="6-migration-schema-postgres-family-d1sqlite-equivalent-di-7">6. Migration schema (Postgres family — D1/SQLite equivalent di §7)</h3>
+<pre><code class="language-sql">-- 0091_capacity_reservation.sql
+
+CREATE TYPE capacity_reservation_kind AS ENUM ('hold', 'confirmed');
+CREATE TYPE capacity_reservation_state AS ENUM (
+  'hold_active', 'confirmed', 'released', 'cancelled', 'expired'
+);
+CREATE TYPE capacity_reservation_release_reason AS ENUM (
+  'hold_expired', 'booking_cancelled', 'appointment_cancelled', 'admin_override'
+);
+
+CREATE TABLE capacity_reservation (
+  id                  uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  psychologist_id     uuid NOT NULL REFERENCES psychologist_profile(id),
+  booking_id          uuid REFERENCES booking(id),
+  appointment_id      uuid REFERENCES appointment(id),
+  reservation_kind    capacity_reservation_kind NOT NULL,
+  state               capacity_reservation_state NOT NULL,
+  starts_at           timestamptz NOT NULL,
+  ends_at             timestamptz NOT NULL,
+  buffer_minutes      int NOT NULL CHECK (buffer_minutes &gt;= 0),
+  created_at          timestamptz NOT NULL DEFAULT now(),
+  released_at         timestamptz,
+  release_reason      capacity_reservation_release_reason,
+  version             int NOT NULL DEFAULT 1,
+  CONSTRAINT capacity_reservation_time_order CHECK (ends_at &gt; starts_at),
+  CONSTRAINT capacity_reservation_booking_or_appointment
+    CHECK (
+      (reservation_kind = 'hold'      AND booking_id IS NOT NULL AND appointment_id IS NULL) OR
+      (reservation_kind = 'confirmed' AND appointment_id IS NOT NULL)
+    )
+);
+
+CREATE INDEX capacity_reservation_psychologist_state_idx
+  ON capacity_reservation (psychologist_id, state);
+
+-- Hard guarantee: no two active/confirmed reservations overlap per psychologist.
+-- effective_range = [starts_at, ends_at + 2*buffer). Implemented via tstzrange exclusion.
+ALTER TABLE capacity_reservation
+  ADD CONSTRAINT capacity_reservation_no_overlap
+  EXCLUDE USING GIST (
+    psychologist_id WITH =,
+    tstzrange(
+      starts_at,
+      ends_at + make_interval(mins =&gt; buffer_minutes * 2),
+      '[)'
+    ) WITH &amp;&amp;
+  )
+  WHERE (state IN ('hold_active', 'confirmed'));
+
+-- Append-only history: state transitions are UPDATE only, never DELETE.
+-- Audit trail is maintained via AuditRecord per IMPLEMENTATION-GUIDE.md §11.
+</code></pre>
+<p>D1/SQLite equivalent §7 menggunakan trigger untuk replicate <code>EXCLUDE</code> constraint.</p>
+<h3 id="7-d1sqlite-equivalent">7. D1/SQLite equivalent</h3>
+<pre><code class="language-sql">-- 0091_capacity_reservation.sql (D1/SQLite)
+
+CREATE TABLE capacity_reservation (
+  id                  TEXT PRIMARY KEY,
+  psychologist_id     TEXT NOT NULL REFERENCES psychologist_profile(id),
+  booking_id          TEXT REFERENCES booking(id),
+  appointment_id      TEXT REFERENCES appointment(id),
+  reservation_kind    TEXT NOT NULL CHECK (reservation_kind IN ('hold', 'confirmed')),
+  state               TEXT NOT NULL CHECK (state IN ('hold_active', 'confirmed', 'released', 'cancelled', 'expired')),
+  starts_at           TEXT NOT NULL,  -- ISO 8601 timestamptz
+  ends_at             TEXT NOT NULL,
+  buffer_minutes      INTEGER NOT NULL CHECK (buffer_minutes &gt;= 0),
+  created_at          TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+  released_at         TEXT,
+  release_reason      TEXT CHECK (release_reason IN ('hold_expired', 'booking_cancelled', 'appointment_cancelled', 'admin_override') OR release_reason IS NULL),
+  version             INTEGER NOT NULL DEFAULT 1,
+  CHECK (ends_at &gt; starts_at),
+  CHECK (
+    (reservation_kind = 'hold'      AND booking_id IS NOT NULL AND appointment_id IS NULL) OR
+    (reservation_kind = 'confirmed' AND appointment_id IS NOT NULL)
+  )
+);
+
+CREATE INDEX capacity_reservation_psychologist_state_idx
+  ON capacity_reservation (psychologist_id, state);
+
+-- Trigger-based overlap check: reject INSERT/UPDATE if any active/confirmed row overlaps.
+-- Overlap definition: a.starts_at &lt; b.effective_end AND b.starts_at &lt; a.effective_end
+-- effective_end = ends_at + (2 * buffer_minutes * 60 seconds)
+CREATE TRIGGER capacity_reservation_no_overlap_insert
+BEFORE INSERT ON capacity_reservation
+WHEN NEW.state IN ('hold_active', 'confirmed')
+BEGIN
+  SELECT RAISE(ABORT, 'capacity_overlap')
+  WHERE EXISTS (
+    SELECT 1 FROM capacity_reservation existing
+    WHERE existing.psychologist_id = NEW.psychologist_id
+      AND existing.state IN ('hold_active', 'confirmed')
+      AND existing.id != NEW.id
+      AND datetime(existing.starts_at) &lt; datetime(NEW.ends_at, '+' || (NEW.buffer_minutes * 2) || ' minutes')
+      AND datetime(NEW.starts_at) &lt; datetime(existing.ends_at, '+' || (existing.buffer_minutes * 2) || ' minutes')
+  );
+END;
+
+CREATE TRIGGER capacity_reservation_no_overlap_update
+BEFORE UPDATE ON capacity_reservation
+WHEN NEW.state IN ('hold_active', 'confirmed')
+BEGIN
+  SELECT RAISE(ABORT, 'capacity_overlap')
+  WHERE EXISTS (
+    SELECT 1 FROM capacity_reservation existing
+    WHERE existing.psychologist_id = NEW.psychologist_id
+      AND existing.state IN ('hold_active', 'confirmed')
+      AND existing.id != NEW.id
+      AND datetime(existing.starts_at) &lt; datetime(NEW.ends_at, '+' || (NEW.buffer_minutes * 2) || ' minutes')
+      AND datetime(NEW.starts_at) &lt; datetime(existing.ends_at, '+' || (existing.buffer_minutes * 2) || ' minutes')
+  );
+END;
+</code></pre>
+<p>D1/SQLite tidak mendukung <code>EXCLUDE USING GIST</code>; trigger memberikan equivalent enforcement dengan overhead per-insert/update. Untuk scale MVP (ratusan reservation per psikolog per minggu), overhead acceptable.</p>
+<h3 id="8-aggregate-entity-mapping">8. Aggregate &amp; entity mapping</h3>
+<table>
+<thead>
+<tr>
+<th>Existing entity</th>
+<th>Behaviour change</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>AvailabilitySlot</code></td>
+<td>Tetap: representasi kandidat bookable capacity. Tidak ada reservation state.</td>
+</tr>
+<tr>
+<td><code>SlotHold</code></td>
+<td>Tetap: state hold + TTL. Saat <code>CreateSlotHold</code> sukses, <strong>juga</strong> insert <code>CapacityReservation</code> (<code>reservation_kind = 'hold'</code>, <code>state = 'hold_active'</code>). Saat <code>ExpireSlotHold</code> atau hold release, update <code>CapacityReservation.state</code> ke <code>released</code>/<code>expired</code>.</td>
+</tr>
+<tr>
+<td><code>Appointment</code></td>
+<td>Tetap: appointment record. Saat <code>confirmed</code>, <strong>juga</strong> insert <code>CapacityReservation</code> (<code>reservation_kind = 'confirmed'</code>). Saat <code>cancelled</code>/<code>rescheduled</code>/<code>no_show</code> final, update reservation state.</td>
+</tr>
+<tr>
+<td><code>Booking</code></td>
+<td>Tetap. Tidak ada perubahan.</td>
+</tr>
+<tr>
+<td><code>OfferSnapshot</code></td>
+<td>Tetap: snapshot <code>buffer_minutes</code> saat <code>CreateSlotHold</code>/<code>CreateBooking</code>.</td>
+</tr>
+<tr>
+<td><code>AuditRecord</code></td>
+<td>Tetap: audit setiap transition <code>CapacityReservation.state</code>.</td>
+</tr>
+</tbody>
+</table>
+<h3 id="9-command-changes">9. Command changes</h3>
+<p>Tidak ada command baru. Perubahan pada command existing:</p>
+<ul>
+<li><strong><code>CreateSlotHold</code></strong>: tambah step atomic — setelah <code>AvailabilitySlot</code> validation, insert <code>CapacityReservation</code> (<code>reservation_kind = 'hold'</code>, <code>state = 'hold_active'</code>, <code>starts_at = slot.starts_at</code>, <code>ends_at = slot.ends_at</code>, <code>buffer_minutes = offer_snapshot.buffer_minutes</code>). Jika constraint menolak, return typed failure <code>capacity_overlap</code> dan rollback seluruh transaction.</li>
+<li><strong><code>ExpireSlotHold</code></strong> dan <strong><code>ApplyVerifiedPaymentEvent</code></strong> (failure path): update <code>CapacityReservation.state</code> ke <code>released</code>/<code>expired</code>/<code>cancelled</code> dalam transaction yang sama.</li>
+<li><strong><code>ApplyVerifiedPaymentEvent</code></strong> (success path): update <code>CapacityReservation.state</code> dari <code>hold_active</code> ke ... sebenarnya, reservation untuk confirmed Appointment adalah <strong>row berbeda</strong> dengan <code>reservation_kind = 'confirmed'</code> dan FK ke <code>Appointment</code>. Hold reservation di-mark <code>released</code> (<code>release_reason = 'booking_cancelled'</code>) dan confirmed reservation di-insert dengan <code>appointment_id</code> baru. Dua transaction ini atomic.</li>
+<li><strong><code>DecideCancellation</code></strong> (approve path): update <code>CapacityReservation.state</code> ke <code>cancelled</code> (<code>release_reason = 'appointment_cancelled'</code>) untuk semua reservation terkait.</li>
+<li><strong><code>RescheduleAction</code></strong>: original <code>CapacityReservation</code> di-mark <code>cancelled</code>; replacement <code>Appointment</code> membuat <code>CapacityReservation</code> baru dengan overlap check yang sama.</li>
+</ul>
+<h3 id="10-acceptance-criteria-test-scenarios">10. Acceptance criteria (test scenarios)</h3>
+<ol>
+<li><strong>Single-psychologist single-offering happy path</strong>: psikolog Fuja, sesi 09:00–10:00, slot A. <code>CreateSlotHold</code> → <code>CapacityReservation</code> row 1 (<code>hold_active</code>). <code>ApplyVerifiedPaymentEvent</code> → reservation 1 released, reservation 2 (<code>confirmed</code>) inserted. No overlap detected.</li>
+<li><strong>Same-psychologist different-offering overlap</strong> (P1-02 evidence): psikolog Fuja, dua klien hold slot 09:00–10:00 dari offering berbeda (<code>online_individual</code> dan <code>online_couple_A</code>). <code>CreateSlotHold</code> kedua gagal dengan <code>capacity_overlap</code>. Reservation kedua tidak ada di DB.</li>
+<li><strong>Same-psychologist different-offering adjacent (legitimate)</strong>: psikolog Fuja, sesi 09:00–10:00 + sesi 10:30–11:30. Buffer 15 menit di kedua sisi = reservation efektif 08:45–10:15 dan 10:15–11:45. Boundary test: 10:15 == 10:15 (exclusive ends_at) → tidak overlap → allowed.</li>
+<li><strong>Same-psychologist different-offering near-overlap (rejected)</strong>: psikolog Fuja, sesi 09:00–10:00 + sesi 10:15–11:15. Reservation efektif 08:45–10:15 dan 10:00–11:30. Overlap detected pada 10:00–10:15 → rejected.</li>
+<li><strong>Cross-psychologist same-time</strong>: psikolog A sesi 09:00–10:00, psikolog B sesi 09:00–10:00. Tidak ada overlap pada <code>psychologist_id</code>. Allowed.</li>
+<li><strong>Race condition</strong>: dua <code>CreateSlotHold</code> concurrent untuk slot overlap pada psikolog yang sama. Satu sukses, satu reject. DB constraint sebagai backstop.</li>
+<li><strong>Late-payment reacquisition</strong>: hold expired (<code>released</code>), verified PaymentEvent arrives, <code>ApplyVerifiedPaymentEvent</code> attempt atomic claim untuk slot asli → jika masih free, reservation <code>confirmed</code> baru inserted → Appointment confirmed. Jika overlap dengan appointment baru di-held/dikonfirmasi orang lain → paid_late path (<code>ADR 0059</code>).</li>
+<li><strong>Cancellation release</strong>: <code>DecideCancellation</code> approve → reservation di-mark <code>cancelled</code>, eligible slot <code>AvailabilitySlot</code> tidak auto-<code>available</code> sampai ada <code>RegenerateFutureAvailability</code> atau sampai <code>ends_at &lt; now()</code>.</li>
+<li><strong>Couple package</strong>: 3 appointment (A, B, joint) untuk psikolog Fuja. Masing-masing punya <code>CapacityReservation</code> <code>confirmed</code>. Tidak overlap di antara ketiganya (jadwal A, B, joint terpisah per hari atau per minggu).</li>
+<li><strong>Per-offering buffer override</strong>: offering A buffer 15 menit, offering B buffer 30 menit. Dua sesi adjacent 09:00–10:00 dan 10:00–11:00 dengan offering berbeda. Reservation efektif A = 08:45–10:15, B = 09:30–11:30. Overlap 09:30–10:15 → rejected.</li>
+</ol>
+<h2 id="consequences">Consequences</h2>
+<p>Positive:</p>
+<ul>
+<li>Overlap detection atomic di level DB; tidak ada race condition lolos;</li>
+<li>Granularitas 30-menit membiarkan psikolog mengelola slot adjacent dengan presisi;</li>
+<li>TransitionBuffer simetris melindungi psikolog dari sesi back-to-back tanpa transisi;</li>
+<li><code>CapacityReservation</code> terpisah dari <code>AvailabilitySlot</code> memungkinkan regenerasi slot tanpa kehilangan claim state;</li>
+<li>Per-offering buffer snapshot pada reservation mempertahankan historical semantics;</li>
+<li>Couple package (<code>ADR 0090</code>) kompatibel tanpa perubahan model participant;</li>
+<li>Late-payment (<code>ADR 0059</code>), cancellation (<code>ADR 0025</code>/<code>0051</code>), dan reschedule (<code>ADR 0011</code>/<code>0039</code>) menggunakan atomic claim yang sama.</li>
+</ul>
+<p>Costs and constraints:</p>
+<ul>
+<li>Tambah satu tabel <code>capacity_reservation</code>; migration overhead;</li>
+<li>App-level precheck + DB constraint = dua lapis enforcement; developer wajib paham keduanya;</li>
+<li>Trigger-based enforcement di D1/SQLite menambah per-insert/update overhead (acceptable untuk MVP scale);</li>
+<li>30-menit granularity membatasi fleksibilitas psikolog yang ingin 15-menit prep session — di luar MVP scope;</li>
+<li>Buffer simetris berarti total "waktu yang di-block" per sesi = 60 + 30 = 90 menit (untuk default 15-menit buffer); availability arithmetic harus menghitung ini;</li>
+<li>Couple package dengan tiga appointment 60-menit occupying 4.5 jam total waktu psikolog per package; perlu visibility di Admin workspace.</li>
+</ul>
+<h2 id="open-follow-up">Open follow-up</h2>
+<ul>
+<li>Tutup <code>TBC-STACK-01</code> (Worker + D1 vs Supabase + Postgres) sebelum migration dieksekusi. DDL Postgres di §6 dan DDL D1/SQLite di §7 keduanya valid; pilih satu saat stack diputuskan.</li>
+<li>Performance test pada trigger-based overlap check di D1 untuk ratusan reservation per psikolog per minggu.</li>
+<li>Admin UI menampilkan effective reservation interval (start − buffer .. end + buffer) atau hanya sesi interval; rekomendasi: tampilkan sesi interval untuk klien-facing, reservation interval untuk Admin/psychologist-facing.</li>
+<li>Future-proof: jika offering baru membutuhkan duration ≠ 60 menit atau buffer ≠ 15 menit, model sudah accommodate via <code>buffer_minutes</code> per reservation dan <code>ends_at - starts_at</code> per slot generation.</li>
+<li><code>RegenerateFutureAvailability</code> (<code>ADR 0061</code>) hanya mengurus <code>AvailabilitySlot</code>; tidak menyentuh <code>CapacityReservation</code> (yang diurus oleh <code>CreateSlotHold</code>/<code>ApplyVerifiedPaymentEvent</code>/<code>DecideCancellation</code>).</li>
+</ul>
+<h2 id="reference">Reference</h2>
+<ul>
+<li><code>ADR 0013-offering-specific-slots.md</code> — offering-specific slots, keputusan overlap</li>
+<li><code>ADR 0041-transition-buffer.md</code> — 15-menit default buffer, snapshot semantics</li>
+<li><code>ADR 0043-service-offering-overrides.md</code> — per-offering buffer override</li>
+<li><code>ADR 0014-ten-minute-slot-hold.md</code> — SlotHold TTL 10 menit</li>
+<li><code>ADR 0040-90-day-booking-horizon.md</code> — rolling horizon</li>
+<li><code>ADR 0061-future-slot-regeneration.md</code> — regeneration boundaries</li>
+<li><code>ADR 0042-offering-snapshot-at-intent.md</code> — OfferSnapshot</li>
+<li><code>ADR 0059-late-payment-reconciliation.md</code> — late payment reacquisition</li>
+<li><code>ADR 0090-couple-participant-model.md</code> — couple package compatibility</li>
+<li><code>IMPLEMENTATION-GUIDE.md</code> §6.5, §8.2 — patched alongside this ADR</li>
+<li><code>DOMAIN-MODEL.md</code> — patched alongside this ADR</li>
+<li><code>PRD-GUIDELINE-REVIEW.md</code> Round 1 P1-02, TBC register TBC-CAPACITY-01 + TBC-BUFFER-01 — closed by this ADR</li>
+</ul>
+</main>
+<footer class="site">
+<p><a href="../index.html">Index</a> · <a href="../adr/index.html">All ADR</a> · <a href="../baseline/index.html">Baseline docs</a></p>
+<p>Generated from <code>/home/jar/output/psychology-research/seraya-psikologi-domain/</code> · Round 6 closure · 2026-08-31</p>
+</footer>
+</body>
+</html>

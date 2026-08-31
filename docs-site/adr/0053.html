@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ADR 0053 · Use 24-hour and 2-hour Appointment Reminders — Seraya Psikologi Docs</title>
+<link rel="stylesheet" href="../assets/main.css">
+</head>
+<body>
+<header class="site">
+<h1>Seraya Psikologi — Documentation</h1>
+<p class="lede">Booking and payment MVP · Implementation baseline · 96 ADR</p>
+</header>
+<nav class="crumbs"><a href="../index.html">Home</a> › ADR 0053 · Use 24-hour and 2-hour Appointment Reminders</nav>
+<main>
+<h1 id="53-use-24-hour-and-2-hour-appointment-reminders">53. Use 24-hour and 2-hour Appointment Reminders</h1>
+<h2 id="status">Status</h2>
+<p>Accepted for the MVP working model; exact opt-out, quiet hours, and provider failure behavior remain open.</p>
+<h2 id="context">Context</h2>
+<p>A single reminder may be missed; too many reminders add noise. The practice uses Asia/Jakarta operational time and needs predictable behavior when an Appointment is rescheduled or cancelled.</p>
+<h2 id="decision">Decision</h2>
+<p>Schedule two transactional email reminders by default:</p>
+<ul>
+<li>24 hours before Appointment start;</li>
+<li>2 hours before Appointment start.</li>
+</ul>
+<p>Offsets are configurable by Admin within the notification policy. ReminderSchedule computes them from the Appointment's canonical instant and renders Asia/Jakarta local date/time. Reschedule/cancellation/terminal outcome cancels stale reminders and creates new ones where applicable. Each send has an idempotency key so retries cannot duplicate a reminder.</p>
+<h2 id="consequences">Consequences</h2>
+<p>Positive:</p>
+<ul>
+<li>predictable minimal reminder cadence;</li>
+<li>local-time copy matches operational schedule;</li>
+<li>reschedule behavior is explicit;</li>
+<li>duplicate delivery is preventable.</li>
+</ul>
+<p>Costs and constraints:</p>
+<ul>
+<li>appointments created inside an offset may skip one reminder;</li>
+<li>scheduler clock/timezone tests are required;</li>
+<li>email failure/manual support path remains necessary;</li>
+<li>quiet hours and client preferences need policy.</li>
+</ul>
+<h2 id="open-follow-up">Open follow-up</h2>
+<p>Define package-expiry offsets, notification opt-out/mandatory rules, quiet hours, and late-created appointment behavior.</p>
+</main>
+<footer class="site">
+<p><a href="../index.html">Index</a> · <a href="../adr/index.html">All ADR</a> · <a href="../baseline/index.html">Baseline docs</a></p>
+<p>Generated from <code>/home/jar/output/psychology-research/seraya-psikologi-domain/</code> · Round 6 closure · 2026-08-31</p>
+</footer>
+</body>
+</html>

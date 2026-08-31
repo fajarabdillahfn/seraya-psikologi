@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ADR 0022 · Settle Packages with Full Upfront Payment — Seraya Psikologi Docs</title>
+<link rel="stylesheet" href="../assets/main.css">
+</head>
+<body>
+<header class="site">
+<h1>Seraya Psikologi — Documentation</h1>
+<p class="lede">Booking and payment MVP · Implementation baseline · 96 ADR</p>
+</header>
+<nav class="crumbs"><a href="../index.html">Home</a> › ADR 0022 · Settle Packages with Full Upfront Payment</nav>
+<main>
+<h1 id="22-settle-packages-with-full-upfront-payment">22. Settle Packages with Full Upfront Payment</h1>
+<h2 id="status">Status</h2>
+<p>Accepted for the MVP working model; gateway limits, refund/credit rules, and admin exceptions remain open.</p>
+<h2 id="context">Context</h2>
+<p>A package creates multiple future session entitlements. Pay-per-session or installments would require payment schedules, partial access, failed installment states, and more complex refund/expiry accounting before the basic package flow is proven.</p>
+<h2 id="decision">Decision</h2>
+<p>A ServicePackage is paid in full upfront through one PackagePayment. Verified payment success confirms the package Booking, creates the full SessionEntitlement set, and confirms the first Appointment selected at checkout. Later scheduling or consumption of remaining entitlements does not create a new payment in MVP.</p>
+<h2 id="consequences">Consequences</h2>
+<p>Positive:</p>
+<ul>
+<li>entitlement count is known immediately;</li>
+<li>package access and expiry are easier to reason about;</li>
+<li>one payment lifecycle can be reconciled against the package;</li>
+<li>later session scheduling stays separate from financial retries.</li>
+</ul>
+<p>Costs and constraints:</p>
+<ul>
+<li>refunds/credits must account for used and unused units;</li>
+<li>full upfront payment increases commitment and must be explained clearly;</li>
+<li>gateway amount limits and payment expiry still need checks;</li>
+<li>an admin exception for payment correction must be audited.</li>
+</ul>
+<h2 id="open-follow-up">Open follow-up</h2>
+<p>Define package price display, gateway amount/settlement behavior, launch full/no-refund/credit policy, late payment handling, and whether an Admin can grant extra entitlement without payment. Partial monetary refunds are deferred beyond launch.</p>
+</main>
+<footer class="site">
+<p><a href="../index.html">Index</a> · <a href="../adr/index.html">All ADR</a> · <a href="../baseline/index.html">Baseline docs</a></p>
+<p>Generated from <code>/home/jar/output/psychology-research/seraya-psikologi-domain/</code> · Round 6 closure · 2026-08-31</p>
+</footer>
+</body>
+</html>

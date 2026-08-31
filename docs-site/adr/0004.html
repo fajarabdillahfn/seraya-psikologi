@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ADR 0004 · Model Availability as Rules, Exceptions, and Concrete Slots — Seraya Psikologi Docs</title>
+<link rel="stylesheet" href="../assets/main.css">
+</head>
+<body>
+<header class="site">
+<h1>Seraya Psikologi — Documentation</h1>
+<p class="lede">Booking and payment MVP · Implementation baseline · 96 ADR</p>
+</header>
+<nav class="crumbs"><a href="../index.html">Home</a> › ADR 0004 · Model Availability as Rules, Exceptions, and Concrete Slots</nav>
+<main>
+<h1 id="4-model-availability-as-rules-exceptions-and-concrete-slots">4. Model Availability as Rules, Exceptions, and Concrete Slots</h1>
+<h2 id="status">Status</h2>
+<p>Accepted for the MVP working model; psychologist-specific offering slots, 90-day generation horizon, 15-minute default buffer, published-only exposure, exception precedence, and unheld/held/booked regeneration boundaries are resolved by ADR 0013/0040/0041/0044/0061. Scheduler trigger/backfill and active-hold invalid-source resolution remain open.</p>
+<h2 id="context">Context</h2>
+<p>The platform needs to publish bookable availability for five psychologists while supporting recurring schedules, leave, holidays, one-off changes, temporary slot holds, and concurrency. A single JSON availability blob would obscure lifecycle and make date-specific changes difficult to audit.</p>
+<p>External calendar synchronization is not the MVP source of truth.</p>
+<h2 id="decision">Decision</h2>
+<p>Use three layers:</p>
+<ul>
+<li><strong>AvailabilityRule</strong> stores recurring weekly schedule patterns.</li>
+<li><strong>AvailabilityException</strong> stores date-specific additions, changes, or blocks.</li>
+<li><strong>AvailabilitySlot</strong> is the concrete bookable capacity generated from the effective schedule for a finite horizon.</li>
+</ul>
+<p>Booking and concurrency operate on AvailabilitySlot, not directly on rules. The generation horizon is 90 days by default, the transition buffer defaults to 15 minutes, slots belong to one ServiceOffering, and only published offerings expose new slots. AvailabilityException overrides AvailabilityRule for the same date/range; ADR 0061 governs regeneration and preservation of unheld, held, and Appointment-linked slots.</p>
+<h2 id="consequences">Consequences</h2>
+<p>Positive:</p>
+<ul>
+<li>recurring schedules do not need to be re-entered every week;</li>
+<li>leave and one-off changes have a first-class place;</li>
+<li>slot holds and claims can be tracked independently from schedule intent;</li>
+<li>generation can be rerun for future dates without rewriting historical appointments.</li>
+</ul>
+<p>Costs and constraints:</p>
+<ul>
+<li>generated slots need a regeneration/update policy;</li>
+<li>changes to rules must not silently alter already confirmed appointments;</li>
+<li>overlap, timezone, DST, and boundary semantics need explicit tests;</li>
+<li>the system needs an owner/runbook for generation failures.</li>
+</ul>
+<h2 id="open-follow-up">Open follow-up</h2>
+<p>Define scheduler trigger/backfill cadence and Admin resolution when an active hold's source becomes invalid. Rule/exception precedence and future-slot preservation/withdrawal are resolved by ADR 0061.</p>
+</main>
+<footer class="site">
+<p><a href="../index.html">Index</a> · <a href="../adr/index.html">All ADR</a> · <a href="../baseline/index.html">Baseline docs</a></p>
+<p>Generated from <code>/home/jar/output/psychology-research/seraya-psikologi-domain/</code> · Round 6 closure · 2026-08-31</p>
+</footer>
+</body>
+</html>

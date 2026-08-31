@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ADR 0071 · Launch Counseling Before Psychological Assessment — Seraya Psikologi Docs</title>
+<link rel="stylesheet" href="../assets/main.css">
+</head>
+<body>
+<header class="site">
+<h1>Seraya Psikologi — Documentation</h1>
+<p class="lede">Booking and payment MVP · Implementation baseline · 96 ADR</p>
+</header>
+<nav class="crumbs"><a href="../index.html">Home</a> › ADR 0071 · Launch Counseling Before Psychological Assessment</nav>
+<main>
+<h1 id="71-launch-counseling-before-psychological-assessment">71. Launch Counseling Before Psychological Assessment</h1>
+<h2 id="status">Status</h2>
+<p>Accepted for launch planning.</p>
+<h2 id="context">Context</h2>
+<p>SERAYA PULANG is the only bookable launch program. Its initial brief includes both counseling and psychological assessment, but the team wants to reduce launch scope and operational complexity.</p>
+<h2 id="decision">Decision</h2>
+<p>Launch SERAYA PULANG with <strong>psychological counseling</strong> as the initial paid ServiceOffering scope. <strong>Psychological assessment is deferred beyond launch</strong> and must not appear as an active bookable/purchasable ServiceOffering until its assessment type, instrument/process, professional responsibility, result delivery, consent, retention, and operational workflow are explicitly designed and approved.</p>
+<p>Counseling remains subject to the existing boundary: the MVP stores booking/payment/appointment operations only and does not store clinical notes, diagnosis, assessment results, or session records.</p>
+<h2 id="consequences">Consequences</h2>
+<p>Positive:</p>
+<ul>
+<li>launch catalog and availability model focus on one service family;</li>
+<li>no premature assessment-result or instrument data boundary;</li>
+<li>simpler payment/refund, consent, and UAT scope.</li>
+</ul>
+<p>Costs and constraints:</p>
+<ul>
+<li>visitors may see assessment described as future capability rather than bookable service;</li>
+<li>future assessment launch requires a separate product/clinical-operational design pass;</li>
+<li>counseling's concrete mode, duration, price, psychologist assignment, and package options still need decisions.</li>
+</ul>
+<h2 id="open-follow-up">Open follow-up</h2>
+<p>Define the initial counseling offerings: online/offline mode, duration, price, psychologist assignment, availability, single-session/package options, intake/consent wording, and public scope. Keep psychological assessment out of active launch catalog.</p>
+</main>
+<footer class="site">
+<p><a href="../index.html">Index</a> · <a href="../adr/index.html">All ADR</a> · <a href="../baseline/index.html">Baseline docs</a></p>
+<p>Generated from <code>/home/jar/output/psychology-research/seraya-psikologi-domain/</code> · Round 6 closure · 2026-08-31</p>
+</footer>
+</body>
+</html>

@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ADR 0076 · Case-by-Case Cancellation Without Automatic Cutoff — Seraya Psikologi Docs</title>
+<link rel="stylesheet" href="../assets/main.css">
+</head>
+<body>
+<header class="site">
+<h1>Seraya Psikologi — Documentation</h1>
+<p class="lede">Booking and payment MVP · Implementation baseline · 96 ADR</p>
+</header>
+<nav class="crumbs"><a href="../index.html">Home</a> › ADR 0076 · Case-by-Case Cancellation Without Automatic Cutoff</nav>
+<main>
+<h1 id="76-case-by-case-cancellation-without-automatic-cutoff">76. Case-by-Case Cancellation Without Automatic Cutoff</h1>
+<h2 id="status">Status</h2>
+<p>Accepted for launch planning.</p>
+<h2 id="context">Context</h2>
+<p>Seraya needs to receive cancellation requests through manual support/Admin CMS, including requests that may arrive close to or after the scheduled time. A rigid automatic cutoff would turn an unapproved commercial policy into a hidden state transition and would not fit the agreed manual-support model.</p>
+<h2 id="decision">Decision</h2>
+<p>For launch, there is <strong>no automatic cancellation cutoff</strong> that automatically approves, denies, releases capacity, or determines a refund.</p>
+<ul>
+<li>A client may communicate a cancellation request through the supported manual channel; Admin records a minimal <code>CancellationRequest</code> in CMS.</li>
+<li>While pending, the Appointment remains confirmed and the slot remains reserved.</li>
+<li>Admin makes an append-only <code>CancellationDecision</code> case-by-case.</li>
+<li>Approval atomically applies the existing cancellation effects: cancel Appointment, release only an eligible reusable future slot, and restore a still-valid entitlement when applicable.</li>
+<li>Denial leaves Booking, Appointment, slot, entitlement, and Payment unchanged.</li>
+<li>Refund is never inferred from timing or cancellation approval. Any refund is a separate append-only <code>RefundAction</code> with its own amount/type, reason, status, actor, and gateway reconciliation.</li>
+<li>Past, in-progress, invalid, or non-reusable capacity is not reopened; the result is recorded.</li>
+</ul>
+<p>This policy does not grant client self-service cancellation or reschedule. It also does not automatically apply an entitlement-level/package refund formula; package refunds remain purchase-level Admin decisions under ADR 0063.</p>
+<h2 id="consequences">Consequences</h2>
+<p>Positive:</p>
+<ul>
+<li>supports the current WhatsApp/manual Admin workflow without inventing a mandatory SLA or cutoff;</li>
+<li>keeps cancellation, capacity, entitlement, and refund effects auditable and explicit;</li>
+<li>allows Admin to handle exceptional circumstances without mutating domain truth silently.</li>
+</ul>
+<p>Costs and constraints:</p>
+<ul>
+<li>clients need clear public wording that requests are reviewed, not automatically refundable;</li>
+<li>Admin needs a reason and decision record for every request;</li>
+<li>refund policy and approval authority still need a minimum vocabulary;</li>
+<li>support volume and consistency should be observed after launch.</li>
+</ul>
+<h2 id="source-of-truth-clarification-2026-08-31-round">Source-of-truth clarification (2026-08-31 round)</h2>
+<p>The business owner has confirmed the policy:</p>
+<ul>
+<li>The booking product does not expose cancellation or refund in the public website.</li>
+<li>All cancellation and refund requests go through Admin WhatsApp; Admin records a minimal <code>CancellationRequest</code> in the workspace.</li>
+<li>Launch refund outcomes are still <code>full_refund</code> or <code>no_refund</code> (ADR 0077); any tiered partial-refund copy in the PRD Non-Teknis <code>booking_policy</code> is admin-conversation context, not an automated calculation.</li>
+<li>Public-facing copy states: "Cancellation and refund are handled by Admin via WhatsApp; review is case-by-case."</li>
+<li>Third-party admin/transfer fees are internal Seraya costs, never debited to the client.</li>
+</ul>
+<h2 id="open-follow-up">Open follow-up</h2>
+<p>Define Admin reason categories used in the conversation log, gateway refund timing/retry/reconciliation, package credit/extension policy, and notification copy. Partial-refund product decision still requires a new ADR.</p>
+</main>
+<footer class="site">
+<p><a href="../index.html">Index</a> · <a href="../adr/index.html">All ADR</a> · <a href="../baseline/index.html">Baseline docs</a></p>
+<p>Generated from <code>/home/jar/output/psychology-research/seraya-psikologi-domain/</code> · Round 6 closure · 2026-08-31</p>
+</footer>
+</body>
+</html>

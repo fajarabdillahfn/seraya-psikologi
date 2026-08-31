@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ADR 0073 · Standard Counseling Session Duration — Seraya Psikologi Docs</title>
+<link rel="stylesheet" href="../assets/main.css">
+</head>
+<body>
+<header class="site">
+<h1>Seraya Psikologi — Documentation</h1>
+<p class="lede">Booking and payment MVP · Implementation baseline · 96 ADR</p>
+</header>
+<nav class="crumbs"><a href="../index.html">Home</a> › ADR 0073 · Standard Counseling Session Duration</nav>
+<main>
+<h1 id="73-standard-counseling-session-duration">73. Standard Counseling Session Duration</h1>
+<h2 id="status">Status</h2>
+<p>Accepted for launch planning.</p>
+<h2 id="context">Context</h2>
+<p>SERAYA PULANG counseling is bookable online and offline at launch. Slot generation and availability need a concrete duration, while the domain already has a separate TransitionBuffer concept.</p>
+<h2 id="decision">Decision</h2>
+<p>The standard duration for one psychological counseling session is <strong>60 minutes</strong> for both online and offline modes. The existing default 15-minute TransitionBuffer remains separate from the session duration and is used for psychologist scheduling/slot overlap protection.</p>
+<p>The 60-minute duration is captured in the ServiceOffering/ServiceOfferingRevision and OfferSnapshot. A future mode-specific duration requires a new offering revision or explicit catalog decision; it must not silently alter confirmed appointments.</p>
+<h2 id="consequences">Consequences</h2>
+<ul>
+<li>one consistent session duration simplifies launch catalog and booking UX;</li>
+<li>online and offline slots use the same base duration;</li>
+<li>psychologist availability must account for 60 minutes plus the configured transition buffer;</li>
+<li>duration changes require revision/regeneration rules and do not mutate historical appointments.</li>
+</ul>
+<h2 id="open-follow-up">Open follow-up</h2>
+<p>Define price per mode, psychologist assignment, availability, offline venue, booking cutoff, package structure, and whether a future assessment or specialized counseling variant needs a different duration.</p>
+</main>
+<footer class="site">
+<p><a href="../index.html">Index</a> · <a href="../adr/index.html">All ADR</a> · <a href="../baseline/index.html">Baseline docs</a></p>
+<p>Generated from <code>/home/jar/output/psychology-research/seraya-psikologi-domain/</code> · Round 6 closure · 2026-08-31</p>
+</footer>
+</body>
+</html>

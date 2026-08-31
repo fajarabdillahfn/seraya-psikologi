@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ADR 0013 · Tie Availability Slots to Service Offerings — Seraya Psikologi Docs</title>
+<link rel="stylesheet" href="../assets/main.css">
+</head>
+<body>
+<header class="site">
+<h1>Seraya Psikologi — Documentation</h1>
+<p class="lede">Booking and payment MVP · Implementation baseline · 96 ADR</p>
+</header>
+<nav class="crumbs"><a href="../index.html">Home</a> › ADR 0013 · Tie Availability Slots to Service Offerings</nav>
+<main>
+<h1 id="13-tie-availability-slots-to-service-offerings">13. Tie Availability Slots to Service Offerings</h1>
+<h2 id="status">Status</h2>
+<p>Accepted for the MVP working model; exact generation algorithm and overlap index/constraint remain implementation details to specify.</p>
+<h2 id="context">Context</h2>
+<p>ServiceOfferings may have different effective durations, prices, modes, or eligibility. A shared generic time slot would require the booking flow to choose a service after selecting capacity and would make duration fit and pricing snapshots less explicit.</p>
+<p>The same psychologist still cannot serve two overlapping bookings, even if the slots belong to different ServiceOfferings.</p>
+<h2 id="decision">Decision</h2>
+<p>An AvailabilitySlot belongs to one psychologist and one ServiceOffering for one concrete time range. Booking selects exactly one such slot. Enforce a provider-level invariant: active SlotHolds and confirmed/active Appointments for the same psychologist must not overlap, regardless of ServiceOffering.</p>
+<h2 id="consequences">Consequences</h2>
+<p>Positive:</p>
+<ul>
+<li>a slot carries an unambiguous service/duration context;</li>
+<li>payment and confirmation can snapshot one concrete offering;</li>
+<li>the public booking flow has fewer ambiguous choices;</li>
+<li>cross-service double booking is explicitly prevented.</li>
+</ul>
+<p>Costs and constraints:</p>
+<ul>
+<li>generation may create candidate slots per offering;</li>
+<li>overlapping candidate slots need a clear hold/claim strategy;</li>
+<li>offering changes must not rewrite already generated/claimed slot history;</li>
+<li>the database/API must enforce overlap atomically, not only in UI code.</li>
+</ul>
+<h2 id="open-follow-up">Open follow-up</h2>
+<p>Choose candidate slot granularity, generation ordering when offerings overlap, whether unpublished slots are generated, and the exact concurrency mechanism.</p>
+</main>
+<footer class="site">
+<p><a href="../index.html">Index</a> · <a href="../adr/index.html">All ADR</a> · <a href="../baseline/index.html">Baseline docs</a></p>
+<p>Generated from <code>/home/jar/output/psychology-research/seraya-psikologi-domain/</code> · Round 6 closure · 2026-08-31</p>
+</footer>
+</body>
+</html>

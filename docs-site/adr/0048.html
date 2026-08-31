@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ADR 0048 · Configure Package Validity per ServicePackage — Seraya Psikologi Docs</title>
+<link rel="stylesheet" href="../assets/main.css">
+</head>
+<body>
+<header class="site">
+<h1>Seraya Psikologi — Documentation</h1>
+<p class="lede">Booking and payment MVP · Implementation baseline · 96 ADR</p>
+</header>
+<nav class="crumbs"><a href="../index.html">Home</a> › ADR 0048 · Configure Package Validity per ServicePackage</nav>
+<main>
+<h1 id="48-configure-package-validity-per-servicepackage">48. Configure Package Validity per ServicePackage</h1>
+<h2 id="status">Status</h2>
+<p>Accepted for the MVP working model; calendar-period validity is resolved by ADR 0055 and restoration retains original expiry under ADR 0062. Exact duration units/range, end-of-month policy, and Admin extension behavior remain open.</p>
+<h2 id="context">Context</h2>
+<p>Different package products may have different expected cadence or commercial validity. A single global duration would force unrelated packages into the same policy and make catalog copy misleading.</p>
+<h2 id="decision">Decision</h2>
+<p>ServicePackage catalog stores a validity duration/configuration. On verified purchase, PackagePurchase snapshots that duration/configuration, start instant, Asia/Jakarta semantics, and computed expiry. Changing the catalog duration affects future purchases only. The technical model does not prescribe the business number yet; public copy must show the effective duration before payment.</p>
+<h2 id="consequences">Consequences</h2>
+<p>Positive:</p>
+<ul>
+<li>package products can express distinct commercial rules;</li>
+<li>historical purchases remain stable;</li>
+<li>expiry is visible and explainable;</li>
+<li>global validation can still enforce allowed bounds.</li>
+</ul>
+<p>Costs and constraints:</p>
+<ul>
+<li>duration units/calendar arithmetic need a canonical policy;</li>
+<li>admin must validate unreasonable values;</li>
+<li>package reminders and refund/credit use the snapshot;</li>
+<li>catalog edits need revision/audit behavior.</li>
+</ul>
+<h2 id="open-follow-up">Open follow-up</h2>
+<p>Choose allowed units/range, exact business values, end-of-month/local expiry policy, and extension/restoration behavior.</p>
+</main>
+<footer class="site">
+<p><a href="../index.html">Index</a> · <a href="../adr/index.html">All ADR</a> · <a href="../baseline/index.html">Baseline docs</a></p>
+<p>Generated from <code>/home/jar/output/psychology-research/seraya-psikologi-domain/</code> · Round 6 closure · 2026-08-31</p>
+</footer>
+</body>
+</html>

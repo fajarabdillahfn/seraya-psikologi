@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ADR 0028 · Mark No-show After a Fifteen-minute Grace Period — Seraya Psikologi Docs</title>
+<link rel="stylesheet" href="../assets/main.css">
+</head>
+<body>
+<header class="site">
+<h1>Seraya Psikologi — Documentation</h1>
+<p class="lede">Booking and payment MVP · Implementation baseline · 96 ADR</p>
+</header>
+<nav class="crumbs"><a href="../index.html">Home</a> › ADR 0028 · Mark No-show After a Fifteen-minute Grace Period</nav>
+<main>
+<h1 id="28-mark-no-show-after-a-fifteen-minute-grace-period">28. Mark No-show After a Fifteen-minute Grace Period</h1>
+<h2 id="status">Status</h2>
+<p>Accepted for the MVP working model.</p>
+<h2 id="context">Context</h2>
+<p>A client may be late or experience a small access problem. Marking no-show exactly at the scheduled start is too eager; leaving the state open indefinitely makes package balance and operational reporting unreliable.</p>
+<h2 id="decision">Decision</h2>
+<p>An Appointment may be marked <code>no_show</code> after a 15-minute grace period from its scheduled start in Asia/Jakarta. The psychologist for that Appointment or an authorized admin may perform the action. The action consumes the related SessionEntitlement by default under ADR 0027 and is audited.</p>
+<p>The threshold is operational only; it does not record why a client did not attend or any clinical judgment.</p>
+<h2 id="consequences">Consequences</h2>
+<p>Positive:</p>
+<ul>
+<li>predictable client and staff expectation;</li>
+<li>enough time for ordinary lateness/access issues;</li>
+<li>package balance eventually reaches a defined state;</li>
+<li>role ownership is clear.</li>
+</ul>
+<p>Costs and constraints:</p>
+<ul>
+<li>timezone and clock consistency are required;</li>
+<li>client support may need an exception path;</li>
+<li>correction after a late arrival requires admin override/audit;</li>
+<li>reminder copy should state the grace period if policy requires.</li>
+</ul>
+<h2 id="open-follow-up">Open follow-up</h2>
+<p>Define whether the grace period can vary by ServiceOffering, whether a late arrival can be marked completed, the correction window, and notification behavior. Initial/correction authority is resolved by ADR 0054.</p>
+</main>
+<footer class="site">
+<p><a href="../index.html">Index</a> · <a href="../adr/index.html">All ADR</a> · <a href="../baseline/index.html">Baseline docs</a></p>
+<p>Generated from <code>/home/jar/output/psychology-research/seraya-psikologi-domain/</code> · Round 6 closure · 2026-08-31</p>
+</footer>
+</body>
+</html>

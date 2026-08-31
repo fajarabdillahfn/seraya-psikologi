@@ -1,0 +1,31 @@
+name = "seraya-psikologi"
+main = "app/src/worker/index.ts"
+compatibility_date = "2024-08-21"
+compatibility_flags = ["nodejs_compat"]
+
+# Placeholder runtime. Real account id, route, and secrets are configured
+# in `.dev.vars` (local) and CF dashboard (production). See ADR 0089.
+# account_id is intentionally commented; add it before deploy.
+
+# Routes / Bindings
+
+[[d1_databases]]
+binding = "DB"
+database_name = "seraya-db"
+database_id = "PLACEHOLDER_DB_ID" # set via `wrangler d1 create seraya-db`
+
+# Placeholder variables for secrets used by the Worker at runtime.
+# These are illustrative; actual values live in CF Workers Secrets and
+# `.dev.vars` (gitignored). Documented in ADR 0089 §10.
+#
+# vars = { ENVIRONMENT = "development" }
+
+# Real production requires:
+# - Midtrans Snap server key (secret)
+# - Google OAuth client id/secret (secret)
+# - Email provider API key (secret)
+# - Inter-service signing key (secret)
+# All set with `wrangler secret put <NAME>`.
+
+[observability]
+enabled = true

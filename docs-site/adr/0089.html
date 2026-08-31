@@ -1,0 +1,145 @@
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ADR 0089 · Single Application Architecture — Cloudflare Worker + D1 with PersistenceAdapter Seam — Seraya Psikologi Docs</title>
+<link rel="stylesheet" href="../assets/main.css">
+</head>
+<body>
+<header class="site">
+<h1>Seraya Psikologi — Documentation</h1>
+<p class="lede">Booking and payment MVP · Implementation baseline · 96 ADR</p>
+</header>
+<nav class="crumbs"><a href="../index.html">Home</a> › ADR 0089 · Single Application Architecture — Cloudflare Worker + D1 with PersistenceAdapter Seam</nav>
+<main>
+<h1 id="89-single-application-architecture-cloudflare-worker-d1-with-persistenceadapter-seam">89. Single Application Architecture — Cloudflare Worker + D1 with PersistenceAdapter Seam</h1>
+<h2 id="status">Status</h2>
+<p>Accepted for launch planning. Closes <code>TBC-STACK-01</code> (Round 1 P0-01 in <code>PRD-GUIDELINE-REVIEW.md</code>).</p>
+<h2 id="context">Context</h2>
+<p><code>IMPLEMENTATION-GUIDE.md</code> lines 79, 378, and 499–501 already commit the project to <strong>Cloudflare Worker + D1</strong>, but the live technical PRD JSON still records <code>database = "supabase"</code> (<code>teknis-embedded.json:25</code>) and <code>architecture = "docker"</code> (<code>teknis-embedded.json:31</code>). No architecture ADR in <code>0001–0088</code> actually ratifies the runtime/database choice. Slice 0 (<code>migrations/0001_init.sql</code>, <code>src/index.ts</code>) is being built on a Worker with a D1 binding, so an explicit decision is needed before schema, transaction model, migration tooling, backup/restore, and observability assumptions diverge further.</p>
+<p>Four candidate stacks were evaluated from the perspectives of cost, latency, transaction model, auth fit, observability, vendor lock-in, operational complexity, and team skill:</p>
+<table>
+<thead>
+<tr>
+<th>#</th>
+<th>Stack</th>
+<th>One-line assessment</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td><strong>Cloudflare Worker + D1</strong></td>
+<td>Lowest cost and complexity; sufficient atomicity via D1 batch; matches what the project already runs.</td>
+</tr>
+<tr>
+<td>2</td>
+<td>Cloudflare Worker + Postgres (Neon/Supabase) via Hyperdrive</td>
+<td>Stronger Postgres primitives (<code>FOR UPDATE SKIP LOCKED</code>, advisory locks) at higher cost and an extra vendor to operate.</td>
+</tr>
+<tr>
+<td>3</td>
+<td>Supabase (Postgres + RLS + Auth + Storage)</td>
+<td>Auth/RLS convenience, but introduces a second runtime vendor and contradicts the already-deployed Worker topology.</td>
+</tr>
+<tr>
+<td>4</td>
+<td>Vercel + Vercel Postgres/Neon</td>
+<td>Mainstream, but most expensive per GB-second, weakest fit with the existing Worker deploy, and requires a third-party auth layer.</td>
+</tr>
+</tbody>
+</table>
+<h3 id="cost">Cost</h3>
+<p>CF Worker + D1 is the cheapest path at MVP scale. The CF Workers Paid plan baseline ($5/month) bundles D1 row reads/writes/storage up to documented quotas, and Workers themselves have a generous free tier. Neon and Supabase both price Postgres compute + storage separately, with Neon free compute hours capped and Supabase Pro starting at $25/month for production. Vercel adds a per-seat/platform fee on top of the same DB cost. For one psychologist, rolling 90-day horizon, and Indonesian traffic, the absolute spend on the chosen stack is the lowest by a meaningful margin.</p>
+<p><em>Placeholder:</em> The exact CF D1 quota/pricing snapshot at booking time must be re-verified by Operations before live launch (see Open follow-up <code>TBC-STACK-OBS-01</code>). The ADR commits to the architecture, not to a price number.</p>
+<h3 id="latency">Latency</h3>
+<p>CF Workers run in 300+ cities; D1 has read replicas in the regions where Workers execute. Indonesia-relevant reads (CGK/SIN/HKG/NRT) hit a regional D1 replica in single-digit milliseconds. Writes go to the primary and are serialized — write latency is higher (~30–100 ms intra-region), but the MVP write path is dominated by Midtrans webhook ingestion and Admin actions, not user-typed requests, so this is acceptable. Neon/Supabase in <code>ap-southeast-1</code> (Singapore) is comparable (50–100 ms RTT from Jakarta) for reads and writes but lacks edge-replicated reads. Vercel Edge Functions with a default US-East Postgres has the worst Jakarta→DB round-trip and would force an explicit region choice.</p>
+<h3 id="transaction-model">Transaction model</h3>
+<p>The booking invariants that drive the database choice (per <code>IMPLEMENTATION-GUIDE.md</code> §6.2 and §8.2):</p>
+<ul>
+<li>atomic <code>Booking + SlotHold + verified PaymentEvent → Appointment</code> (Slice 3);</li>
+<li>atomic <code>CancellationDecision approve → Appointment cancel + eligible future slot release + valid entitlement restore</code> (Slice 6, ADR 0051/0062/0076);</li>
+<li>at-most-one successful settlement per Booking/package purchase (P1-10);</li>
+<li>idempotent webhook + retry/reconciliation (TBC-REC-01).</li>
+</ul>
+<p>D1 supports atomicity through <code>db.batch([...statements])</code> (formerly the D1 session API) inside a single Worker invocation: statements within a batch run in one implicit transaction with SERIALIZABLE-equivalent semantics, with the same durability/visibility guarantees for the row set touched. Combined with a <code>UNIQUE</code> index on <code>(slot_id)</code> for active <code>SlotHold</code>, a state-machine precondition on <code>Approval</code>, and an idempotency-key <code>UNIQUE</code> index per <code>PaymentEvent</code>/<code>RefundAction</code>, the booking invariants are satisfied. We do <strong>not</strong> rely on <code>SELECT ... FOR UPDATE SKIP LOCKED</code> (Postgres-only); D1's write serialization and the unique constraint make the slot-claim race deterministic without that primitive.</p>
+<p>Postgres via Hyperdrive would give us <code>FOR UPDATE SKIP LOCKED</code>, advisory locks, partial unique indexes, and <code>LISTEN/NOTIFY</code> — all useful at higher scale. None of them are required for MVP traffic and one-psychologist capacity. They are listed as <code>Open follow-up</code> migration triggers, not launch blockers.</p>
+<p>Supabase RLS would shift authorization enforcement into the database. The application already centralizes authz in <code>AccessModule</code> and in each command's precondition check (<code>IMPLEMENTATION-GUIDE.md</code> §5.1, §5.2), which is the equivalent enforcement point. RLS is a defense-in-depth option for a later move, not a launch requirement.</p>
+<h3 id="auth-fit">Auth fit</h3>
+<p>All four candidates require Google SSO for staff and an email-magic-link for guest ClientAccess (<code>IMPLEMENTATION-GUIDE.md</code> §3.2–§3.3; ADR 0080). Worker + D1 implements Google ID-token verification in-process via a standard JOSE library, stores StaffMembership/RoleAssignment in D1, and implements ClientAccess (15-min token, 30-min scoped session, resend invalidates) in domain code. Supabase Auth would reduce some boilerplate but couples the auth path to a second vendor and brings its own session-lifetime semantics that would have to be reconciled with the existing ClientAccess vocabulary. Chosen stack keeps auth implementation in one place.</p>
+<h3 id="observability">Observability</h3>
+<p>CF Workers Logs (with Logpush for long-term retention) and Workers Analytics Engine give request-level logs, custom event counters (e.g. <code>payment_event.verified</code>, <code>slot_hold.expired</code>), and per-route latency without standing up an external stack. D1 query metrics are surfaced in the Cloudflare dashboard. The chosen stack requires no extra observability vendor; the other three would require adding at least one more (Neon/Supabase dashboards + Workers Logs, or Vercel Observability + DB dashboard).</p>
+<h3 id="vendor-lock-in">Vendor lock-in</h3>
+<p>D1 is the biggest lock-in risk: the SQL is close to standard SQLite, but D1-specific bindings (e.g. <code>DB.prepare(...).bind(...)</code>), session/batch API, and Cloudflare-side operational tooling are not directly portable. Postgres (Neon/Supabase/Vercel) is more portable at the schema level but ties the project to a different runtime vendor.</p>
+<p><strong>Mitigation:</strong> all persistence operations must go through one in-process <code>PersistenceAdapter</code> interface (<code>query</code>, <code>batch</code>, <code>tx</code>) implemented by a D1 driver today. A future move to Postgres rewrites the adapter implementation, not the domain modules. This seam is part of the Decision below and is required even though no second backend is shipping at launch.</p>
+<h3 id="operational-complexity">Operational complexity</h3>
+<p>CF Worker + D1 has a single deploy unit (the Worker, with a D1 binding) plus migrations run via <code>wrangler</code>. Local dev uses <code>wrangler dev</code> and <code>wrangler d1 execute --local</code>, with Miniflare providing in-process emulation for Vitest. No Docker, no second runtime, no cross-vendor networking policy. Neon/Supabase add a Postgres endpoint that must be reachable from Workers (Hyperdrive cache for CF Worker+Postgres; direct connection from Vercel), plus a separate dashboard and credential set. Supabase adds an Auth service. Vercel adds platform-user accounts and per-function/edge config.</p>
+<h3 id="team-skill-and-existing-investment">Team skill and existing investment</h3>
+<p>The project already ships a Worker that writes to D1 (the autosave PRD form backend at <code>src/index.ts:138–148</code> uses a D1 binding; <code>migrations/0001_init.sql</code> is the existing schema). Switching stack means throwing away a working pipeline and rebuilding local-dev, CI/CD, secrets handling, and the schema baseline. The chosen stack reuses all of it.</p>
+<h2 id="decision">Decision</h2>
+<p>Seraya Psikologi MVP runs on <strong>Cloudflare Workers</strong> with <strong>Cloudflare D1</strong> as the primary data store, fronted by an in-process <strong>PersistenceAdapter</strong> seam so the runtime can be re-targeted at Postgres later without changing domain modules.</p>
+<ol>
+<li><strong>Runtime:</strong> Cloudflare Workers (TypeScript, Node-compatible APIs via the <code>nodejs_compat</code> flag where needed).</li>
+<li><strong>Database:</strong> Cloudflare D1 — a single regional primary plus global read replicas.</li>
+<li><strong>Schema and migrations:</strong> <code>migrations/NNNN_*.sql</code> files applied through <code>wrangler d1 migrations apply</code>; reversible by pairing forward migrations with explicit down scripts where safe. Destructive migrations require an audited redaction/retention check before applying in production (per ADR 0083–0087).</li>
+<li><strong>Transaction primitive:</strong> the D1 batch API (<code>db.batch([...])</code>) inside one Worker invocation, used for any command whose atomicity spans multiple rows (<code>ApplyVerifiedPaymentEvent</code>, <code>DecideCancellation</code> approve, <code>ConsumeEntitlement</code>, <code>RestoreEntitlement</code>, <code>ExecuteRefundAction</code>, <code>AssignOrRevokeStaffMembership</code>). Single-statement commands use a typed <code>query</code>. There is no explicit <code>BEGIN/COMMIT</code> user transaction in MVP.</li>
+<li><strong>Concurrency enforcement:</strong> UNIQUE index on <code>slot_hold(slot_id) WHERE state = 'active'</code> plus state-machine precondition in the <code>UPDATE</code> (<code>WHERE state = ? AND expires_at &gt; ?</code>). Duplicate webhook prevention: UNIQUE on <code>payment_event(provider_event_id)</code>. Idempotency key on each domain command (<code>command_id</code>/<code>correlation_id</code>).</li>
+<li><strong>PersistenceAdapter seam:</strong> every module that touches the database does so through a <code>PersistenceAdapter</code> interface declared in <code>src/persistence/adapter.ts</code>, with the D1 implementation in <code>src/persistence/d1-adapter.ts</code>. Domain modules (<code>BookingModule</code>, <code>PaymentModule</code>, <code>CancellationModule</code>, etc.) never import from <code>@cloudflare/workers-types</code> or call <code>env.DB.prepare(...)</code> directly. This is a code-review gate, not just a convention.</li>
+<li><strong>Local development and tests:</strong> <code>wrangler dev</code> for the Worker, <code>wrangler d1 execute --local</code> for ad-hoc queries, Vitest + Miniflare for unit and integration tests. The D1 local binding is used as the test database; no separate Postgres or SQLite-server dependency is introduced.</li>
+<li><strong>Backup/restore:</strong> Cloudflare-managed daily backups are the baseline (Workers Paid plan includes D1 backup history per CF docs; the exact retention value is a <code>TBC-STACK-OBS-01</code> verification item). Pre-destructive migrations and pre-launch snapshots are exported with <code>wrangler d1 export</code> and stored in the operations vault with the same retention rules as Payment/Refund records (ADR 0084). Restore drill is required before production launch and quarterly thereafter.</li>
+<li><strong>Observability:</strong> CF Workers Logs (Logpush to long-term storage), Workers Analytics Engine for domain-event counters (<code>slot_hold.created</code>, <code>payment_event.verified</code>, <code>cancellation_decision.recorded</code>, <code>refund_action.recorded</code>, <code>staff_membership.changed</code>), and CF dashboard D1 metrics for query latency and error rate. Application logs must not write clinical or contact fields (P1-11); the audit writer remains the source of truth for privileged-action history.</li>
+<li><strong>Secrets:</strong> CF Workers Secrets (encrypted at rest, injected at runtime) hold Midtrans server key, Google OAuth client secret, email provider key, and any inter-service signing keys. No secret is written to PRD artifacts, code, or the Obsidian vault.</li>
+<li><strong>Migration path if scale or feature parity forces Postgres later:</strong> implement a second <code>PostgresAdapter</code> behind the same <code>PersistenceAdapter</code> interface, run dual-write shadow mode for one release, switch reads, then remove D1. Triggers for opening this work: D1 write-throughput saturation, need for <code>FOR UPDATE SKIP LOCKED</code>, need for <code>LISTEN/NOTIFY</code>, or a multi-region write requirement.</li>
+</ol>
+<h2 id="consequences">Consequences</h2>
+<p>Positive:</p>
+<ul>
+<li>Aligns with the already-deployed Worker + D1 autosave pipeline (<code>src/index.ts</code>, <code>migrations/0001_init.sql</code>); no infrastructure rebuild.</li>
+<li>Single-vendor operational surface — one deploy, one dashboard, one secrets store, one log pipeline.</li>
+<li>Lowest cost at MVP scale (one psychologist, rolling 90-day horizon, ID traffic).</li>
+<li>D1 batch atomicity satisfies the booking/cancellation/package invariants without a hand-rolled transaction manager.</li>
+<li><code>PersistenceAdapter</code> seam keeps domain modules portable and makes a future Postgres migration bounded.</li>
+<li>Observability is built into the platform; no extra vendor on day one.</li>
+</ul>
+<p>Costs and constraints:</p>
+<ul>
+<li>No <code>FOR UPDATE SKIP LOCKED</code>; concurrency relies on D1 write serialization + UNIQUE constraints + state-machine preconditions. This is acceptable at MVP and is documented in code comments at each contended write site.</li>
+<li>No database-enforced RLS; authorization is enforced centrally in <code>AccessModule</code> and at each command's precondition. Two-Admin recovery (ADR 0081) and <code>StaffMembership</code> audit (ADR 0080) are mandatory compensating controls.</li>
+<li>D1 SQL is close to SQLite standard but uses the CF binding API; portability to another runtime requires the adapter seam to be honored.</li>
+<li>Backup/restore cadence and pricing snapshot depend on CF plan tier at launch and must be verified before live traffic (Open follow-up <code>TBC-STACK-OBS-01</code>).</li>
+<li>Single regional primary for writes means D1 is not the right fit if/when Seraya requires multi-region active-active writes — that case is the explicit migration trigger above.</li>
+</ul>
+<h2 id="open-follow-up">Open follow-up</h2>
+<ul>
+<li><code>TBC-STACK-OBS-01</code> — Operations to confirm CF Workers Paid plan tier, D1 included quotas, daily-backup retention, and Logpush retention at launch-time. Replace the placeholder pricing line in this ADR with the verified snapshot before go-live.</li>
+<li><code>TBC-STACK-OBS-02</code> — Run a restore drill against a staging D1 instance before production launch; record RPO and RTO evidence in the production preflight checklist.</li>
+<li><code>TBC-STACK-OBS-03</code> — Confirm the <code>PersistenceAdapter</code> interface is the only call path to D1 from domain modules via a CI lint (forbid imports of <code>@cloudflare/workers-types</code> <code>D1Database</code> outside <code>src/persistence/</code>).</li>
+<li><code>TBC-STACK-OBS-04</code> — Document the migration triggers (write saturation, need for advisory locks, multi-region writes) in the runbook so the decision to leave D1 is data-driven, not speculative.</li>
+<li>This ADR does <strong>not</strong> change PRD answer-store values; the technical PRD JSON <code>database</code> and <code>architecture</code> fields are reconciled by a separate content-patch ticket, not by an architecture rewrite.</li>
+</ul>
+<hr />
+<h2 id="ringkasan-eksekutif-bahasa-indonesia">Ringkasan eksekutif (Bahasa Indonesia)</h2>
+<p><strong>Keputusan:</strong> Seraya Psikologi MVP berjalan di atas <strong>Cloudflare Worker + Cloudflare D1</strong>, dibungkus oleh satu interface <code>PersistenceAdapter</code> agar domain module tidak bergantung langsung ke driver D1.</p>
+<p><strong>Alasan satu baris:</strong> stack ini sudah berjalan (Worker + D1 dipakai autosave PRD), paling murah untuk skala MVP (satu psikolog, horizon 90 hari, trafik Indonesia), dan atomicity <code>db.batch</code> D1 cukup untuk invariant booking+cancellation+package yang wajib atomic.</p>
+<p><strong>Perspektif yang dibandingkan:</strong></p>
+<ul>
+<li><em>Biaya:</em> CF+D1 termurah; Neon/Supabase/Vercel tambah komponen mahal.</li>
+<li><em>Latency:</em> CF+D1 punya read-replica regional (SIN/HKG/NRT) yang menang untuk visitor Indonesia; Postgres managed dari US-East paling jelek.</li>
+<li><em>Transaksi:</em> D1 batch + UNIQUE constraint + state precondition sudah memenuhi invariant; <code>FOR UPDATE SKIP LOCKED</code> (Postgres) tidak dibutuhkan di MVP.</li>
+<li><em>Auth:</em> semua kandidat tetap perlu Google SSO + ClientAccess magic link; Supabase Auth sedikit memangkas kode tapi menambah vendor baru.</li>
+<li><em>Observability:</em> CF Logs + Workers Analytics Engine built-in; kandidat lain butuh dashboard kedua.</li>
+<li><em>Vendor lock-in:</em> D1 adalah lock-in terbesar; dimitigasi dengan <code>PersistenceAdapter</code> seam agar migrasi ke Postgres nanti cukup rewrite adapter, bukan domain.</li>
+<li><em>Kompleksitas:</em> CF+D1 = satu deploy, satu secrets store, satu log pipeline; paling sederhana.</li>
+<li><em>Skill &amp; investasi tim:</em> pipeline Worker+D1 sudah jalan di repo (<code>src/index.ts</code>, <code>migrations/0001_init.sql</code>); pindah stack berarti buang investasi itu.</li>
+</ul>
+<p><strong>Yang dijawab ADR ini:</strong> runtime (Worker), database (D1), transaction primitive (<code>db.batch</code> + UNIQUE + state precondition), migration path (<code>wrangler d1 migrations</code> + <code>wrangler d1 export</code> snapshot sebelum destructive change), backup/restore (managed daily backup baseline + restore drill pra-launch), local test DB (<code>wrangler dev</code> + <code>wrangler d1 execute --local</code> + Miniflare/Vitest), biaya (placeholder diverifikasi Operations; arsitektur tidak tergantung angka), observability (Logs + Logpush + Analytics Engine + D1 metrics), dan alasan tegas memilih ini.</p>
+<p><strong>Trade-off yang diterima:</strong> tanpa <code>FOR UPDATE SKIP LOCKED</code>, tanpa RLS di level database, write primary single-region. Ketiganya adalah trigger migrasi ke Postgres, bukan blocker launch — dan <code>PersistenceAdapter</code> seam membuat migrasi itu bounded.</p>
+<p><strong>Risiko residual:</strong> konfigurasi CF/D1 aktual (quota, retention backup, harga) belum diverifikasi saat ADR ditulis; harus dicek Operations sebelum go-live dan dicatat di <code>TBC-STACK-OBS-01</code>. CI lint untuk memaksa semua akses DB lewat <code>PersistenceAdapter</code> juga belum dipasang (<code>TBC-STACK-OBS-03</code>).</p>
+</main>
+<footer class="site">
+<p><a href="../index.html">Index</a> · <a href="../adr/index.html">All ADR</a> · <a href="../baseline/index.html">Baseline docs</a></p>
+<p>Generated from <code>/home/jar/output/psychology-research/seraya-psikologi-domain/</code> · Round 6 closure · 2026-08-31</p>
+</footer>
+</body>
+</html>

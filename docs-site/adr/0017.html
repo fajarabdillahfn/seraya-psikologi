@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ADR 0017 · Schedule the First Package Session at Checkout — Seraya Psikologi Docs</title>
+<link rel="stylesheet" href="../assets/main.css">
+</head>
+<body>
+<header class="site">
+<h1>Seraya Psikologi — Documentation</h1>
+<p class="lede">Booking and payment MVP · Implementation baseline · 96 ADR</p>
+</header>
+<nav class="crumbs"><a href="../index.html">Home</a> › ADR 0017 · Schedule the First Package Session at Checkout</nav>
+<main>
+<h1 id="17-schedule-the-first-package-session-at-checkout">17. Schedule the First Package Session at Checkout</h1>
+<h2 id="status">Status</h2>
+<p>Accepted for the MVP working model; PackagePurchase and first-entitlement reservation are resolved by ADR 0034/0035. Package validity/anchor, sequential ordering, closed-unit skipping, scoped guest access, restoration expiry, late-payment handling, and manual package refund accounting are resolved by ADR 0019/0020/0036–0038/0046/0059/0062/0063. Package unavailability/transfer exception and exact refund/extension criteria remain open.</p>
+<h2 id="context">Context</h2>
+<p>Packages are supported in MVP, but forcing a client to choose every future session at purchase increases friction and may block capacity unnecessarily. Conversely, confirming a package with no concrete first session weakens the booking experience and makes the payment-gated Appointment flow ambiguous.</p>
+<h2 id="decision">Decision</h2>
+<p>At package checkout:</p>
+<ol>
+<li>Client selects and holds the first AvailabilitySlot.</li>
+<li>Payment success confirms the package Booking and creates the first Appointment.</li>
+<li>The remaining package units become explicit SessionEntitlement records that are not yet scheduled.</li>
+<li>A later client/admin scheduling flow may reserve the next valid entitlement and create another Appointment, subject to availability and policy; consumption happens only from the Appointment outcome.</li>
+</ol>
+<p>A SessionEntitlement may produce at most one active Appointment at a time. PackagePurchase owns the units (ADR 0034), and the first Appointment reserves one unit without consuming it until outcome (ADR 0035).</p>
+<h2 id="consequences">Consequences</h2>
+<p>Positive:</p>
+<ul>
+<li>first purchase has a concrete confirmed appointment;</li>
+<li>client does not need to commit all future dates at checkout;</li>
+<li>remaining sessions are countable/auditable;</li>
+<li>later scheduling can reuse the normal slot hold/concurrency flow.</li>
+</ul>
+<p>Costs and constraints:</p>
+<ul>
+<li>package has two levels of state: purchased entitlement and scheduled appointment;</li>
+<li>notifications must distinguish first appointment from remaining sessions;</li>
+<li>expiry and launch full/no-refund outcomes need to account for scheduled/consumed/unused units; partial refunds are deferred;</li>
+<li>scoped ClientAccess must let a guest schedule remaining sessions safely without self-service cancellation/reschedule.</li>
+</ul>
+<h2 id="open-follow-up">Open follow-up</h2>
+<p>Define package unavailability/transfer exception, exact Admin refund criteria/approval, extension rules, and late-payment resolution SLA/timing. Package refund accounting, restoration expiry, and late-payment slot reacquisition rule are resolved by ADR 0060/0062/0063/0059.</p>
+</main>
+<footer class="site">
+<p><a href="../index.html">Index</a> · <a href="../adr/index.html">All ADR</a> · <a href="../baseline/index.html">Baseline docs</a></p>
+<p>Generated from <code>/home/jar/output/psychology-research/seraya-psikologi-domain/</code> · Round 6 closure · 2026-08-31</p>
+</footer>
+</body>
+</html>

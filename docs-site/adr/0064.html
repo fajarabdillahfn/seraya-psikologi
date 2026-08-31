@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ADR 0064 · Use Required WhatsApp Follow-up for Paid Confirmed Bookings — Seraya Psikologi Docs</title>
+<link rel="stylesheet" href="../assets/main.css">
+</head>
+<body>
+<header class="site">
+<h1>Seraya Psikologi — Documentation</h1>
+<p class="lede">Booking and payment MVP · Implementation baseline · 96 ADR</p>
+</header>
+<nav class="crumbs"><a href="../index.html">Home</a> › ADR 0064 · Use Required WhatsApp Follow-up for Paid Confirmed Bookings</nav>
+<main>
+<h1 id="64-use-required-whatsapp-follow-up-for-paid-confirmed-bookings">64. Use Required WhatsApp Follow-up for Paid Confirmed Bookings</h1>
+<h2 id="status">Status</h2>
+<p>Superseded by ADR 0066 for timing/task semantics. The cancellation/refund handling stays on Admin WhatsApp only and is not surfaced in the public website; the business confirms this in the 2026-08-31 round.</p>
+<h2 id="context">Context</h2>
+<p>Cancellation/refund handling is too policy-heavy to expose as a self-service flow. The practice prefers human Admin contact after a booking is paid and confirmed. Email remains useful for durable transactional evidence and ClientAccess, while WhatsApp is the practical channel for a human confirmation/follow-up conversation.</p>
+<h2 id="decision">Decision</h2>
+<p>Collect a required WhatsApp-capable contact number during Booking. After verified payment success and Appointment/Booking confirmation:</p>
+<ol>
+<li>send the normal minimal transactional email notification;</li>
+<li>create a WhatsApp confirmation/follow-up task for Admin;</li>
+<li>Admin contacts the client through WhatsApp to confirm operational details and provide support;</li>
+<li>cancellation/refund requests and decisions are handled manually through that support path, then recorded internally as CancellationRequest/CancellationDecision/RefundAction where applicable.</li>
+</ol>
+<p>The follow-up is best effort. Client acknowledgement is not required for the Appointment to remain confirmed; only explicit domain actions may change its state.</p>
+<p>WhatsApp communication is not Payment, Booking, or Appointment source of truth. A WhatsApp delivery failure or unanswered follow-up does not silently change domain state. No clinical detail is required in the message/task.</p>
+<p>MVP does not require automated WhatsApp lifecycle delivery; if automation is added later, it must remain an adapter/DeliveryAttempt behind the same domain truth and privacy rules.</p>
+<h2 id="consequences">Consequences</h2>
+<p>Positive:</p>
+<ul>
+<li>client receives a human contact point after purchase;</li>
+<li>cancellation/refund policy stays out of self-service UI;</li>
+<li>the business can clarify operational details before the session;</li>
+<li>email and internal records preserve durable status/audit.</li>
+</ul>
+<p>Costs and constraints:</p>
+<ul>
+<li>WhatsApp-capable number becomes required booking data;</li>
+<li>Admin follow-up needs an assignment/status/task record;</li>
+<li>response time and manual script become operational policy;</li>
+<li>phone/contact retention and identity verification need privacy handling.</li>
+</ul>
+<h2 id="open-follow-up">Open follow-up</h2>
+<p>Define number verification/format, Admin follow-up SLA/statuses, message script/content, provider/automation decision, and escalation when the client cannot be reached.</p>
+</main>
+<footer class="site">
+<p><a href="../index.html">Index</a> · <a href="../adr/index.html">All ADR</a> · <a href="../baseline/index.html">Baseline docs</a></p>
+<p>Generated from <code>/home/jar/output/psychology-research/seraya-psikologi-domain/</code> · Round 6 closure · 2026-08-31</p>
+</footer>
+</body>
+</html>

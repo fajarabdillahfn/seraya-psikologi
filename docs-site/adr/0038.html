@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ADR 0038 · Advance Package Sequence Past Closed Entitlements — Seraya Psikologi Docs</title>
+<link rel="stylesheet" href="../assets/main.css">
+</head>
+<body>
+<header class="site">
+<h1>Seraya Psikologi — Documentation</h1>
+<p class="lede">Booking and payment MVP · Implementation baseline · 96 ADR</p>
+</header>
+<nav class="crumbs"><a href="../index.html">Home</a> › ADR 0038 · Advance Package Sequence Past Closed Entitlements</nav>
+<main>
+<h1 id="38-advance-package-sequence-past-closed-entitlements">38. Advance Package Sequence Past Closed Entitlements</h1>
+<h2 id="status">Status</h2>
+<p>Accepted for the MVP working model; expired/closed units are skipped and restored cancellation retains sequence. Restoration expiry/extension is resolved by ADR 0062; exact closed-state vocabulary, closure authority, and refund/credit display remain open.</p>
+<h2 id="context">Context</h2>
+<p>Sequential scheduling gives a clear next session, but an entitlement may become permanently unavailable through expiry or an approved operational closure. Blocking all later units would make one expired/closed unit strand the rest of a paid package.</p>
+<h2 id="decision">Decision</h2>
+<p>Normal scheduling selects the lowest sequence-numbered entitlement that is still available and valid. Entitlements in terminal <code>expired</code>/<code>closed</code> state are skipped and do not block later units. An authorized admin may restore/reopen or override sequence only through an audited action, subject to PackageValidity and policy.</p>
+<p>A cancelled appointment whose entitlement is approved for restoration returns to its original sequence; it is not treated as closed.</p>
+<h2 id="consequences">Consequences</h2>
+<p>Positive:</p>
+<ul>
+<li>one expired/closed unit cannot strand the package;</li>
+<li>package progress remains usable and explainable;</li>
+<li>restoration preserves history and sequence;</li>
+<li>client UI can show skipped/closed units separately from remaining balance.</li>
+</ul>
+<p>Costs and constraints:</p>
+<ul>
+<li>“expired”, “closed”, “cancelled/restored”, and “consumed” need distinct states;</li>
+<li>refund/credit must account for skipped units;</li>
+<li>admin overrides require strict permission/audit;</li>
+<li>notifications should explain why a sequence was skipped if visible to the client.</li>
+</ul>
+<h2 id="open-follow-up">Open follow-up</h2>
+<p>Define terminal state names, who can close an entitlement, whether closed units receive credit/refund, and client-facing display. Restoration sequence/expiry is resolved by ADR 0062.</p>
+</main>
+<footer class="site">
+<p><a href="../index.html">Index</a> · <a href="../adr/index.html">All ADR</a> · <a href="../baseline/index.html">Baseline docs</a></p>
+<p>Generated from <code>/home/jar/output/psychology-research/seraya-psikologi-domain/</code> · Round 6 closure · 2026-08-31</p>
+</footer>
+</body>
+</html>

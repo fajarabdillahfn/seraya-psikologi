@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="id">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Seraya Psikologi — Documentation</title>
+<link rel="stylesheet" href="assets/main.css"></head>
+<body>
+<header class="site">
+<h1>Seraya Psikologi — Documentation</h1>
+<p class="lede">Booking & payment MVP · Implementation baseline · 96 ADR · 1,155-line review</p>
+</header>
+<nav class="crumbs">Home</nav>
+<main>
+<div class="callout">
+<strong>Status:</strong> All 10 top-priority tickets closed via ADR 0089–0096. MVP skeleton code ready (Cloudflare Worker + D1). Production launch remains gated by ADR 0096 G-1..G-14.
+</div>
+
+<h2>Quick navigation</h2>
+<div class="toc">
+<h4>Reviews & baseline</h4>
+<ul>
+<li><a href="baseline/prd-guideline-review.html">PRD/ADR/Guide Review</a> — 1,155 lines, Round 1–7 closure narrative, ranked findings, verdict</li>
+<li><a href="baseline/implementation-guide.html">Implementation Guide</a> — 989 lines, definitive technical baseline</li>
+<li><a href="baseline/domain-model.html">Domain Model</a> — 275 lines, synchronized summary</li>
+<li><a href="baseline/context.html">Context</a> — 285 lines, current-state glossary</li>
+</ul>
+<h4>Decisions</h4>
+<ul>
+<li><a href="adr/index.html">All 96 ADR</a> — architecture, couple, capacity, no-show, settlement, intake, package cancellation, launch gate, JSON cleanup</li>
+</ul>
+<h4>MVP skeleton</h4>
+<ul>
+<li><a href="mvp-readme.html">MVP README</a> — what is locked, what is placeholder, production gate</li>
+</ul>
+</div>
+
+<h2>Authority rule (locked 2026-08-31)</h2>
+<p>Untuk konflik bisnis/scope, <strong>sumber Non-Teknis</strong> (Charter, Matrix, IA, JSON psikolog) yang menang atas technical artifacts. Untuk keputusan teknis (stack, concurrency, schema), tim teknis memutuskan dengan ADR.</p>
+
+<h2>Top-priority tickets (closed)</h2>
+<table>
+<thead><tr><th>#</th><th>Ticket</th><th>Closed by</th></tr></thead>
+<tbody>
+<tr><td>1</td><td>Architecture ADR (Worker + D1 vs Supabase + Docker)</td><td><a href="adr/0089.html">ADR 0089</a></td></tr>
+<tr><td>2</td><td>Couple participant model</td><td><a href="adr/0090.html">ADR 0090</a></td></tr>
+<tr><td>3</td><td>Capacity overlap + TransitionBuffer</td><td><a href="adr/0091.html">ADR 0091</a></td></tr>
+<tr><td>4</td><td>No-show timing + late-arrival</td><td><a href="adr/0092.html">ADR 0092</a></td></tr>
+<tr><td>5</td><td>Settlement uniqueness + paid-late package</td><td><a href="adr/0093.html">ADR 0093</a></td></tr>
+<tr><td>6</td><td>JSON cleanup</td><td>Round 4 + Round 6 JSON edits</td></tr>
+<tr><td>7</td><td>Launch-gate executable checklist</td><td><a href="adr/0096.html">ADR 0096</a></td></tr>
+<tr><td>8</td><td>Persona + biz_story framing</td><td>Round 6 edits</td></tr>
+<tr><td>9</td><td>Intake/minor/eligibility/cutoff</td><td><a href="adr/0094.html">ADR 0094</a></td></tr>
+<tr><td>10</td><td>Package cancellation matrix + outcome race</td><td><a href="adr/0095.html">ADR 0095</a></td></tr>
+</tbody>
+</table>
+
+<h2>Round 3 (locked)</h2>
+<ul>
+<li>Cancellation/refund handled by <strong>Admin WhatsApp only</strong>.</li>
+<li>Public website has <strong>no cancellation/refund UI</strong>.</li>
+<li>Refund outcomes: <code>full_refund</code> / <code>no_refund</code> only.</li>
+<li>Third-party admin/transfer fees are internal Seraya costs.</li>
+<li>Public statement: <em>"Cancellation and refund are handled by Admin via WhatsApp; review is case-by-case."</em></li>
+</ul>
+
+<h2>MVP artifact</h2>
+<div class="callout warn">
+<strong>Not production-ready.</strong> Authorization is a placeholder per business-owner instruction. Production must wire Google SSO + StaffMembership + real Midtrans Snap before flipping the switch. See <a href="mvp-readme.html">MVP README</a> §9 for the operational list.
+</div>
+</main>
+<footer class="site">
+<p>Generated from <code>/home/jar/output/psychology-research/seraya-psikologi-domain/</code> · 2026-08-31</p>
+</footer>
+</body>
+</html>

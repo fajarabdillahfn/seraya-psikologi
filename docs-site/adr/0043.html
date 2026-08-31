@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ADR 0043 · Limit ServiceOffering Overrides to Effective Booking Values — Seraya Psikologi Docs</title>
+<link rel="stylesheet" href="../assets/main.css">
+</head>
+<body>
+<header class="site">
+<h1>Seraya Psikologi — Documentation</h1>
+<p class="lede">Booking and payment MVP · Implementation baseline · 96 ADR</p>
+</header>
+<nav class="crumbs"><a href="../index.html">Home</a> › ADR 0043 · Limit ServiceOffering Overrides to Effective Booking Values</nav>
+<main>
+<h1 id="43-limit-serviceoffering-overrides-to-effective-booking-values">43. Limit ServiceOffering Overrides to Effective Booking Values</h1>
+<h2 id="status">Status</h2>
+<p>Accepted for the MVP working model; exact admin UI and policy/eligibility schema remain open.</p>
+<h2 id="context">Context</h2>
+<p>Service provides a shared public category/defaults while ServiceOffering is the psychologist-specific bookable variant. Allowing every field to vary would fragment policy and make public/operational semantics hard to reason about.</p>
+<h2 id="decision">Decision</h2>
+<p>A ServiceOffering may override these effective booking values:</p>
+<ul>
+<li>price and currency, subject to admin policy;</li>
+<li>duration;</li>
+<li>mode/location configuration allowed by the practice;</li>
+<li>TransitionBuffer.</li>
+</ul>
+<p>Service/category identity, eligibility rules, consent/privacy requirements, crisis/disclaimer boundaries, and global cancellation policy remain controlled by Service/admin policy. The effective values are resolved before OfferSnapshot creation; later catalog changes do not mutate snapshots.</p>
+<h2 id="consequences">Consequences</h2>
+<p>Positive:</p>
+<ul>
+<li>psychologist-level operational differences are expressible;</li>
+<li>policy and public taxonomy remain centralized;</li>
+<li>snapshot logic has a bounded field set;</li>
+<li>admin UI can clearly show inherited vs overridden values.</li>
+</ul>
+<p>Costs and constraints:</p>
+<ul>
+<li>precedence and validation must be server-side;</li>
+<li>currency/mode combinations need policy validation;</li>
+<li>overrides need audit and future-slot impact handling;</li>
+<li>a later need for per-psychologist policy must be a deliberate model extension.</li>
+</ul>
+<h2 id="open-follow-up">Open follow-up</h2>
+<p>Define exact mode/location fields, price/currency constraints, eligibility representation, and whether admin approval is needed before an offering override becomes bookable.</p>
+</main>
+<footer class="site">
+<p><a href="../index.html">Index</a> · <a href="../adr/index.html">All ADR</a> · <a href="../baseline/index.html">Baseline docs</a></p>
+<p>Generated from <code>/home/jar/output/psychology-research/seraya-psikologi-domain/</code> · Round 6 closure · 2026-08-31</p>
+</footer>
+</body>
+</html>

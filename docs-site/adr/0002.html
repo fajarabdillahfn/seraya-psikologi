@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ADR 0002 · Allow Guest Booking with Optional Client Account — Seraya Psikologi Docs</title>
+<link rel="stylesheet" href="../assets/main.css">
+</head>
+<body>
+<header class="site">
+<h1>Seraya Psikologi — Documentation</h1>
+<p class="lede">Booking and payment MVP · Implementation baseline · 96 ADR</p>
+</header>
+<nav class="crumbs"><a href="../index.html">Home</a> › ADR 0002 · Allow Guest Booking with Optional Client Account</nav>
+<main>
+<h1 id="2-allow-guest-booking-with-optional-client-account">2. Allow Guest Booking with Optional Client Account</h1>
+<h2 id="status">Status</h2>
+<p>Accepted for the MVP working model; guest access is scoped by ADR 0020 and email-primary delivery by ADR 0021. Token lifetime is resolved by ADR 0046: one-time token 15 minutes, scoped session 30 minutes. Duplicate Client records remain separate by default with audited Admin merge/link (ADR 0047); rate limits, recovery, and account linking remain open.</p>
+<h2 id="context">Context</h2>
+<p>The public website needs to support first-time visitors who may be hesitant to create an account before asking for mental-health support. The technical PRD currently says Google SSO, but making it mandatory would add identity friction and would turn an implementation preference into a product rule.</p>
+<p>The system still needs a reliable way to verify contact ownership and let a guest access or manage a Booking without exposing another person's data.</p>
+<h2 id="decision">Decision</h2>
+<p>Allow a client to create a Booking as a guest after verified contact capture. A Google-backed UserAccount may be offered as an optional convenience, but it is not a prerequisite for booking.</p>
+<p>Model the concepts separately:</p>
+<ul>
+<li><strong>Client</strong> is the person receiving/seeking the service.</li>
+<li><strong>UserAccount</strong> is a durable authentication identity and is optional for clients in MVP.</li>
+<li><strong>ClientAccess</strong> is a limited, verified mechanism for a guest to access or manage a Booking.</li>
+</ul>
+<p>The MVP working channel for ClientAccess is email automated magic link/OTP. WhatsApp is optional manual support for cancellation/refund and general help while a client has an active Booking/Appointment/package under ADR 0066; it is not an automated ClientAccess channel or lifecycle source of truth.</p>
+<h2 id="consequences">Consequences</h2>
+<p>Positive:</p>
+<ul>
+<li>lower first-booking friction;</li>
+<li>Google is not treated as the only acceptable identity provider;</li>
+<li>client identity and authentication can evolve independently;</li>
+<li>the model supports future account linking without requiring it now.</li>
+</ul>
+<p>Costs and constraints:</p>
+<ul>
+<li>guest access must be scoped, expiring, and protected against enumeration;</li>
+<li>contact verification, duplicate Client handling, and account linking need explicit rules;</li>
+<li>notifications become part of the access and recovery design;</li>
+<li>retention and deletion must cover guest contact data as well as account data.</li>
+</ul>
+<h2 id="open-follow-up">Open follow-up</h2>
+<p>Choose rate limits, recovery, and whether clients may link a UserAccount later. Email ClientAccess, optional flexible manual WhatsApp support, token lifetime, and default duplicate handling are resolved.</p>
+</main>
+<footer class="site">
+<p><a href="../index.html">Index</a> · <a href="../adr/index.html">All ADR</a> · <a href="../baseline/index.html">Baseline docs</a></p>
+<p>Generated from <code>/home/jar/output/psychology-research/seraya-psikologi-domain/</code> · Round 6 closure · 2026-08-31</p>
+</footer>
+</body>
+</html>

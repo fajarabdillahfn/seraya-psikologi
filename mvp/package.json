@@ -1,0 +1,28 @@
+{
+  "name": "seraya-psikologi-mvp",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Seraya Psikologi — booking and payment MVP. Cloudflare Worker + D1. Implementation baseline 2026-08-31 (post Round 3).",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "migrate:local": "wrangler d1 migrations apply seraya-db --local",
+    "migrate:remote": "wrangler d1 migrations apply seraya-db --remote",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc --noEmit",
+    "seed:local": "node scripts/seed.mjs --local",
+    "seed:remote": "node scripts/seed.mjs --remote"
+  },
+  "dependencies": {
+    "hono": "4.5.0"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "4.20240821.0",
+    "@types/node": "20.14.10",
+    "miniflare": "3.20240806.1",
+    "typescript": "5.5.3",
+    "vitest": "2.0.5",
+    "wrangler": "3.78.4"
+  }
+}

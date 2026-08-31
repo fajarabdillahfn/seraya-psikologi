@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ADR 0033 · Give Psychologists Scoped Assigned-client Visibility — Seraya Psikologi Docs</title>
+<link rel="stylesheet" href="../assets/main.css">
+</head>
+<body>
+<header class="site">
+<h1>Seraya Psikologi — Documentation</h1>
+<p class="lede">Booking and payment MVP · Implementation baseline · 96 ADR</p>
+</header>
+<nav class="crumbs"><a href="../index.html">Home</a> › ADR 0033 · Give Psychologists Scoped Assigned-client Visibility</nav>
+<main>
+<h1 id="33-give-psychologists-scoped-assigned-client-visibility">33. Give Psychologists Scoped Assigned-client Visibility</h1>
+<h2 id="status">Status</h2>
+<p>Accepted for the MVP working model; exact field matrix and contact necessity by service remain open.</p>
+<h2 id="context">Context</h2>
+<p>Psychologists need enough operational information to conduct assigned appointments, but the MVP does not contain clinical records and should not expose unrelated client/payment/privacy data. A broad Client history view would exceed the scheduling boundary.</p>
+<h2 id="decision">Decision</h2>
+<p>A Psychologist may view only appointments/package entitlements assigned to that Psychologist and the minimum operational client fields needed for the appointment: display name, service/offering, scheduled time, mode, and contact details only when operationally necessary. They cannot browse other psychologists' bookings, full Client history, payment details, full ConsentRecord history, or PrivacyRequest operations.</p>
+<p>Admin retains cross-provider operational access subject to audit. Editor has no client visibility.</p>
+<h2 id="consequences">Consequences</h2>
+<p>Positive:</p>
+<ul>
+<li>least-privilege access maps to assignment;</li>
+<li>team members can perform the session operation without a clinical system;</li>
+<li>payment/privacy boundaries remain separate;</li>
+<li>cross-provider browsing is prevented by design.</li>
+</ul>
+<p>Costs and constraints:</p>
+<ul>
+<li>assignment changes need audit and effective-time rules;</li>
+<li>APIs must enforce scope server-side, not only hide UI fields;</li>
+<li>contact necessity may differ by service/mode;</li>
+<li>admin support needs an audited break-glass path if ever required.</li>
+</ul>
+<h2 id="open-follow-up">Open follow-up</h2>
+<p>Define exact field matrix, assignment lifecycle, whether contact is always visible or conditionally revealed, and admin break-glass approval/logging.</p>
+</main>
+<footer class="site">
+<p><a href="../index.html">Index</a> · <a href="../adr/index.html">All ADR</a> · <a href="../baseline/index.html">Baseline docs</a></p>
+<p>Generated from <code>/home/jar/output/psychology-research/seraya-psikologi-domain/</code> · Round 6 closure · 2026-08-31</p>
+</footer>
+</body>
+</html>
