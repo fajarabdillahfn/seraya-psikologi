@@ -190,7 +190,7 @@ export class BookingModule {
         sql: `INSERT INTO slot_hold
               (id, booking_id, slot_id, expires_at, state)
               VALUES (?, ?, ?, ?, 'active')`,
-        params: [slotHoldId, bookingId, slotHoldId, expiresAt],
+        params: [slotHoldId, bookingId, args.slotId, expiresAt],
       },
       {
         sql: `INSERT INTO capacity_reservation

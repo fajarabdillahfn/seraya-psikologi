@@ -216,8 +216,8 @@ CREATE TABLE IF NOT EXISTS booking (
   id                    TEXT PRIMARY KEY,
   client_id             TEXT NOT NULL REFERENCES client(id),
   offer_snapshot_id     TEXT NOT NULL REFERENCES offer_snapshot(id),
-  state                 TEXT NOT NULL DEFAULT 'pending_payment'
-                        CHECK (state IN ('pending_payment','confirmed','cancelled','expired','failed','paid_late')),
+  state                 TEXT NOT NULL DEFAULT 'pending_manual_payment'
+                        CHECK (state IN ('pending_manual_payment','awaiting_confirmation','confirmed','cancelled','expired','failed','paid_late','pending_payment')),
   is_package            INTEGER NOT NULL DEFAULT 0 CHECK (is_package IN (0,1)),
   is_couple             INTEGER NOT NULL DEFAULT 0 CHECK (is_couple IN (0,1)),
   intake_short_message  TEXT,

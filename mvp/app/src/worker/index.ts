@@ -466,7 +466,8 @@ app.notFound((c) =>
 
 app.onError((err, c) => {
   console.error(err);
-  return c.html(`<h1>500</h1><p>Terjadi kesalahan. <a href='/safety/crisis'>Butuh bantuan segera?</a></p>`, 500);
+  const message = err instanceof Error ? err.message : String(err);
+  return c.html(`<h1>500</h1><p>Terjadi kesalahan. <a href='/safety/crisis'>Butuh bantuan segera?</a></p><pre style="white-space: pre-wrap; font-size: 0.8rem; background: #fafafa; padding: 1rem; border-radius: 8px;">${message}</pre>`, 500);
 });
 
 export default app;

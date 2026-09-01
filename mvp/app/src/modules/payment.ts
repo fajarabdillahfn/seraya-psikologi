@@ -233,13 +233,14 @@ export class WhatsAppManualPaymentModule {
       sql: `SELECT b.id AS booking_id,
                    c.display_name AS client_display_name,
                    c.contact_email AS client_contact_email,
-                   so.display_name AS offering_name,
+                   s.display_name AS offering_name,
                    os.price_idr AS amount_idr,
                    sh.expires_at AS expires_at
             FROM booking b
             JOIN client c ON c.id = b.client_id
             JOIN offer_snapshot os ON os.id = b.offer_snapshot_id
             JOIN service_offering so ON so.id = os.offering_id
+            JOIN service s ON s.id = so.service_id
             LEFT JOIN slot_hold sh ON sh.booking_id = b.id
             WHERE b.id = ?`,
       params: [bookingId],
