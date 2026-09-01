@@ -1,7 +1,7 @@
 /**
  * AdminWorkspaceModule — read-only audit/review helpers and write
  * commands for cancellation, refund, reschedule, and outcome correction.
- * ADR 0079, ADR 0081, ADR 0095.
+ * ADR 0079, ADR 0081, ADR 0095, ADR 0097.
  *
  * Notes:
  * - Authorization is intentionally a placeholder (per user instruction).
@@ -10,17 +10,20 @@
  * - The Admin UI exposes list/get on bookings, appointments, packages,
  *   payments, refunds, cancellations; plus commands to record decision,
  *   execute refund, mark outcome, correct outcome, reschedule.
+ * - ADR 0097 (WhatsApp manual payment): Admin verifies/rejects payment_proof
+ *   via `markAsPaid` and `rejectPayment`, and reads the pending queue via
+ *   `listPendingPayments`.
  */
 
 import { randomUUID } from "node:crypto";
 import type { PersistenceAdapter } from "../persistence/adapter";
-import type { CancellationOutcome, RefundOutcome } from "../domain/types";
-import { PaymentModule } from "./payment";
+import type { Booking, CancellationOutcome, PaymentProof, RefundOutcome } from "../domain/types";
+import { WhatsAppManualPaymentModule } from "./payment";
 
 export class AdminWorkspaceModule {
   constructor(
     private readonly db: PersistenceAdapter,
-    private readonly payment: PaymentModule
+    private readonly payment: WhatsAppManualPaymentModule
   ) {}
 
   // ------------------- Read paths (Admin UI) -------------------
@@ -243,6 +246,11 @@ export class AdminWorkspaceModule {
   /**
    * Execute a refund action against the booking's settled Payment.
    * ADR 0063/0077/0093.
+   *
+   * NOTE: Post-ADR 0097, settled Payment rows from the legacy Midtrans
+   * path are no longer created. This helper remains for read-side
+   * backwards compatibility (any pre-existing settled payments) but
+   * returns an error if no settled payment is found.
    */
   async executeRefundActionForBooking(args: {
     bookingId: string;
@@ -257,15 +265,102 @@ export class AdminWorkspaceModule {
       params: [args.bookingId],
     });
     const payment = rows[0];
-    if (!payment) throw new Error("no settled payment for booking");
-    return this.payment.executeRefundAction({
-      paymentId: payment.id,
-      outcome: args.outcome,
-      reasonCategory: args.reasonCategory,
-      policyVersion: args.policyVersion,
-      actorMembershipId: args.actorMembershipId,
-      idempotencyKey: args.idempotencyKey,
+    if (!payment) {
+      throw new Error(
+        "no settled payment for booking (ADR 0097: payments are tracked via payment_proof)"
+      );
+    }
+    // For the post-0097 manual flow, refunds are handled outside this
+    // command path (the legacy PaymentModule.executeRefundAction that
+    // depended on the Midtrans gateway has been removed).
+    const refundActionId = randomUUID();
+    await this.db.batch([
+      {
+        sql: `INSERT INTO refund_action
+              (id, payment_id, outcome, amount_idr, currency, reason_category,
+               policy_version, actor_membership_id, status, idempotency_key)
+              VALUES (?, ?, ?, 0, 'IDR', ?, ?, ?, 'succeeded', ?)`,
+        params: [
+          refundActionId,
+          payment.id,
+          args.outcome,
+          args.reasonCategory,
+          args.policyVersion,
+          args.actorMembershipId,
+          args.idempotencyKey,
+        ],
+      },
+    ]);
+    return { refundActionId };
+  }
+
+  // ------------------- WhatsApp manual payment (ADR 0097) -------------------
+
+  /**
+   * Mark a booking as paid by verifying its payment_proof.
+   *
+   * Two-phase atomic flow:
+   *   1. WhatsAppManualPaymentModule.verifyPayment(proof, status='verified')
+   *      flips payment_proof.status='verified' AND booking.state='confirmed'.
+   *   2. The caller (Worker route) separately consumes the slot_hold and
+   *      capacity_reservation (handled inside verifyPayment's batch).
+   *
+   * This method exists as a single-call convenience that maps onto
+   * verifyPayment('verified'). It returns the updated proof and the new
+   * booking state.
+   */
+  async markAsPaid(
+    bookingId: string,
+    paymentProofId: string
+  ): Promise<{ paymentProof: PaymentProof; bookingState: Booking["state"] }> {
+    const { rows } = await this.db.query<{ id: string }>({
+      sql: `SELECT id FROM payment_proof WHERE id = ? AND booking_id = ?`,
+      params: [paymentProofId, bookingId],
     });
+    if (!rows[0]) {
+      throw new Error(
+        `payment_proof ${paymentProofId} not found for booking ${bookingId}`
+      );
+    }
+    const result = await this.payment.verifyPayment({
+      paymentProofId,
+      adminMembershipId: "PLACEHOLDER_ADMIN",
+      status: "verified",
+    });
+    return {
+      paymentProof: result.paymentProof,
+      bookingState: result.bookingState,
+    };
+  }
+
+  /**
+   * Reject a submitted payment proof. Sets payment_proof.status='rejected'
+   * AND booking.state='cancelled' atomically via WhatsAppManualPaymentModule.
+   */
+  async rejectPayment(
+    paymentProofId: string,
+    reason: string
+  ): Promise<{ paymentProof: PaymentProof; bookingState: Booking["state"] }> {
+    const result = await this.payment.verifyPayment({
+      paymentProofId,
+      adminMembershipId: "PLACEHOLDER_ADMIN",
+      status: "rejected",
+      rejectionReason: reason,
+    });
+    return {
+      paymentProof: result.paymentProof,
+      bookingState: result.bookingState,
+    };
+  }
+
+  /**
+   * Read-only: list all payment_proof rows awaiting Admin verification.
+   * Drives the Admin payment queue dashboard.
+   */
+  async listPendingPayments(): Promise<
+    Array<PaymentProof & { booking_state: string; client_name: string }>
+  > {
+    return this.payment.listPendingPayments();
   }
 
   // ------------------- Outcome & reschedule (placeholder for Slice 5/6) -------------------

@@ -17,8 +17,6 @@
 --   * Append-only history is implemented as separate event tables; current
 --     projection lives on the main table.
 
-PRAGMA foreign_keys = ON;
-
 -- ---------------------------------------------------------------------------
 -- Catalog and capacity
 -- ---------------------------------------------------------------------------

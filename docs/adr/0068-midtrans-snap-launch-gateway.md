@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted for launch planning; Midtrans is the single gateway-of-record and Snap is the initial checkout surface. Initial method categories (QRIS + bank transfer/Virtual Account) are resolved by ADR 0069. Exact activated method codes, merchant onboarding eligibility, method-specific refund coverage/fees, and reconciliation cadence remain open operational follow-ups.
+**Superseded for MVP launch; kept as future option. WhatsApp manual payment is launch path per [ADR 0097](../0097-whatsapp-manual-payment.md).** Midtrans Snap is no longer the launch payment path. The decision below describes the Midtrans option that may be reactivated post-MVP via a future ADR; the launch path is manual bank transfer / VA / QRIS off-platform with Admin "Mark as paid" verification in the Admin workspace.
 
 ## Context
 

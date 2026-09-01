@@ -74,8 +74,8 @@ Jika konflik belum terselesaikan, jangan memilih diam-diam. Buat `TBC` atau bloc
 - Guest booking tanpa akun penuh.
 - Optional UserAccount/Google linking untuk client tetap terpisah dari staff access.
 - Email adalah automated channel utama.
-- Midtrans + Snap adalah gateway-of-record launch.
-- Payment method launch hanya QRIS dan bank transfer/Virtual Account.
+- **WhatsApp manual payment adalah launch path** (PDF + plain text invoice, Admin "Mark as paid"). Tidak ada payment gateway di launch (`ADR 0097`); Midtrans deferred post-MVP (`ADR 0068` superseded).
+- Payment method launch: `bank_transfer`, `va`, `qris_manual` — semuanya off-platform settlement.
 - Cloudflare Worker + D1 adalah implementation baseline proyek saat ini.
 
 ### 2.2 Out of scope — DEFERRED
@@ -417,59 +417,200 @@ correction (repeat rule, ADR 0095 §4):
 - Fuja `anytime/anyplace` hanya placeholder PRD/design.
 - Production slot publication wajib menunggu schedule/location nyata.
 
-## 7. Payment implementation
+## 7. Payment implementation — WhatsApp manual flow (per `ADR 0097`)
 
-### 7.1 Adapter interface — CONFIRMED seam
+Launch path tidak menggunakan payment gateway. Klien menerima invoice PDF + plain text via WhatsApp, membayar manual (bank transfer / VA / QRIS), mengirim bukti ke Admin WhatsApp, dan Admin menandai Booking sebagai paid via tombol "Mark as paid" di Admin workspace. Refund tetap off-platform (`ADR 0077` vocabulary). Midtrans Snap deferred post-MVP (`ADR 0068` superseded).
 
-Gunakan interface provider-neutral seperti:
+### 7.0 Launch payment model — CONFIRMED (per `ADR 0097`)
 
-```ts
-interface PaymentGatewayAdapter {
-  createCheckout(input: CreateCheckoutInput): Promise<CheckoutCreated>;
-  verifyNotification(input: unknown): Promise<VerifiedPaymentEvent>;
-  requestFullRefund(input: FullRefundInput): Promise<RefundProviderResult>;
-}
+- **Tidak ada payment gateway.** Klien membayar manual ke rekening / VA / QRIS Seraya. Invoice diberikan via WhatsApp dalam format PDF (downloadable) dan plain text (untuk share).
+- **Booking state machine (payment-relevant)**: `pending_manual_payment` → `awaiting_confirmation` → `confirmed` (mark-as-paid) → `cancelled`.
+- **Admin verification**: tombol "Mark as Paid" di Admin workspace. Command `MarkAsPaid` menerima `payment_method`, `amount_idr`, `evidence_url` (nullable), `evidence_note` (nullable), dan atomic-insert `payment_proof` row + update `Payment.status = 'paid'` + `Booking.status = 'confirmed'` + outbox event dalam satu transaction.
+- **`payment_proof` table** (append-only): fields `id`, `booking_id`, `payment_method` (`bank_transfer` | `va` | `qris_manual`), `amount_idr`, `evidence_url`, `evidence_note`, `verified_by_membership_id`, `verified_at`, `status` (`verified` | `rejected`), `correction_of` (nullable). Re-verify path: Admin reject existing row + create new row dengan `correction_of` linkage; original immutable.
+- **Audit trail**: setiap state change logged ke `audit_record` dengan `actor_membership_id`, `before_state`, `after_state`, `reason_code`, `timestamp`. Tidak ada rewrite in-place.
+- **Settlement uniqueness invariant tetap berlaku** (`ADR 0093 §1.2`): unique partial index `payment(booking_id) WHERE status = 'paid' AND settled_at IS NOT NULL` + application-level precheck di `MarkAsPaid` handler.
+- **Refund**: `RefundAction` `full_refund` / `no_refund` per `ADR 0077`; `provider_reference = "manual_bank_transfer:<date>:<admin_ref>"`; `status` transitions `pending → completed` (Admin confirms off-platform transfer) atau `failed`.
+
+### 7.1 Invoice generation — CONFIRMED
+
+Invoice adalah **immutable output** per Booking, generated on-demand dari `OfferSnapshot` + payment instructions di Admin CMS config. Dua format tersedia:
+
+#### 7.1.1 PDF invoice
+
+Server-side rendered via template engine (puppeteer / pdfkit / equivalent). Fields:
+
+- `invoice_id`: `INV-<booking_id>`
+- `issued_at`: ISO 8601 Asia/Jakarta
+- `due_at`: `issued_at + 24h`
+- `client_name`, `client_email`
+- `booking_id`
+- `service_offering_name`, `mode` (`online` | `offline`), `sessions` (`1` | `2` | `3` | `couple-3`)
+- `amount_idr` (integer, formatted sebagai `Rp X.XXX.XXX`)
+- `payment_instructions`: dari Admin CMS config (`bank_transfer` → `bank_name`/`account_number`/`account_holder`; `va` → `va_number`; `qris_manual` → `qris_image_url`)
+- `support_whatsapp`: `wa.me/<admin_number>`
+- `disclaimer`: "Pembayaran akan dikonfirmasi dalam 1 hari kerja setelah bukti diterima."
+
+**Tidak termasuk**: clinical information, contact phone (jika ada), BookingParticipant detail untuk couple — hanya identitas payer.
+
+PDF di-cache per `booking_id`. Signed URL dengan retention mengikuti Booking (12 bulan setelah last active service, `ADR 0083`). Regen hanya jika `OfferSnapshot` berubah (tidak seharusnya — snapshot immutable).
+
+#### 7.1.2 Plain text invoice
+
+Static template dengan field substitution. Format WhatsApp-friendly (markdown lite: `*bold*`, list):
+
+```
+*SERAYA PSIKOLOGI — INVOICE*
+
+Invoice ID: INV-<booking_id>
+Issued: <YYYY-MM-DD HH:mm WIB>
+Due: <YYYY-MM-DD HH:mm WIB> (24 jam)
+
+Client: <client_name>
+Email: <client_email>
+Booking ID: <booking_id>
+Service: <service_offering_name>
+Mode: <online|offline>
+Sessions: <1 | 2 | 3 | couple-3>
+Amount: Rp <amount formatted>
+
+*Payment Instructions*
+Method: <bank_transfer|va|qris_manual>
+<bank_name>: <account_number>
+a/n: <account_holder>
+<VA number>  (jika applicable)
+<QRIS image: <url>>  (jika applicable)
+
+Setelah membayar, mohon kirim bukti transfer ke WhatsApp Admin: wa.me/<admin_number>
+
+Pembayaran akan dikonfirmasi dalam 1 hari kerja.
 ```
 
-Nama type boleh berubah, tetapi adapter wajib menyembunyikan:
+#### 7.1.3 Generation rules
 
-- provider status names;
-- provider payload shape;
-- signature verification;
-- provider reference format;
-- provider retry semantics.
+- Endpoint: `GET /api/booking/{booking_id}/invoice.pdf` (PDF) dan `GET /api/booking/{booking_id}/invoice.txt` (plain text).
+- Authorization: ClientAccess scoped ke Booking (self-service) **atau** Admin session.
+- Idempotent: regenerating invoice tidak membuat side effect; output deterministik untuk input yang sama.
+- Payment instructions di Admin CMS config — **bukan hardcode**. Admin mengelola via `Admin CMS → Payment Settings`. Default fallback saat kosong: tampilkan error "Payment instructions not configured. Hubungi Admin." (graceful failure).
+- Retention: PDF di-object storage dengan retention policy 12 bulan; auto-delete setelah retention expiry per `ADR 0083` + `IMPLEMENTATION-GUIDE.md §9`.
 
-### 7.2 Midtrans launch
+#### 7.1.4 Invoice buttons di client confirmation page
 
-- Adapter: Midtrans Snap.
-- Enabled categories: QRIS dan bank transfer/Virtual Account.
-- Unsupported methods tidak ditampilkan di checkout.
-- Browser redirect hanya informational.
-- Signed server-verified notification/webhook menghasilkan `PaymentEvent`.
-- Duplicate webhook harus aman.
-- Webhook datang sebelum/bersamaan/delayed terhadap redirect harus aman.
+- **Download Invoice (PDF)** — link ke signed URL PDF.
+- **Copy Invoice Text** — copy plain text ke clipboard client.
+- **Kirim via WhatsApp** — `wa.me/<admin_number>?text=<url_encoded_plain_text_invoice>` deep link.
 
-**TBC-PAY-01 / PRODUCTION GATE:** exact Midtrans method codes, merchant onboarding, fees, limits, expiry behavior, refund coverage, signature/API verification evidence, retry/dead-letter policy, dan reconciliation cadence.
+### 7.2 Mark-as-paid workflow (Admin workspace) — CONFIRMED
 
-Implementasikan `PaymentGatewayAdapter` dengan fake/in-memory adapter untuk unit/domain tests. Jangan membuat domain code bergantung langsung pada Midtrans SDK.
+#### 7.2.1 `MarkAsPaid` command
 
-### 7.3 Settlement uniqueness invariants — CONFIRMED
+| Aspect | Spec |
+|---|---|
+| Input | `booking_id`, `payment_method` (`bank_transfer` \| `va` \| `qris_manual`), `amount_idr`, `evidence_url` (nullable, signed URL ke uploaded screenshot di R2), `evidence_note` (nullable, max 500 char), `actor_membership_id` |
+| Precondition | `booking.status IN ('pending_manual_payment', 'awaiting_confirmation')`; `payment.status = 'pending_manual_payment'`; `payment.provider = 'manual_whatsapp'`; tidak ada `payment_proof` existing dengan `status = 'verified'` untuk `booking_id` |
+| Authorization | Admin only (StaffMembership.role = 'admin') |
+| Idempotency | `idempotency_key = booking_id`; re-submit dengan key sama = no-op + return existing `payment_proof.id` |
+| Atomic effects (single transaction) | (1) `INSERT INTO payment_proof ...`; (2) `UPDATE payment SET status = 'paid', settled_at = now()`; (3) `UPDATE booking SET status = 'confirmed'`; (4) untuk package: slot reacquire attempt per `ADR 0091` + `PackagePurchase` + ordered `SessionEntitlement` (`SessionEntitlement #1.state = 'scheduled'` jika reacquire sukses, `'pending_schedule'` jika gagal); (5) `INSERT INTO audit_record` (action `mark_as_paid`, reason `manual_whatsapp_verified`); (6) outbox: `booking_confirmed` + `payment_received` email |
+| Output | `payment_proof_id`, `booking.status = 'confirmed'`, `payment.status = 'paid'`, `payment.settled_at` |
 
-Diperlukan oleh `ADR 0093-payment-settlement-uniqueness.md`. Berlaku untuk semua `PaymentGatewayAdapter`, bukan hanya Midtrans:
+#### 7.2.2 `RejectPaymentProof` command
 
-- **At-most-one successful settlement per `Booking.id` / purchase intent.** Tepat satu `Payment` dengan `status = 'paid'` (yaitu `settled_at IS NOT NULL`) per `Booking.id`. Ditegakkan oleh unique partial index `payment(booking_id) WHERE status = 'paid' AND settled_at IS NOT NULL` plus application-level precheck di webhook handler (defense-in-depth, mengikuti pola `ADR 0091` capacity overlap).
-- **Amount/currency/order/merchant match wajib**, bukan hanya signature. `verifyNotification` melakukan value match check; application handler melakukan second verification terhadap `Booking.snapshotted_amount`, `OfferSnapshot.amount_cents`, `OfferSnapshot.currency`, `Booking.id`, dan configured merchant ID. Mismatch → `payment_event_mismatch_log` entry + rollback; tidak ada state transition.
-- **Idempotency key scope: lifetime, payload fingerprint.** `payment_event_idempotency` keyed by `(provider_event_id, payment_intent_id)` adalah lifetime (tidak ada TTL selama `PaymentEvent` masih ada). `payload_hash = sha256(canonical_json(payload))`. Same key + same hash → return existing event result; same key + different hash → typed failure `idempotency_key_collision` (rollback, tidak diam-diam overwrite); different key + same payload → new `PaymentEvent` row, no-op transition jika sudah settled.
-- **Out-of-order / repeated-status mapping** (lihat `ADR 0093 §4.1`): `capture`/`settlement` final → `Payment.status = 'paid'` + state transition; `pending` → no-op; `deny`/`cancel`/`expire`/`failure` → `Payment.status = 'failed'`; `refund`/`chargeback` → no-op di `Payment` (refund adalah `RefundAction` terpisah per `ADR 0077`); `challenge` → Admin review, no state change. Duplicate `capture` untuk Booking yang sudah settled → idempotency hit, no `Payment` kedua, no email konfirmasi tambahan.
-- **Crash window tiga-lapis**:
-  1. Antara provider API call dan persistence: optimistic insert `Payment status = 'pending'` + `payment_event_idempotency` keyed by `createCheckout` correlation dalam satu transaction.
-  2. Antara verified webhook dan state transition: webhook handler transaction — insert idempotency record (`ON CONFLICT DO NOTHING`), insert `PaymentEvent`, value match check, state transition (insert/update `Payment`), outbox event, semua dalam satu transaction.
-  3. Antara transition dan outbox delivery: transactional outbox pattern (`application_outbox` table); outbox dispatcher best-effort dengan idempotency dan exponential backoff; dead-letter setelah N retry.
-- **Verified event + state transition + outbox harus atomic.** Crash di antara tiga langkah = transaction rollback + retry-safe. Tidak ada partial-commit state yang dapat direkonstruksi sebagai sukses oleh klien.
+| Aspect | Spec |
+|---|---|
+| Input | `payment_proof_id`, `reason_note` (required, max 500 char), `actor_membership_id` |
+| Precondition | `payment_proof.status = 'verified'`; `booking.status = 'confirmed'` |
+| Effect | `payment_proof.status = 'rejected'` (audit-logged sebagai `payment_proof_rejected`). **Tidak** mengubah `booking.status` atau `payment.status` (financial tetap settled). |
+| Follow-up | Admin minta bukti baru via WhatsApp; jika diterima, Admin create new `payment_proof` row dengan `correction_of = <original_row_id>`. Original immutable history. |
 
-### 7.4 Midtrans adapter contract — CONFIRMED
+#### 7.2.3 `MarkAwaitingConfirmation` command
 
-`PaymentGatewayAdapter` interface (provider-neutral, type names dapat berubah):
+| Aspect | Spec |
+|---|---|
+| Input | `booking_id`, `actor_membership_id` |
+| Precondition | `booking.status = 'pending_manual_payment'` |
+| Effect | `booking.status = 'awaiting_confirmation'`. SlotHold released (slot kembali ke available pool). Tidak menggerakkan payment. |
+| Use case | Admin melihat bukti masuk via WhatsApp, toggle state sebelum verifikasi final. |
+
+#### 7.2.4 Booking state transitions di Admin workspace
+
+| From | Event | To | Side effects |
+|---|---|---|---|
+| `pending_manual_payment` | Client klik "Saya sudah bayar" / Admin `MarkAwaitingConfirmation` | `awaiting_confirmation` | SlotHold released; email reminder ke Admin `admin_invoice_sent`. |
+| `pending_manual_payment` / `awaiting_confirmation` | Admin `MarkAsPaid` | `confirmed` | `payment_proof` insert; `Payment.status = 'paid'` + `settled_at`; slot reacquire attempt (single-session → `Appointment` confirmed atau pending reconcile; package → `SessionEntitlement #1` scheduled atau pending_schedule); outbox events. |
+| `pending_manual_payment` / `awaiting_confirmation` | CancellationRequest approve, atau Admin manual cancel (no proof dalam 24h window) | `cancelled` | Slot released per `ADR 0095`. `RefundAction` terpisah jika applicable (tidak ada paid amount → no refund action). |
+
+### 7.3 `payment_proof` audit — CONFIRMED
+
+#### 7.3.1 Schema (D1/SQLite + Postgres equivalent)
+
+```sql
+CREATE TABLE payment_proof (
+  id                          TEXT PRIMARY KEY,
+  booking_id                  TEXT NOT NULL REFERENCES booking(id),
+  payment_method              TEXT NOT NULL CHECK (payment_method IN ('bank_transfer','va','qris_manual')),
+  amount_idr                  INTEGER NOT NULL CHECK (amount_idr > 0),
+  evidence_url                TEXT,
+  evidence_note               TEXT,
+  verified_by_membership_id   TEXT NOT NULL REFERENCES staff_membership(id),
+  verified_at                 TEXT NOT NULL,
+  status                      TEXT NOT NULL CHECK (status IN ('verified','rejected')),
+  correction_of               TEXT REFERENCES payment_proof(id),
+  created_at                  TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
+);
+
+CREATE INDEX idx_payment_proof_booking_id ON payment_proof(booking_id);
+CREATE INDEX idx_payment_proof_verified_at ON payment_proof(verified_at);
+CREATE UNIQUE INDEX payment_proof_one_verified_per_booking
+  ON payment_proof(booking_id) WHERE status = 'verified';
+```
+
+#### 7.3.2 Append-only invariant
+
+- Tidak ada `UPDATE` pada `id`, `booking_id`, `payment_method`, `amount_idr`, `verified_by_membership_id`, `verified_at`, `created_at`.
+- `status` transisi `verified → rejected` diizinkan via `RejectPaymentProof` (audit-logged, bukan in-place).
+- Setiap re-verify membuat row baru dengan `correction_of` linkage ke row rejected.
+
+#### 7.3.3 Idempotency
+
+- `MarkAsPaid` dengan `idempotency_key = booking_id`: re-submit return existing `payment_proof.id`, no duplicate insert.
+- Unique partial index `payment_proof_one_verified_per_booking` mencegah dua `verified` row untuk satu booking pada satu waktu.
+
+#### 7.3.4 Audit trail integration
+
+Setiap `payment_proof` row di-link ke `audit_record`:
+
+| payment_proof action | audit_record action | actor |
+|---|---|---|
+| Insert dengan `status = 'verified'` | `mark_as_paid` (juga mengaudit Booking transition) | admin |
+| Update `status = 'verified' → 'rejected'` | `payment_proof_rejected` | admin |
+| Insert dengan `correction_of != null` | `payment_proof_re_verified` | admin |
+
+#### 7.3.5 Retention
+
+`payment_proof` rows tunduk pada Payment/Refund retention policy (audit/legal). Default aman: 7 tahun (Indonesian PSAK + UU PDP untuk financial record), tapi exact duration adalah `TBC-PAY-MANUAL-01` operational concern (admin/finance owner). `evidence_url` (uploaded screenshot) mengikuti retention yang sama; auto-delete dari R2 setelah expiry.
+
+#### 7.3.6 Acceptance test untuk payment_proof
+
+1. **Single verify path**: Admin Mark as Paid → `payment_proof` row dengan `status = 'verified'` → Booking `confirmed` → email `payment_received` terkirim. Atomic.
+2. **Re-verify path**: Admin reject existing `payment_proof` (status `rejected`) → Admin create new row dengan `correction_of = <original_id>` → new row `verified`, original immutable. Booking tetap `confirmed`.
+3. **Idempotency**: Admin double-click "Mark as Paid" → hanya satu `payment_proof` row, response return existing ID.
+4. **Settlement uniqueness**: Dua `MarkAsPaid` concurrent (race) → unique partial index reject salah satu + audit log `mark_as_paid_duplicate_attempt`. Hanya satu `Payment.status = 'paid'`.
+5. **Slot reacquire failure (package)**: Admin Mark as Paid untuk package dengan slot yang sudah ter-overlap → `SessionEntitlement #1.state = 'pending_schedule'` + `PackagePurchase.requires_first_session_scheduling = true`. Admin resolution via existing reconciliation flow (`ADR 0067`).
+
+### 7.4 Settlement uniqueness invariants — CONFIRMED (cross-reference `ADR 0093`)
+
+Diperlukan oleh `ADR 0093-payment-settlement-uniqueness.md`. Berlaku untuk semua payment path termasuk WhatsApp manual (per `ADR 0097`):
+
+- **At-most-one successful settlement per `Booking.id` / purchase intent.** Tepat satu `Payment` dengan `status = 'paid'` (yaitu `settled_at IS NOT NULL`) per `Booking.id`. Ditegakkan oleh unique partial index `payment(booking_id) WHERE status = 'paid' AND settled_at IS NOT NULL` plus application-level precheck di `MarkAsPaid` handler (defense-in-depth, mengikuti pola `ADR 0091` capacity overlap).
+- **Amount/currency match wajib** untuk manual flow. `MarkAsPaid` command melakukan value verification: `payment_proof.amount_idr == offer_snapshot.amount_cents` (Admin input, auto-fill dari OfferSnapshot, editable). Mismatch → typed failure `amount_mismatch`, no state transition. Untuk gateway flow (`PaymentGatewayAdapter`), `verifyNotification` melakukan value match check (`grossAmountCents`, `currency`, `merchantId`); application handler melakukan second verification terhadap `Booking.snapshotted_amount`, `OfferSnapshot.amount_cents`, `OfferSnapshot.currency`, `Booking.id`, dan configured merchant ID. Mismatch → `payment_event_mismatch_log` entry + rollback; tidak ada state transition.
+- **Idempotency key scope.** Untuk gateway flow: `payment_event_idempotency` keyed by `(provider_event_id, payment_intent_id)` adalah lifetime (tidak ada TTL selama `PaymentEvent` masih ada). `payload_hash = sha256(canonical_json(payload))`. Same key + same hash → return existing event result; same key + different hash → typed failure `idempotency_key_collision` (rollback, tidak diam-diam overwrite); different key + same payload → new `PaymentEvent` row, no-op transition jika sudah settled. Untuk manual flow: `MarkAsPaid` dengan `idempotency_key = booking_id`; re-submit return existing `payment_proof.id`, no duplicate insert. Unique partial index `payment_proof_one_verified_per_booking` mencegah dua `verified` row per booking.
+- **Out-of-order / repeated-status mapping** (lihat `ADR 0093 §4.1`): `capture`/`settlement` final → `Payment.status = 'paid'` + state transition; `pending` → no-op; `deny`/`cancel`/`expire`/`failure` → `Payment.status = 'failed'`; `refund`/`chargeback` → no-op di `Payment` (refund adalah `RefundAction` terpisah per `ADR 0077`); `challenge` → Admin review, no state change. Duplicate `capture` untuk Booking yang sudah settled → idempotency hit, no `Payment` kedua, no email konfirmasi tambahan. Untuk manual flow, tidak ada status mapping — Admin adalah operator; semua transisi eksplisit via command (`MarkAsPaid`, `RejectPaymentProof`, `MarkAwaitingConfirmation`).
+- **Crash window untuk manual flow**: tunggal (single transaction per command). `MarkAsPaid` transaction membungkus `INSERT payment_proof` + `UPDATE payment` + `UPDATE booking` + outbox event. Crash di tengah = transaction rollback + retry-safe via `idempotency_key`. Tidak ada crash window tiga-lapis (seperti Midtrans) untuk manual flow.
+- **Crash window untuk gateway flow (post-MVP jika Midtrans diaktifkan kembali)**: tiga-lapis per `ADR 0093 §1.2`.
+- **Verified event + state transition + outbox harus atomic.** Crash di antara langkah = transaction rollback + retry-safe. Tidak ada partial-commit state yang dapat direkonstruksi sebagai sukses oleh klien.
+
+### 7.5 ManualWhatsappAdapter contract — CONFIRMED (deferred post-MVP future gateway seam)
+
+`PaymentGatewayAdapter` interface tetap dipertahankan sebagai seam untuk reaktivasi payment gateway post-MVP. Untuk launch WhatsApp manual, adapter ini **di-stub** dengan `ManualWhatsappAdapter` yang tidak memanggil provider eksternal:
 
 ```ts
 interface PaymentGatewayAdapter {
@@ -490,40 +631,39 @@ interface CreateCheckoutInput {
 }
 
 interface CheckoutCreated {
-  provider: 'midtrans';
-  providerIntentId: string;     // Midtrans transaction_id
-  snapToken: string;
-  snapRedirectUrl: string;      // informational only, never settlement source
-  expiresAt: string;            // ISO timestamp; client countdown mirrors SlotHold TTL
+  provider: 'manual_whatsapp';  // launch: no provider; field untuk future gateway reactivation
+  providerIntentId: string;     // = Booking.id (no external transaction)
+  snapToken: null;              // not applicable
+  snapRedirectUrl: null;        // not applicable
+  expiresAt: null;              // not applicable; manual flow has no provider-side expiry
 }
 
 interface VerifiedPaymentEvent {
-  providerEventId: string;       // Midtrans notification id; idempotency key
+  providerEventId: string;       // = payment_proof.id; idempotency key
   paymentIntentId: string;      // = providerIntentId; FK to Payment
   bookingId: string;             // = order_id; must match Booking.id
   eventType:
-    | 'capture' | 'settlement'
-    | 'pending'
-    | 'deny' | 'cancel' | 'expire' | 'failure'
+    | 'capture' | 'settlement'   // → MarkAsPaid verified
+    | 'deny' | 'cancel' | 'expire' | 'failure'  // → Admin manual cancel
     | 'refund' | 'partial_refund' | 'chargeback'
     | 'challenge';
   grossAmountCents: number;     // must match OfferSnapshot.amount_cents
   currency: 'IDR';
-  merchantId: string;           // must match configured merchant
+  merchantId: string;           // launch: 'manual_whatsapp' (no real merchant)
   verifiedAt: string;           // ISO timestamp
   payloadHash: string;          // sha256 hex of canonical JSON payload
   rawPayloadRedacted: Record<string, unknown>;
 }
 
 interface FullRefundInput {
-  paymentProviderId: string;    // Midtrans transaction_id
+  paymentProviderId: string;    // launch: = booking.id (manual off-platform)
   amountCents: number;          // = captured amount for full_refund
   reasonCode: string;           // policy/version reference
   idempotencyKey: string;
 }
 
 interface RefundProviderResult {
-  provider: 'midtrans';
+  provider: 'manual_whatsapp';
   providerRefundId: string;
   status: 'completed' | 'pending' | 'failed';
   rawResult: Record<string, unknown>;
@@ -532,11 +672,10 @@ interface RefundProviderResult {
 
 Adapter wajib:
 
-- **Menyembunyikan** provider status names, payload shape, signature verification, provider reference format, retry semantics.
-- **Memverifikasi signature** server-side sebelum mengembalikan `VerifiedPaymentEvent`. Adapter tidak pernah mengembalikan event yang gagal signature verification.
-- **Melakukan value match** (`grossAmountCents`, `currency`, `merchantId`) sebelum return. Mismatch → throw typed error `provider_value_mismatch` (bukan `VerifiedPaymentEvent`); application handler kemudian log ke `payment_event_mismatch_log`.
-- **Tidak pernah menulis langsung ke domain tables.** Adapter hanya return value ke application; domain writes terjadi di application transaction.
-- **Idempotent untuk `createCheckout` retries** dengan `idempotencyKey` yang sama: return existing `providerIntentId`. (Per-call idempotency berbeda dari per-event idempotency.)
+- **Menyembunyikan** provider status names, payload shape, signature verification, provider reference format, retry semantics (untuk launch, semua ini `null` karena `ManualWhatsappAdapter` adalah stub).
+- **Untuk launch (`ManualWhatsappAdapter`)**: `createCheckout` return `CheckoutCreated` dengan `provider = 'manual_whatsapp'` dan semua field opsional `null`. `verifyNotification` selalu throw `manual_flow_unused` (gateway flow tidak digunakan di launch). `requestFullRefund` mengembalikan `RefundProviderResult { status: 'pending', providerRefundId: booking_id + '-manual' }` — Admin kemudian menandai `completed` setelah off-platform transfer selesai.
+- **Untuk future gateway reactivation (post-MVP)**: Midtrans adapter akan implement `verifyNotification` dengan signature verification + value match check. Application handler tetap melakukan second verification. Sama seperti dokumentasi asli Midtrans adapter contract di section ini (dipertahankan untuk forward compatibility).
+- **Idempotent untuk `createCheckout` retries** dengan `idempotencyKey` yang sama: return existing `providerIntentId`.
 - **Idempotent untuk `requestFullRefund` retries** dengan `idempotencyKey` yang sama: return existing `providerRefundId`.
 
 Adapter tidak wajib:
@@ -545,62 +684,82 @@ Adapter tidak wajib:
 - Memutuskan status `paid_late_*` (application handler yang decide berdasarkan `SlotHold` state).
 - Memutuskan `PackagePurchase` creation (application handler).
 
-### 7.5 `paid_late` package effects — CONFIRMED
+### 7.6 `paid_late` package effects — CONFIRMED
 
-Mengikuti `ADR 0093 §5`. Pada verified webhook untuk late payment (hold sudah expired):
+Mengikuti `ADR 0093 §5` Option A. Untuk manual flow, "late" tidak berlaku (tidak ada provider late event), tetapi **slot reacquire failure** pada `MarkAsPaid` menghasilkan efek yang sama dengan `paid_late_first_session_pending`:
 
 - **Slot reacquire berhasil** (atomic claim `CapacityReservation` mengikuti `ADR 0091`):
-  - `Payment.status = 'paid_late_slot_reacquired'`, `settled_at = now()`.
-  - `Booking.status = 'paid_late_slot_reacquired'`.
-  - `PackagePurchase.status = 'paid'` (atau `'paid_late'`).
+  - `Payment.status = 'paid'`, `settled_at = now()`.
+  - `Booking.status = 'confirmed'`.
+  - `PackagePurchase.status = 'paid'`.
   - `SessionEntitlement #1.state = 'scheduled'`, linked ke Appointment reacquired.
   - `SessionEntitlement #2..N.state = 'available'`, `PackageValidity.validity_start = now()`.
 - **Slot reacquire gagal** (overlap atau slot unavailable):
-  - `Payment.status = 'paid_late_first_session_pending'`, `settled_at = now()`.
-  - `Booking.status = 'paid_late_slot_unavailable'`.
-  - `PackagePurchase.status = 'paid_late'`, `requires_first_session_scheduling = true`.
-  - `SessionEntitlement #1.state = 'pending_schedule'`.
-  - `SessionEntitlement #2..N.state = 'available'`, `PackageValidity.validity_start = now()`.
+  - `Payment.status = 'paid'`, `settled_at = now()`.
+  - `Booking.status = 'confirmed'` (Payment tetap settled regardless).
+  - `Appointment.state = 'pending_schedule'` (single-session) atau `PackagePurchase.requires_first_session_scheduling = true` + `SessionEntitlement #1.state = 'pending_schedule'` (package).
+  - `SessionEntitlement #2..N.state = 'available'` (untuk package), `PackageValidity.validity_start = now()`.
   - Admin resolution: schedule alternative slot untuk #1 (→ `scheduled`), atau `full_refund` (→ PackagePurchase `closed_refunded`, semua remaining entitlement `cancelled`), atau hold for client decision via WhatsApp.
 
-Invariant: `PackagePurchase` dan `SessionEntitlement` rows dibuat **tepat pada saat webhook verified**, bukan ditunda. Financial truth terjaga. Admin resolution tidak pernah otomatis — selalu eksplisit Admin decision (konsisten dengan `ADR 0076` no auto-cutoff).
+Invariant: `PackagePurchase` dan `SessionEntitlement` rows dibuat **tepat pada saat MarkAsPaid verified**, bukan ditunda. Financial truth terjaga. Admin resolution tidak pernah otomatis — selalu eksplisit Admin decision (konsisten dengan `ADR 0076` no auto-cutoff).
 
-### 7.6 Duplicate webhook integration test (acceptance criteria #1)
+Status names `paid_late_slot_reacquired` / `paid_late_first_session_pending` dicadangkan untuk future gateway integration (saat Midtrans diaktifkan kembali, ADR baru menjelaskan mapping manual → gateway).
 
-Didefinisikan di `ADR 0093 §1.2`. Skenario test wajib:
+### 7.7 Duplicate Mark-as-Paid integration test (acceptance criteria #1)
 
-1. Buat `Booking` dengan `Booking.id = X`, hold aktif.
-2. Trigger Midtrans Snap checkout → `Payment` row `status = 'pending'` di-insert.
-3. Kirim dua webhook `capture` event berbeda `provider_event_id` (`event_a`, `event_b`) untuk `order_id = X` secara berurutan (atau concurrent).
+Didefinisikan di `ADR 0097 §7.2`. Skenario test wajib:
+
+1. Buat `Booking` dengan `Booking.id = X`. `Payment` row `status = 'pending_manual_payment'`, `provider = 'manual_whatsapp'`.
+2. Admin submit `MarkAsPaid` dengan `idempotency_key = X`, `payment_method = 'bank_transfer'`, `amount_idr = 235000`, `evidence_url = <signed_url>`, `evidence_note = 'BCA transfer 235000'`.
+3. Admin submit `MarkAsPaid` ulang dengan `idempotency_key = X` (double-click atau network retry).
 4. Assertion:
-   - Hanya satu `Payment` row dengan `status = 'paid'` (verified by unique partial index).
-   - `event_a` di-apply sebagai state transition.
-   - `event_b` adalah idempotency no-op (new `PaymentEvent` row inserted, `Payment` unchanged, no duplicate email).
+   - Hanya satu `payment_proof` row dengan `status = 'verified'` (verified by unique partial index).
+   - Submission pertama apply state transition: `Booking.status = 'confirmed'`, `Payment.status = 'paid'`, `settled_at = now()`.
+   - Submission kedua adalah idempotency no-op (return existing `payment_proof.id`, no duplicate row, no duplicate email).
 5. State akhir: Booking confirmed, `Payment.settled_at` di-set sekali (tidak di-update kedua kali).
 
-### 7.7 Paid-late package integration test (acceptance criteria #2)
+### 7.8 Slot reacquire failure integration test (acceptance criteria #2)
 
-Didefinisikan di `ADR 0093 §5`. Skenario test wajib:
+Didefinisikan di `ADR 0097 §7.2.6.5` dan `ADR 0093 §5`. Skenario test wajib:
 
-1. Buat `Booking` package (couple atau individual) dengan `Booking.id = Y`, hold aktif untuk slot `S1`.
-2. SlotHold expire (`released`).
-3. Midtrans Snap checkout expired (atau skip; trigger verified webhook langsung setelah expiry).
-4. Kirim verified webhook `capture` event untuk `order_id = Y`.
-5. Place `CapacityReservation` baru untuk slot lain (hold oleh Booking berbeda) untuk mensimulasikan overlap → reacquire attempt gagal.
-6. Assertion:
-   - `Payment.status = 'paid_late_first_session_pending'`, `settled_at` di-set.
-   - `PackagePurchase.status = 'paid_late'`, `requires_first_session_scheduling = true`.
+1. Buat `Booking` package (couple atau individual) dengan `Booking.id = Y`, `SlotHold` aktif untuk slot `S1`.
+2. Klien transfer manual dan kirim bukti.
+3. Place `CapacityReservation` baru untuk slot lain (hold oleh Booking berbeda) untuk mensimulasikan overlap → reacquire attempt akan gagal.
+4. Admin submit `MarkAsPaid` untuk `Y` dengan bukti valid.
+5. Assertion:
+   - `Payment.status = 'paid'`, `settled_at` di-set.
+   - `Booking.status = 'confirmed'`.
+   - `PackagePurchase.status = 'paid_late'` (atau flag `requires_first_session_scheduling = true`).
    - `SessionEntitlement #1.state = 'pending_schedule'`.
    - `SessionEntitlement #2..N.state = 'available'`.
-   - `PackageValidity.validity_start = now()` (bukan original checkout time).
-   - Booking original tidak confirmed (status `paid_late_slot_unavailable`); original slot reference di-keep untuk audit.
-7. Admin resolution action: `ScheduleNextEntitlement` untuk slot `S2` (different slot).
-8. Assertion post-resolution:
+   - `PackageValidity.validity_start = now()` (bukan original booking time).
+6. Admin resolution action: `ScheduleNextEntitlement` untuk slot `S2` (different slot).
+7. Assertion post-resolution:
    - `SessionEntitlement #1.state = 'scheduled'`, linked ke `Appointment` di `S2`.
    - `PackagePurchase.requires_first_session_scheduling = false`.
-   - `Booking` original tetap `paid_late_slot_unavailable` (historical); new `Booking` mungkin tercipta untuk reschedule per `IMPLEMENTATION-GUIDE.md §6.1` rules.
+   - `Booking` tetap `confirmed` (Payment settled, slot reacquire failure adalah orthogonal concern).
 
-`TBC-PAY-SETTLEMENT-01` closed by `ADR 0093-payment-settlement-uniqueness.md`; patch section §6.3 dan §6.4 cross-reference.
+### 7.9 Refund off-platform — CONFIRMED
+
+Mengikuti `ADR 0077` vocabulary (`full_refund` / `no_refund`):
+
+- `RefundAction` row di-create oleh Admin di Admin Cancellation & Refund Workspace setelah `CancellationDecision approve`.
+- `RefundAction.provider_reference = "manual_bank_transfer:<YYYY-MM-DD>:<admin_internal_ref>"`.
+- `RefundAction.status` transitions: `pending` (default saat create) → `completed` (setelah Admin konfirmasi transfer balik selesai) atau `failed` (transfer gagal, retry / bank berbeda).
+- Tidak ada automatic disbursement. Admin adalah operator.
+- `Payment.status` summary update via derived projection: `refunded_full` jika `RefundAction` `completed` dengan `full_refund`; `refunded_no_disbursement` jika `no_refund`. Bukan in-place rewrite historical.
+
+### 7.10 PRODUCTION GATE / TBC
+
+- **`TBC-PAY-MANUAL-01` (PRODUCTION GATE)**: Admin verification SLA (default ≤ 24 jam kerja), `payment_proof` retention duration (audit/legal policy), dispute escalation path (Admin → Operations → Finance), dan PDF rendering library choice. Operational concern; bukan domain blocker.
+
+`TBC-PAY-01` (Midtrans-specific evidence gap) **closed by `ADR 0097`** — Midtrans no longer in launch path; specific evidence not required for launch. Midtrans-specific items (merchant onboarding, sandbox test, retry/dead-letter) deferred post-MVP.
+
+`TBC-PAY-SETTLEMENT-01` tetap closed by `ADR 0093`; settlement uniqueness invariant berlaku untuk manual flow juga (unique partial index + application precheck).
+
+`TBC-PAY-EXPIRY-01` **closed by `ADR 0097`** — provider expiry no longer relevant (no provider). Reopen jika Midtrans diaktifkan kembali post-MVP.
+
+`TBC-PAY-SETTLEMENT-01` closed by `ADR 0093-payment-settlement-uniqueness.md`; manual flow coverage di `§7.4` di atas; patch section §6.3 dan §6.4 cross-reference.
 
 ## 8. Persistence and data rules
 

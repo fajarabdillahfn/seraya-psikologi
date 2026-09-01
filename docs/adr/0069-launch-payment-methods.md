@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted for launch planning; the initial method categories are QRIS and bank transfer/Virtual Account. Exact Midtrans method activation, bank/channel selection, fees, limits, and method-specific refund coverage remain pre-launch verification items.
+**Superseded for MVP launch; the payment method categories are retained but delivered as off-platform manual settlement per [ADR 0097](../0097-whatsapp-manual-payment.md).** Launch methods (`bank_transfer`, `va`, `qris_manual`) are paid directly to Seraya's bank account / VA number / static QRIS — the client receives a PDF + plain-text invoice via WhatsApp and an Admin verifies the payment proof in the Admin workspace. No payment gateway is involved in the launch path.
 
 ## Context
 

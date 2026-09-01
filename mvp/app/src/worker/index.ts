@@ -3,10 +3,12 @@
  *
  * Implements:
  * - Public marketing surfaces (Home, SERAYA PULANG, About, Fuja profile, FAQ)
- * - Booking flow (offer selection, slot selection, intake, payment, confirmation)
+ * - Booking flow (offer selection, slot selection, intake, WhatsApp invoice, confirmation)
  * - ClientAccess (magic-link issuance, scoped session, booking view)
- * - Admin workspace (placeholder; auth = stub until TBC-STAFF-SESSION-01 closes)
- * - Midtrans webhook ingestion (placeholder; provider adapter is a stub)
+ * - Admin workspace (placeholder auth until TBC-STAFF-SESSION-01 closes)
+ * - WhatsApp Manual Payment flow (ADR 0097):
+ *     - invoice generation (PDF + text)
+ *     - Admin payment proof record + verify/reject
  * - Cancellation/refund public route: NOT exposed. Routes go to 410 Gone
  *   with the "Admin WhatsApp" copy per Round 3 resolution.
  *
@@ -14,6 +16,12 @@
  * auth for staff routes. Production must integrate Google SSO +
  * StaffMembership + role check (ADR 0080/0081). The placeholder is
  * gated behind a single env flag and documented in `docs/MVP-LIMITATIONS.md`.
+ *
+ * Migration from Midtrans (ADR 0097):
+ * - The /api/payment/notification webhook route has been removed entirely.
+ * - Booking now lands in 'pending_manual_payment' state; the Worker emits
+ *   a WhatsApp invoice (PDF + text) and posts the booking to the Admin
+ *   queue for manual verification.
  */
 
 import { Hono } from "hono";
@@ -21,30 +29,38 @@ import { createAdapter } from "../persistence/d1-adapter";
 import { CatalogModule } from "../modules/catalog";
 import { AvailabilityModule } from "../modules/availability";
 import { BookingModule } from "../modules/booking";
-import { PaymentModule } from "../modules/payment";
+import { WhatsAppManualPaymentModule } from "../modules/payment";
 import { AdminWorkspaceModule } from "../modules/admin";
-import { MidtransSnapAdapter } from "../adapters/midtrans-snap";
-import { renderHome } from "../views/home";
-import { renderPulang } from "../views/pulang";
-import { renderFuja } from "../views/fuja";
-import { renderFaq } from "../views/faq";
-import { renderBookingOffer } from "../views/booking-offer";
-import { renderBookingSlot } from "../views/booking-slot";
-import { renderBookingIntake } from "../views/booking-intake";
-import { renderBookingConfirmation } from "../views/booking-confirmation";
-import { renderCrisisNotice } from "../views/crisis";
-import { renderPrivacyNotice } from "../views/privacy";
-import { renderConsent } from "../views/consent";
-import { renderCancellationPolicy } from "../views/cancellation-policy";
-import { renderAdminBookingDetail } from "../views/admin-booking-detail";
+import {
+  renderHome,
+  renderPulang,
+  renderFuja,
+  renderFaq,
+  renderCrisisNotice,
+  renderPrivacyNotice,
+  renderConsent,
+  renderCancellationPolicy,
+  renderBookingOffer,
+  renderBookingSlot,
+  renderBookingIntake,
+  renderBookingConfirmation,
+  renderAdminBookingDetail,
+  renderAdminPaymentQueue,
+  renderAdminPaymentVerify,
+  renderAdminPaymentRecord,
+} from "../views/index";
 
 interface Env {
   DB: D1Database;
   ENVIRONMENT?: string;
-  MIDTRANS_SERVER_KEY?: string;     // PLACEHOLDER (set via `wrangler secret put`)
   GOOGLE_OAUTH_CLIENT_ID?: string;  // PLACEHOLDER (TBC-STAFF-SESSION-01)
   EMAIL_PROVIDER_KEY?: string;      // PLACEHOLDER (TBC-NOTIFY-01)
   ALLOW_PLACEHOLDER_ADMIN_AUTH?: string; // 'true' enables /admin/* in dev only
+  ADMIN_WHATSAPP_NUMBER?: string;   // e.g. "+6281234567890"
+  SERAYA_BANK_NAME?: string;
+  SERAYA_BANK_ACCOUNT?: string;
+  SERAYA_BANK_HOLDER?: string;
+  SERAYA_QRIS_IMAGE_URL?: string;
 }
 
 const app = new Hono<{ Bindings: Env }>();
@@ -53,11 +69,15 @@ const app = new Hono<{ Bindings: Env }>();
 // Static assets
 // ---------------------------------------------------------------------------
 
-app.get("/static/css/main.css", async (c) =>
-  c.body(await c.env.DB ? new Response("/* MVP placeholder */", {
+app.get("/static/css/main.css", async (c) => {
+  if (!c.env.DB) {
+    return new Response("", { status: 404 });
+  }
+  return new Response("/* MVP placeholder */", {
+    status: 200,
     headers: { "content-type": "text/css; charset=utf-8" },
-  }) : new Response("", { status: 404 }), 200)
-);
+  });
+});
 
 app.get("/healthz", (c) =>
   c.json({ status: "ok", environment: c.env.ENVIRONMENT ?? "unknown" })
@@ -160,10 +180,63 @@ app.post("/api/booking/create", async (c) => {
       shortMessage: body["shortMessage"] ? String(body["shortMessage"]) : null,
     },
   });
+
+  // ADR 0097: After booking is created, the Worker hands the booking off
+  // to the WhatsApp Manual Payment flow:
+  //   - Generate the invoice (text + PDF metadata) for the booking.
+  //   - Render the confirmation page with WhatsApp instructions:
+  //       - WhatsApp message text (copy/paste to Admin number)
+  //       - Invoice PDF download link
+  //       - Admin WhatsApp contact number
+  //   - The booking is now in 'pending_manual_payment'; Admin will verify
+  //     the payment_proof once the client sends the transfer slip.
+  const payment = new WhatsAppManualPaymentModule(adapter);
+  const invoice = await payment.generateInvoice(result.bookingId, "text");
+  const adminWhatsapp = c.env.ADMIN_WHATSAPP_NUMBER ?? "+628000000000";
+
   return c.html(renderBookingConfirmation({
     bookingId: result.bookingId,
     expiresAt: result.expiresAt,
+    whatsappMessage: invoice.textMessage,
+    adminWhatsapp,
+    pdfDownloadPath: `/api/booking/${result.bookingId}/invoice.pdf`,
   }));
+});
+
+// Invoice download (PDF) — rendered fresh on demand (ADR 0097).
+app.get("/api/booking/:bookingId/invoice.pdf", async (c) => {
+  const bookingId = c.req.param("bookingId");
+  const adapter = createAdapter({ DB: c.env.DB });
+  const payment = new WhatsAppManualPaymentModule(adapter);
+  try {
+    const invoice = await payment.generateInvoice(bookingId, "pdf");
+    const binary = atob(invoice.contentBase64);
+    const bytes = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+    return new Response(bytes, {
+      headers: {
+        "content-type": invoice.mimeType,
+        "content-disposition": `attachment; filename="${invoice.filename}"`,
+      },
+    });
+  } catch {
+    return c.text("Invoice not available", 404);
+  }
+});
+
+// Plain-text invoice (for clients who just want to copy the message).
+app.get("/api/booking/:bookingId/invoice.txt", async (c) => {
+  const bookingId = c.req.param("bookingId");
+  const adapter = createAdapter({ DB: c.env.DB });
+  const payment = new WhatsAppManualPaymentModule(adapter);
+  try {
+    const invoice = await payment.generateInvoice(bookingId, "text");
+    return new Response(invoice.textMessage, {
+      headers: { "content-type": "text/plain; charset=utf-8" },
+    });
+  } catch {
+    return c.text("Invoice not available", 404);
+  }
 });
 
 // ---------------------------------------------------------------------------
@@ -183,34 +256,6 @@ app.all("/api/booking/:id/refund", (c) =>
 );
 
 // ---------------------------------------------------------------------------
-// Payment webhook ingestion
-//
-// In production this is the Midtrans notification endpoint. Until
-// TBC-PAY-01 closes (real Midtrans merchant onboarding + signature
-// verification), this returns 503 to make the placeholder explicit.
-// ---------------------------------------------------------------------------
-
-app.post("/api/payment/notification", async (c) => {
-  if (!c.env.MIDTRANS_SERVER_KEY) {
-    return c.text("Payment provider not yet onboarded (TBC-PAY-01)", 503);
-  }
-  const adapter = createAdapter({ DB: c.env.DB });
-  const gateway = new MidtransSnapAdapter({
-    serverKey: c.env.MIDTRANS_SERVER_KEY,
-    isProduction: c.env.ENVIRONMENT === "production",
-  });
-  const payment = new PaymentModule(adapter, gateway);
-  const body = await c.req.parseBody();
-  const providerEvent = await gateway.verifyNotification(body);
-  const result = await payment.applyVerifiedPaymentEvent({
-    paymentId: String(body["paymentId"] ?? ""),
-    providerEvent,
-    actorAt: new Date().toISOString(),
-  });
-  return c.json({ applied: result.applied, reason: result.reason });
-});
-
-// ---------------------------------------------------------------------------
 // Admin workspace (PLACEHOLDER auth per user instruction)
 //
 // Production: must replace with Google SSO + StaffMembership + role check
@@ -218,9 +263,11 @@ app.post("/api/payment/notification", async (c) => {
 // `ALLOW_PLACEHOLDER_ADMIN_AUTH=true` env flag (dev only).
 // ---------------------------------------------------------------------------
 
-function adminGate(c: { env: Env }) {
+function adminGate(c: { env: Env }): Response | null {
   if (c.env.ALLOW_PLACEHOLDER_ADMIN_AUTH !== "true") {
-    return c.text("Admin auth not configured (TBC-STAFF-SESSION-01)", 401);
+    return new Response("Admin auth not configured (TBC-STAFF-SESSION-01)", {
+      status: 401,
+    });
   }
   return null;
 }
@@ -228,7 +275,14 @@ function adminGate(c: { env: Env }) {
 app.get("/admin", (c) => {
   const gate = adminGate(c);
   if (gate) return gate;
-  return c.html("<h1>Admin Workspace</h1><p>Placeholder. See <a href='/admin/bookings'>bookings</a>.</p>");
+  return c.html(
+    `<h1>Admin Workspace</h1>
+     <ul>
+       <li><a href="/admin/bookings">Bookings</a></li>
+       <li><a href="/admin/payments">Payment Queue (WhatsApp manual)</a></li>
+       <li><a href="/admin/cancellations/new">Record Cancellation Request</a></li>
+     </ul>`
+  );
 });
 
 app.get("/admin/bookings", async (c) => {
@@ -238,10 +292,7 @@ app.get("/admin/bookings", async (c) => {
   const catalog = new CatalogModule(adapter);
   const availability = new AvailabilityModule(adapter);
   const booking = new BookingModule(adapter, availability);
-  const payment = new PaymentModule(adapter, new MidtransSnapAdapter({
-    serverKey: c.env.MIDTRANS_SERVER_KEY ?? "PLACEHOLDER",
-    isProduction: false,
-  }));
+  const payment = new WhatsAppManualPaymentModule(adapter);
   const admin = new AdminWorkspaceModule(adapter, payment);
   const bookings = await admin.listRecentBookings({ limit: 50 });
   const items = bookings
@@ -257,14 +308,119 @@ app.get("/admin/bookings/:id", async (c) => {
   const gate = adminGate(c);
   if (gate) return gate;
   const adapter = createAdapter({ DB: c.env.DB });
-  const payment = new PaymentModule(adapter, new MidtransSnapAdapter({
-    serverKey: c.env.MIDTRANS_SERVER_KEY ?? "PLACEHOLDER",
-    isProduction: false,
-  }));
+  const payment = new WhatsAppManualPaymentModule(adapter);
   const admin = new AdminWorkspaceModule(adapter, payment);
   const detail = await admin.getBookingDetail(c.req.param("id"));
   if (!detail) return c.notFound();
   return c.html(renderAdminBookingDetail({ bookingId: c.req.param("id"), detail }));
+});
+
+// ----- WhatsApp payment queue (ADR 0097) -----
+
+app.get("/admin/payments", async (c) => {
+  const gate = adminGate(c);
+  if (gate) return gate;
+  const adapter = createAdapter({ DB: c.env.DB });
+  const payment = new WhatsAppManualPaymentModule(adapter);
+  const admin = new AdminWorkspaceModule(adapter, payment);
+  const pending = await admin.listPendingPayments();
+  // Narrow PaymentProof to the columns the queue view renders.
+  const queueRows = pending.map((row) => ({
+    id: row.id,
+    booking_id: row.bookingId,
+    client_name: row.client_name,
+    payment_method: row.paymentMethod,
+    evidence_url: row.evidenceUrl,
+    recorded_at: row.recordedAt,
+    status: row.status,
+  }));
+  return c.html(renderAdminPaymentQueue({ pending: queueRows }));
+});
+
+app.get("/admin/payments/:proofId/verify", async (c) => {
+  const gate = adminGate(c);
+  if (gate) return gate;
+  const proofId = c.req.param("proofId");
+  const adapter = createAdapter({ DB: c.env.DB });
+  const { rows } = await adapter.query<{
+    id: string;
+    booking_id: string;
+    payment_method: string;
+    evidence_url: string | null;
+    evidence_note: string | null;
+    recorded_at: string;
+    status: string;
+  }>({
+    sql: `SELECT id, booking_id, payment_method, evidence_url, evidence_note,
+                 recorded_at, status
+          FROM payment_proof WHERE id = ?`,
+    params: [proofId],
+  });
+  const proof = rows[0];
+  if (!proof) return c.notFound();
+  return c.html(renderAdminPaymentVerify({ proof }));
+});
+
+app.get("/admin/payments/:proofId/record", async (c) => {
+  const gate = adminGate(c);
+  if (gate) return gate;
+  return c.html(renderAdminPaymentRecord({ bookingId: c.req.query("bookingId") ?? "" }));
+});
+
+// POST: Admin records a new payment_proof for a booking.
+app.post("/api/payment/manual/record", async (c) => {
+  const gate = adminGate(c);
+  if (gate) return gate;
+  const body = await c.req.parseBody();
+  const adapter = createAdapter({ DB: c.env.DB });
+  const payment = new WhatsAppManualPaymentModule(adapter);
+  try {
+    const result = await payment.recordPayment({
+      bookingId: String(body["bookingId"] ?? ""),
+      paymentMethod: String(body["paymentMethod"] ?? "bank_transfer") as
+        | "qris"
+        | "bank_transfer"
+        | "cash",
+      evidenceUrl: body["evidenceUrl"] ? String(body["evidenceUrl"]) : null,
+      evidenceNote: body["evidenceNote"] ? String(body["evidenceNote"]) : null,
+      adminMembershipId: "PLACEHOLDER_ADMIN",
+    });
+    return c.text(
+      `Payment proof ${result.paymentProofId} ${result.created ? "recorded" : "already exists"}.`
+    );
+  } catch (e: unknown) {
+    const msg = e instanceof Error ? e.message : String(e);
+    return c.text(`Failed to record payment: ${msg}`, 400);
+  }
+});
+
+// POST: Admin verifies or rejects a payment_proof.
+app.post("/api/payment/manual/verify", async (c) => {
+  const gate = adminGate(c);
+  if (gate) return gate;
+  const body = await c.req.parseBody();
+  const adapter = createAdapter({ DB: c.env.DB });
+  const payment = new WhatsAppManualPaymentModule(adapter);
+  const admin = new AdminWorkspaceModule(adapter, payment);
+  const proofId = String(body["paymentProofId"] ?? "");
+  const status = String(body["status"] ?? "verified") as "verified" | "rejected";
+  const reason = body["reason"] ? String(body["reason"]) : null;
+  try {
+    if (status === "verified") {
+      const result = await admin.markAsPaid(String(body["bookingId"] ?? ""), proofId);
+      return c.text(
+        `Payment verified. Booking state: ${result.bookingState}. Proof: ${result.paymentProof.id}.`
+      );
+    } else {
+      const result = await admin.rejectPayment(proofId, reason ?? "no reason given");
+      return c.text(
+        `Payment rejected. Booking state: ${result.bookingState}. Proof: ${result.paymentProof.id}.`
+      );
+    }
+  } catch (e: unknown) {
+    const msg = e instanceof Error ? e.message : String(e);
+    return c.text(`Failed to verify payment: ${msg}`, 400);
+  }
 });
 
 app.get("/admin/cancellations/new", (c) => {
@@ -288,10 +444,7 @@ app.post("/admin/cancellations", async (c) => {
   if (gate) return gate;
   const body = await c.req.parseBody();
   const adapter = createAdapter({ DB: c.env.DB });
-  const payment = new PaymentModule(adapter, new MidtransSnapAdapter({
-    serverKey: c.env.MIDTRANS_SERVER_KEY ?? "PLACEHOLDER",
-    isProduction: false,
-  }));
+  const payment = new WhatsAppManualPaymentModule(adapter);
   const admin = new AdminWorkspaceModule(adapter, payment);
   const id = await admin.recordCancellationRequest({
     targetKind: String(body["target_kind"] ?? "booking") as "booking" | "appointment" | "package_purchase",

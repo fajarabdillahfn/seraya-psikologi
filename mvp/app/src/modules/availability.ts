@@ -93,6 +93,9 @@ export class AvailabilityModule {
     cursor.setUTCHours(0, 0, 0, 0);
     const [sh, sm] = args.startsAtLocal.split(":").map(Number);
     const [eh, em] = args.endsAtLocal.split(":").map(Number);
+    if (sh === undefined || sm === undefined || eh === undefined || em === undefined) {
+      throw new Error(`invalid local time range: ${args.startsAtLocal}-${args.endsAtLocal}`);
+    }
     const windowMinutes = eh * 60 + em - (sh * 60 + sm);
     const slotsPerWindow = Math.max(
       1,

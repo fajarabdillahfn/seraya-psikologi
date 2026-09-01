@@ -169,12 +169,13 @@ export class BookingModule {
 
     // Atomic batch: insert booking, slot_hold, capacity_reservation.
     // Idempotency via UNIQUE(idempotency_key) on payment and client_access.
+    // ADR 0097: booking starts in 'pending_manual_payment' (WhatsApp manual flow).
     await this.db.batch([
       {
         sql: `INSERT INTO booking
               (id, client_id, offer_snapshot_id, state, is_package, is_couple,
                intake_short_message, crisis_ack)
-              VALUES (?, ?, ?, 'pending_payment', ?, ?, ?, ?)`,
+              VALUES (?, ?, ?, 'pending_manual_payment', ?, ?, ?, ?)`,
         params: [
           bookingId,
           args.clientId,
@@ -261,5 +262,64 @@ export class BookingModule {
       params: [bookingId],
     });
     return rows[0] ?? null;
+  }
+
+  /**
+   * Confirm a booking after a verified payment proof (ADR 0097).
+   *
+   * Atomic transition:
+   *   - booking.state → 'confirmed'
+   *   - slot_hold.state → 'consumed' (if a hold exists)
+   *   - capacity_reservation (slot_hold) → 'confirmed'
+   *
+   * Idempotent: if booking.state is already 'confirmed', this is a no-op
+   * and returns { alreadyConfirmed: true }.
+   *
+   * The payment_proof row must already be in status='verified' before this
+   * is called (enforced by callers via WhatsAppManualPaymentModule.verifyPayment).
+   * This method only flips booking/slot/capacity state.
+   */
+  async confirmPayment(
+    bookingId: string,
+    _paymentProofId: string
+  ): Promise<{ confirmed: boolean; alreadyConfirmed: boolean }> {
+    const { rows } = await this.db.query<{ state: string }>({
+      sql: `SELECT state FROM booking WHERE id = ?`,
+      params: [bookingId],
+    });
+    const row = rows[0];
+    if (!row) throw new Error(`booking ${bookingId} not found`);
+    if (row.state === "confirmed") {
+      return { confirmed: true, alreadyConfirmed: true };
+    }
+    if (row.state !== "pending_manual_payment" && row.state !== "awaiting_confirmation") {
+      throw new Error(
+        `booking ${bookingId} is in state '${row.state}'; cannot confirm`
+      );
+    }
+    const now = new Date().toISOString();
+    await this.db.batch([
+      {
+        sql: `UPDATE booking
+              SET state = 'confirmed', updated_at = ?
+              WHERE id = ? AND state IN ('pending_manual_payment','awaiting_confirmation')`,
+        params: [now, bookingId],
+      },
+      {
+        sql: `UPDATE slot_hold
+              SET state = 'consumed'
+              WHERE booking_id = ? AND state = 'active'`,
+        params: [bookingId],
+      },
+      {
+        sql: `UPDATE capacity_reservation
+              SET state = 'confirmed'
+              WHERE reservation_kind = 'slot_hold'
+                AND parent_id IN (SELECT id FROM slot_hold WHERE booking_id = ?)
+                AND state = 'hold_active'`,
+        params: [bookingId],
+      },
+    ]);
+    return { confirmed: true, alreadyConfirmed: false };
   }
 }

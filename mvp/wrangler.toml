@@ -12,7 +12,8 @@ compatibility_flags = ["nodejs_compat"]
 [[d1_databases]]
 binding = "DB"
 database_name = "seraya-db"
-database_id = "PLACEHOLDER_DB_ID" # set via `wrangler d1 create seraya-db`
+database_id = "8f193be1-59da-42ba-8ef7-9494cdd18f8c" # set via `wrangler d1 create seraya-db`
+migrations_dir = "app/migrations"
 
 # Placeholder variables for secrets used by the Worker at runtime.
 # These are illustrative; actual values live in CF Workers Secrets and
@@ -21,11 +22,14 @@ database_id = "PLACEHOLDER_DB_ID" # set via `wrangler d1 create seraya-db`
 # vars = { ENVIRONMENT = "development" }
 
 # Real production requires:
-# - Midtrans Snap server key (secret)
 # - Google OAuth client id/secret (secret)
 # - Email provider API key (secret)
 # - Inter-service signing key (secret)
-# All set with `wrangler secret put <NAME>`.
+# - WhatsApp manual payment config (vars, not secret):
+#     ADMIN_WHATSAPP_NUMBER, SERAYA_BANK_NAME, SERAYA_BANK_ACCOUNT,
+#     SERAYA_BANK_HOLDER, SERAYA_QRIS_IMAGE_URL
+# All set with `wrangler secret put <NAME>` (for secret) or
+# `[vars]` block (for non-secret payment config).
 
 [observability]
 enabled = true

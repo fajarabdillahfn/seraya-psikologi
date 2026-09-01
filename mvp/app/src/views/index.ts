@@ -173,7 +173,7 @@ export function renderFaq(): string {
     </section>
     <section class="card">
       <h2>Bagaimana cara pembayaran?</h2>
-      <p>QRIS atau transfer bank / Virtual Account lewat Midtrans. Verifikasi otomatis.</p>
+      <p>Transfer bank atau QRIS secara manual, lalu kirim bukti pembayaran ke Admin Seraya via WhatsApp. Admin akan memverifikasi dan mengkonfirmasi booking Anda.</p>
     </section>
     <section class="card">
       <h2>Bagaimana jika saya perlu cancel atau refund?</h2>
@@ -344,23 +344,57 @@ export function renderBookingIntake(p: {
       <p><label><input type=checkbox name=consentAck value=true required> Saya telah membaca dan menyetujui <a href="/consent" target=_blank>Informed Consent</a> dan <a href="/privacy" target=_blank>Kebijakan Privasi</a>.</label></p>
       <p><button class="cta" type=submit>Lanjut ke pembayaran</button></p>
     </form>
-    <p><small class="muted">Setelah submit, sistem akan membuat slot hold selama 10 menit dan mengarahkan ke pembayaran Midtrans.</small></p>`
+    <p><small class="muted">Setelah submit, sistem akan membuat slot hold selama 10 menit dan menampilkan instruksi pembayaran via WhatsApp (invoice PDF + nomor Admin).</small></p>`
   );
 }
 
 export function renderBookingConfirmation(p: {
   bookingId: string;
   expiresAt: string;
+  whatsappMessage: string;
+  adminWhatsapp: string;
+  pdfDownloadPath: string;
 }): string {
+  // Escape user-derived content for safe embedding in HTML.
+  const esc = (s: string) =>
+    s
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&#39;");
+  const waUrl =
+    "https://wa.me/" +
+    p.adminWhatsapp.replace(/[^0-9]/g, "") +
+    "?text=" +
+    encodeURIComponent(p.whatsappMessage);
+
   return base(
     "Booking Diterima",
     `<h1>Booking Diterima</h1>
     <div class="success">
-      <p>Booking <code>${p.bookingId}</code> dibuat.</p>
-      <p>Slot hold berlaku hingga <strong>${p.expiresAt}</strong>. Selesaikan pembayaran dalam waktu tersebut.</p>
-      <p>(Integrasi Midtrans Snap adalah placeholder — TBC-PAY-01 closed untuk live onboarding.)</p>
+      <p>Booking <code>${esc(p.bookingId)}</code> dibuat.</p>
+      <p>Slot hold berlaku hingga <strong>${esc(p.expiresAt)}</strong>. Selesaikan pembayaran dalam waktu tersebut.</p>
     </div>
-    <p><small class="muted">Konfirmasi dan detail sesi akan dikirim ke email Anda setelah pembayaran diverifikasi.</small></p>`
+
+    <h2>Cara Bayar via WhatsApp</h2>
+    <div class="card">
+      <p><strong>1. Download invoice:</strong> <a class="cta-secondary" href="${esc(p.pdfDownloadPath)}">Unduh invoice PDF</a> (atau <a href="/api/booking/${esc(p.bookingId)}/invoice.txt">salin teks invoice</a>).</p>
+      <p><strong>2. Kirim pembayaran</strong> sesuai instruksi di invoice (bank/QRIS) sebelum batas waktu di atas.</p>
+      <p><strong>3. Kirim bukti transfer</strong> (screenshot / foto struk) ke Admin Seraya via WhatsApp:</p>
+      <p><a class="cta" href="${esc(waUrl)}" target="_blank" rel="noopener">Kirim bukti ke WhatsApp Admin</a></p>
+      <p><small class="muted">Nomor Admin Seraya: <code>${esc(p.adminWhatsapp)}</code></small></p>
+    </div>
+
+    <h2>Pesan WhatsApp (siap kirim)</h2>
+    <div class="card">
+      <pre style="white-space: pre-wrap; font-family: inherit; background: #fafafa; padding: 0.75rem; border-radius: 6px; font-size: 0.9rem;">${esc(p.whatsappMessage)}</pre>
+      <p><a class="cta-secondary" href="${esc(waUrl)}" target="_blank" rel="noopener">Buka WhatsApp dengan pesan ini</a></p>
+    </div>
+
+    <div class="warning">
+      <p><small class="muted">Konfirmasi booking akan dikirim setelah Admin memverifikasi bukti pembayaran. Cancellation dan refund ditangani Admin — review case-by-case.</small></p>
+    </div>`
   );
 }
 
@@ -377,5 +411,148 @@ export function renderAdminBookingDetail(p: {
     `<h1>Booking ${p.bookingId}</h1>
     <pre style="white-space: pre-wrap; font-size: 0.85rem; background: #fafafa; padding: 1rem; border-radius: 8px;">${detail}</pre>
     <p><small class="muted">Authorization placeholder — production requires Google SSO + StaffMembership + role check (ADR 0080/0081).</small></p>`
+  );
+}
+
+/**
+ * Admin payment queue — list all payment_proof rows awaiting verification.
+ * ADR 0097. Each row links to the verify/reject form.
+ */
+export function renderAdminPaymentQueue(p: {
+  pending: Array<{
+    id: string;
+    booking_id: string;
+    client_name: string;
+    payment_method: string;
+    evidence_url: string | null;
+    recorded_at: string;
+    status: string;
+  }>;
+}): string {
+  const esc = (s: string) =>
+    String(s)
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&#39;");
+  const rows = p.pending.length
+    ? p.pending
+        .map(
+          (q) => `<tr>
+        <td><code>${esc(q.id)}</code></td>
+        <td>${esc(q.client_name)}</td>
+        <td><code>${esc(q.booking_id)}</code></td>
+        <td>${esc(q.payment_method)}</td>
+        <td>${q.evidence_url ? `<a href="${esc(q.evidence_url)}" target="_blank" rel="noopener">buka</a>` : "—"}</td>
+        <td>${esc(q.recorded_at)}</td>
+        <td><a class="cta-secondary" href="/admin/payments/${esc(q.id)}/verify">review</a></td>
+      </tr>`
+        )
+        .join("")
+    : `<tr><td colspan="7"><small class="muted">Tidak ada payment proof yang menunggu verifikasi.</small></td></tr>`;
+
+  return base(
+    "Payment Queue",
+    `<h1>Payment Queue (WhatsApp Manual)</h1>
+    <p><small class="muted">ADR 0097 — bukti pembayaran dari klien yang dikirim via WhatsApp, menunggu verifikasi Admin.</small></p>
+    <table border=1>
+      <tr>
+        <th>proof_id</th><th>client</th><th>booking</th><th>method</th>
+        <th>evidence</th><th>recorded_at</th><th></th>
+      </tr>
+      ${rows}
+    </table>
+    <p><a href="/admin">← Admin Workspace</a></p>`
+  );
+}
+
+/**
+ * Admin mark-as-paid form — review a single payment_proof and either
+ * verify (→ booking confirmed) or reject (→ booking cancelled).
+ */
+export function renderAdminPaymentVerify(p: {
+  proof: {
+    id: string;
+    booking_id: string;
+    payment_method: string;
+    evidence_url: string | null;
+    evidence_note: string | null;
+    recorded_at: string;
+    status: string;
+  };
+}): string {
+  const esc = (s: string) =>
+    String(s)
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&#39;");
+  return base(
+    `Verify Payment ${p.proof.id}`,
+    `<h1>Verify Payment</h1>
+    <div class="card">
+      <p><strong>Proof ID:</strong> <code>${esc(p.proof.id)}</code></p>
+      <p><strong>Booking:</strong> <a href="/admin/bookings/${esc(p.proof.booking_id)}">${esc(p.proof.booking_id)}</a></p>
+      <p><strong>Payment method:</strong> ${esc(p.proof.payment_method)}</p>
+      <p><strong>Recorded at:</strong> ${esc(p.proof.recorded_at)}</p>
+      <p><strong>Status:</strong> ${esc(p.proof.status)}</p>
+      <p><strong>Evidence URL:</strong> ${p.proof.evidence_url ? `<a href="${esc(p.proof.evidence_url)}" target="_blank" rel="noopener">${esc(p.proof.evidence_url)}</a>` : "<em>(none)</em>"}</p>
+      <p><strong>Evidence note:</strong> ${p.proof.evidence_note ? esc(p.proof.evidence_note) : "<em>(none)</em>"}</p>
+    </div>
+
+    <h2>Aksi</h2>
+    <div class="card">
+      <form method=POST action=/api/payment/manual/verify>
+        <input type=hidden name=paymentProofId value="${esc(p.proof.id)}">
+        <input type=hidden name=bookingId value="${esc(p.proof.booking_id)}">
+        <p><label>Status:
+          <select name=status>
+            <option value=verified>verified — booking.confirmed</option>
+            <option value=rejected>rejected — booking.cancelled</option>
+          </select>
+        </label></p>
+        <p><label>Alasan penolakan (opsional untuk verified, wajib untuk rejected):
+          <textarea name=reason placeholder="Misal: nominal transfer tidak sesuai, bukti tidak terbaca, dsb."></textarea>
+        </label></p>
+        <p><button class="cta" type=submit>Submit</button></p>
+      </form>
+    </div>
+
+    <h2>Catatan</h2>
+    <div class="warning">
+      <p><small class="muted">Verifikasi bersifat idempotent — verifikasi ulang dengan status yang sama tidak mengubah state. Reject hanya dapat dilakukan dari status 'submitted'.</small></p>
+    </div>
+
+    <p><a href="/admin/payments">← Kembali ke queue</a></p>`
+  );
+}
+
+/**
+ * Admin record-payment form — manual entry when client did not upload
+ * any evidence URL and the Admin received the screenshot via WhatsApp DM.
+ */
+export function renderAdminPaymentRecord(p: {
+  bookingId: string;
+}): string {
+  return base(
+    "Record Payment Proof",
+    `<h1>Record Payment Proof</h1>
+    <p><small class="muted">ADR 0097 — gunakan form ini ketika klien sudah mengirim bukti via WhatsApp tetapi tidak meng-upload URL bukti.</small></p>
+    <form method=POST action=/api/payment/manual/record>
+      <p><label>Booking ID <input name=bookingId value="${p.bookingId}" required></label></p>
+      <p><label>Payment method
+        <select name=paymentMethod>
+          <option value=bank_transfer>bank_transfer</option>
+          <option value=qris>qris</option>
+          <option value=cash>cash</option>
+        </select>
+      </label></p>
+      <p><label>Evidence URL (opsional) <input name=evidenceUrl placeholder="https://..."></label></p>
+      <p><label>Evidence note (opsional) <textarea name=evidenceNote placeholder="Misal: nominal Rp125.000 dari BCA a.n. John, 2026-09-01"></textarea></label></p>
+      <p><button class="cta" type=submit>Record</button></p>
+    </form>
+    <p><small class="muted">Setelah record, gunakan <a href="/admin/payments">payment queue</a> untuk verify/reject.</small></p>`
   );
 }

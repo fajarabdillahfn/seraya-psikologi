@@ -26,17 +26,32 @@ Migration is in `app/migrations/0001_init.sql` and references ADRs 0089–0095 (
   - Role check per ADR 0079 (`admin` / `psychologist`).
   - Two-Admin invariant for staff invite/revoke (TBC-STAFF-SESSION-01).
 
-## 3. Payment integration (placeholder)
+## 3. Payment integration (WhatsApp manual, ADR 0097)
 
-- `app/src/adapters/midtrans-snap.ts` is a **stub** that throws on non-test calls. It exists to keep the Worker compilable and to lock the interface per ADR 0089 §7.
-- For real settlement, complete `TBC-PAY-01`:
-  1. Midtrans Snap merchant onboarding (server key, client key, sandbox account).
-  2. Real signature verification (`SHA-512 over body + server key`).
-  3. Webhook payload mapping into `VerifiedPaymentEvent`.
-  4. Idempotency-key naming convention.
-  5. Retry and dead-letter policy.
+The payment flow is **manual, Admin-verified** — no automated payment gateway is in scope for the MVP.
 
-The `FakePaymentAdapter` for local dev/tests is **not** in this skeleton; add it under `tests/integration/fake-adapter.ts` before running integration tests.
+- After booking intake, `booking.state = 'pending_manual_payment'`.
+- The Worker renders a confirmation page with:
+  - Downloadable **invoice PDF** (`/api/booking/:id/invoice.pdf`)
+  - Plain-text invoice (`/api/booking/:id/invoice.txt`)
+  - A WhatsApp deep-link (`https://wa.me/<ADMIN_NUMBER>?text=...`) the client taps to send the proof.
+  - The Admin's WhatsApp number (set via `ADMIN_WHATSAPP_NUMBER` var).
+- The client pays via bank transfer or QRIS, then sends the screenshot/slip to Admin on WhatsApp.
+- Admin opens `/admin/payments`, reviews each `payment_proof`, and either:
+  - **verify** (`/api/payment/manual/verify` with `status=verified`) → atomic flip of `payment_proof.status='verified'` AND `booking.state='confirmed'`.
+  - **reject** (`status=rejected`) → atomic flip of `payment_proof.status='rejected'` AND `booking.state='cancelled'`.
+
+Both transitions are **idempotent** (re-applying the same terminal status is a no-op) and **atomic** (single `db.batch`).
+
+Key files:
+- `app/src/modules/payment.ts` — `WhatsAppManualPaymentModule` (generator, recordPayment, verifyPayment, listPendingPayments).
+- `app/src/modules/admin.ts` — `markAsPaid`, `rejectPayment`, `listPendingPayments`.
+- `app/src/modules/booking.ts` — `confirmPayment` for the booking-side state flip.
+- `app/migrations/0002_payment_proof.sql` — `payment_proof` table schema.
+
+### Pre-ADR 0097 (legacy Midtrans path, removed)
+
+The previous `app/src/adapters/midtrans-snap.ts` (placeholder Midtrans Snap adapter) and the `payment` table webhook flow (`/api/payment/notification`, `applyVerifiedPaymentEvent`, `executeRefundAction`) have been **removed entirely**. The `payment` table is retained for read-only audit of any pre-existing settled rows. New bookings go through `payment_proof` only.
 
 ## 4. Notification and email (placeholder)
 
@@ -79,12 +94,12 @@ The `FakePaymentAdapter` for local dev/tests is **not** in this skeleton; add it
 
 1. **Staff bootstrap**: record two Admin StaffMemberships per ADR 0081.
 2. **Profile evidence**: verify Fuja's STR/SILP and obtain publication consent.
-3. **Real availability**: replace `anytime/anyplace` placeholder with Fuja's recurring schedule and offline venue (TBC-SCHEDULE-01).
-4. **Approved consent/privacy copy**: clinical/ethics sign-off on the placeholder text in `app/src/views/index.ts`.
-5. **Midtrans onboarding**: production merchant + sandbox evidence + refund capability verification (TBC-PAY-01).
-6. **Email provider**: choose provider, set sender domain, and write template copy (TBC-NOTIFY-01).
-7. **Backup/restore drill**: pre-launch snapshot export via `wrangler d1 export`; restore drill.
-8. **Runbook**: cancellation handling, late payment reconciliation, refund failure recovery.
+5. **Real availability**: replace `anytime/anyplace` placeholder with Fuja's recurring schedule and offline venue (TBC-SCHEDULE-01).
+6. **Approved consent/privacy copy**: clinical/ethics sign-off on the placeholder text in `app/src/views/index.ts`.
+7. **WhatsApp payment onboarding**: confirm Admin WhatsApp number, bank account details, and QRIS image URL are set in `wrangler.toml` `[vars]` (TBC-PAY-01 replaced by ADR 0097 manual flow).
+8. **Email provider**: choose provider, set sender domain, and write template copy (TBC-NOTIFY-01).
+9. **Backup/restore drill**: pre-launch snapshot export via `wrangler d1 export`; restore drill.
+10. **Runbook**: cancellation handling, WhatsApp payment verification turnaround, refund failure recovery.
 
 Each gate G-1..G-14 in ADR 0096 maps to one of the above.
 
@@ -103,11 +118,14 @@ seraya-psikologi-mvp/
 │   │   └── (placeholder, Worker serves inline CSS)
 │   └── src/
 │       ├── worker/index.ts     # Hono router; public + booking + admin + webhook
-│       ├── modules/            # catalog, availability, booking, payment, admin
-│       ├── adapters/           # MidtransSnapAdapter (placeholder)
-│       ├── persistence/        # PersistenceAdapter + D1 driver
-│       ├── domain/types.ts     # shared vocabulary
-│       └── views/index.ts      # SSR HTML helpers
+│   │   ├── modules/            # catalog, availability, booking, payment, admin
+│   │   ├── adapters/           # (legacy Midtrans adapter removed per ADR 0097)
+│   │   ├── persistence/        # PersistenceAdapter + D1 driver
+│   │   ├── domain/types.ts     # shared vocabulary
+│   │   └── views/index.ts      # SSR HTML helpers
+│   └── migrations/
+│       ├── 0001_init.sql       # D1 schema baseline (post ADR 0089–0095)
+│       └── 0002_payment_proof.sql # payment_proof table (ADR 0097)
 └── tests/
     ├── unit/                   # (empty; place pure-policy tests here)
     └── integration/            # (empty; place D1/Miniflare tests here)

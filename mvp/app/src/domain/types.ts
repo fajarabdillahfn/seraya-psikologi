@@ -12,7 +12,8 @@ export type ServiceMode = "online" | "offline";
 export type AudienceKind = "individual" | "couple";
 
 export type BookingState =
-  | "pending_payment"
+  | "pending_manual_payment"
+  | "awaiting_confirmation"
   | "confirmed"
   | "cancelled"
   | "expired"
@@ -36,7 +37,10 @@ export type PaymentStatus =
   | "expired"
   | "refunded";
 
-export type PaymentMethod = "qris" | "va";
+// Manual payment methods accepted via WhatsApp (ADR 0097).
+// `qris` is still supported because clients may send a QRIS screenshot;
+// `bank_transfer` covers admin-recorded manual bank receipts.
+export type PaymentMethod = "qris" | "bank_transfer" | "cash";
 
 export type RefundOutcome = "full_refund" | "no_refund";
 
@@ -201,6 +205,31 @@ export interface Payment {
   idempotencyKey: string;
   createdAt: string;
   settledAt: string | null;
+}
+
+/**
+ * PaymentProof — client-uploaded evidence (screenshot / transfer slip)
+ * for a manual WhatsApp payment flow (ADR 0097).
+ *
+ * Statuses:
+ *   - submitted:  client sent evidence, awaiting Admin review
+ *   - verified:   Admin accepted; Booking.state → confirmed
+ *   - rejected:   Admin rejected; Booking.state → cancelled
+ *
+ * Idempotency: one PaymentProof per Booking (UNIQUE booking_id).
+ */
+export interface PaymentProof {
+  id: string;
+  bookingId: string;
+  paymentMethod: PaymentMethod;
+  evidenceUrl: string | null;
+  evidenceNote: string | null;
+  status: "submitted" | "verified" | "rejected";
+  recordedByMembershipId: string | null;
+  recordedAt: string;
+  verifiedByMembershipId: string | null;
+  verifiedAt: string | null;
+  rejectionReason: string | null;
 }
 
 export interface PaymentEvent {
