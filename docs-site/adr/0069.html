@@ -9,13 +9,13 @@
 <body>
 <header class="site">
 <h1>Seraya Psikologi — Documentation</h1>
-<p class="lede">Booking and payment MVP · Implementation baseline · 96 ADR</p>
+<p class="lede">Booking and payment MVP · Implementation baseline · 97 ADR</p>
 </header>
 <nav class="crumbs"><a href="../index.html">Home</a> › ADR 0069 · Keep Launch Payment Methods Minimal</nav>
 <main>
 <h1 id="69-keep-launch-payment-methods-minimal">69. Keep Launch Payment Methods Minimal</h1>
 <h2 id="status">Status</h2>
-<p>Accepted for launch planning; the initial method categories are QRIS and bank transfer/Virtual Account. Exact Midtrans method activation, bank/channel selection, fees, limits, and method-specific refund coverage remain pre-launch verification items.</p>
+<p><strong>Superseded for MVP launch; the payment method categories are retained but delivered as off-platform manual settlement per <a href="../0097-whatsapp-manual-payment.md">ADR 0097</a>.</strong> Launch methods (<code>bank_transfer</code>, <code>va</code>, <code>qris_manual</code>) are paid directly to Seraya's bank account / VA number / static QRIS — the client receives a PDF + plain-text invoice via WhatsApp and an Admin verifies the payment proof in the Admin workspace. No payment gateway is involved in the launch path.</p>
 <h2 id="context">Context</h2>
 <p>Seraya needs a small, testable payment surface for Indonesia-first single-session and full-upfront package purchases. Enabling every available method increases payment expiry variants, webhook cases, fee reconciliation, refund coverage questions, and UAT scope before the business has validated demand.</p>
 <h2 id="decision">Decision</h2>
@@ -46,7 +46,7 @@
 </main>
 <footer class="site">
 <p><a href="../index.html">Index</a> · <a href="../adr/index.html">All ADR</a> · <a href="../baseline/index.html">Baseline docs</a></p>
-<p>Generated from <code>/home/jar/output/psychology-research/seraya-psikologi-domain/</code> · Round 6 closure · 2026-08-31</p>
+<p>Generated from <code>/home/jar/output/psychology-research/seraya-psikologi-domain/</code> · 2026-09-01</p>
 </footer>
 </body>
 </html>

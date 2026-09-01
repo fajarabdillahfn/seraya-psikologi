@@ -6,26 +6,26 @@
 <body>
 <header class="site">
 <h1>Seraya Psikologi — Documentation</h1>
-<p class="lede">Booking & payment MVP · Implementation baseline · 96 ADR · 1,155-line review</p>
+<p class="lede">Booking & payment MVP · Implementation baseline · 97 ADR</p>
 </header>
 <nav class="crumbs">Home</nav>
 <main>
 <div class="callout">
-<strong>Status:</strong> All 10 top-priority tickets closed via ADR 0089–0096. MVP skeleton code ready (Cloudflare Worker + D1). Production launch remains gated by ADR 0096 G-1..G-14.
+<strong>Status (2026-09-01):</strong> Payment migrated ke <strong>WhatsApp manual flow</strong> per ADR 0097. Midtrans Snap deferred ke post-MVP (ADR 0068 superseded untuk launch). MVP skeleton live di Cloudflare. Production launch tetap gated oleh ADR 0096 G-1..G-14.
 </div>
 
 <h2>Quick navigation</h2>
 <div class="toc">
 <h4>Reviews & baseline</h4>
 <ul>
-<li><a href="baseline/prd-guideline-review.html">PRD/ADR/Guide Review</a> — 1,155 lines, Round 1–7 closure narrative, ranked findings, verdict</li>
-<li><a href="baseline/implementation-guide.html">Implementation Guide</a> — 989 lines, definitive technical baseline</li>
-<li><a href="baseline/domain-model.html">Domain Model</a> — 275 lines, synchronized summary</li>
-<li><a href="baseline/context.html">Context</a> — 285 lines, current-state glossary</li>
+<li><a href="baseline/prd-guideline-review.html">PRD/ADR/Guide Review</a> — 1,200+ lines, Round 1–7 closure narrative</li>
+<li><a href="baseline/implementation-guide.html">Implementation Guide</a> — 989+ lines, definitive technical baseline (post ADR 0097)</li>
+<li><a href="baseline/domain-model.html">Domain Model</a> — 275+ lines, synchronized summary</li>
+<li><a href="baseline/context.html">Context</a> — 285+ lines, current-state glossary</li>
 </ul>
 <h4>Decisions</h4>
 <ul>
-<li><a href="adr/index.html">All 96 ADR</a> — architecture, couple, capacity, no-show, settlement, intake, package cancellation, launch gate, JSON cleanup</li>
+<li><a href="adr/index.html">All 97 ADR</a> — architecture, couple, capacity, no-show, settlement, intake, package cancellation, launch gate, JSON cleanup, <strong>WhatsApp manual payment</strong></li>
 </ul>
 <h4>MVP skeleton</h4>
 <ul>
@@ -34,7 +34,7 @@
 </div>
 
 <h2>Authority rule (locked 2026-08-31)</h2>
-<p>Untuk konflik bisnis/scope, <strong>sumber Non-Teknis</strong> (Charter, Matrix, IA, JSON psikolog) yang menang atas technical artifacts. Untuk keputusan teknis (stack, concurrency, schema), tim teknis memutuskan dengan ADR.</p>
+<p>Untuk konflik bisnis/scope, <strong>sumber Non-Teknis</strong> (Charter, Matrix, IA, JSON psikolog) yang menang atas technical artifacts.</p>
 
 <h2>Top-priority tickets (closed)</h2>
 <table>
@@ -50,6 +50,7 @@
 <tr><td>8</td><td>Persona + biz_story framing</td><td>Round 6 edits</td></tr>
 <tr><td>9</td><td>Intake/minor/eligibility/cutoff</td><td><a href="adr/0094.html">ADR 0094</a></td></tr>
 <tr><td>10</td><td>Package cancellation matrix + outcome race</td><td><a href="adr/0095.html">ADR 0095</a></td></tr>
+<tr><td>11</td><td>WhatsApp manual payment (replaces Midtrans Snap for MVP)</td><td><a href="adr/0097.html">ADR 0097</a></td></tr>
 </tbody>
 </table>
 
@@ -58,17 +59,22 @@
 <li>Cancellation/refund handled by <strong>Admin WhatsApp only</strong>.</li>
 <li>Public website has <strong>no cancellation/refund UI</strong>.</li>
 <li>Refund outcomes: <code>full_refund</code> / <code>no_refund</code> only.</li>
-<li>Third-party admin/transfer fees are internal Seraya costs.</li>
 <li>Public statement: <em>"Cancellation and refund are handled by Admin via WhatsApp; review is case-by-case."</em></li>
 </ul>
 
-<h2>MVP artifact</h2>
-<div class="callout warn">
-<strong>Not production-ready.</strong> Authorization is a placeholder per business-owner instruction. Production must wire Google SSO + StaffMembership + real Midtrans Snap before flipping the switch. See <a href="mvp-readme.html">MVP README</a> §9 for the operational list.
+<h2>WhatsApp manual payment (2026-09-01)</h2>
+<div class="callout info">
+<strong>Business decision:</strong> MVP launch menggunakan WhatsApp manual payment (PDF + text invoice, Admin verifikasi). Midtrans Snap deferred ke post-MVP. Detail di <a href="adr/0097.html">ADR 0097</a>.
 </div>
+<ul>
+<li>Klien booking → invoice PDF + text generated → kirim via WhatsApp manual ke Admin</li>
+<li>Klien transfer manual + kirim bukti → Admin verifikasi di <code>/admin/payments</code></li>
+<li>Admin mark-as-paid → Booking.state = 'confirmed'</li>
+<li>Tidak ada payment gateway integration di MVP</li>
+</ul>
 </main>
 <footer class="site">
-<p>Generated from <code>/home/jar/output/psychology-research/seraya-psikologi-domain/</code> · 2026-08-31</p>
+<p>Generated from <code>/home/jar/output/psychology-research/seraya-psikologi-domain/</code> · 2026-09-01</p>
 </footer>
 </body>
 </html>

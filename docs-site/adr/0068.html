@@ -9,13 +9,13 @@
 <body>
 <header class="site">
 <h1>Seraya Psikologi — Documentation</h1>
-<p class="lede">Booking and payment MVP · Implementation baseline · 96 ADR</p>
+<p class="lede">Booking and payment MVP · Implementation baseline · 97 ADR</p>
 </header>
 <nav class="crumbs"><a href="../index.html">Home</a> › ADR 0068 · Select Midtrans Snap for Launch Payments</nav>
 <main>
 <h1 id="68-select-midtrans-snap-for-launch-payments">68. Select Midtrans Snap for Launch Payments</h1>
 <h2 id="status">Status</h2>
-<p>Accepted for launch planning; Midtrans is the single gateway-of-record and Snap is the initial checkout surface. Initial method categories (QRIS + bank transfer/Virtual Account) are resolved by ADR 0069. Exact activated method codes, merchant onboarding eligibility, method-specific refund coverage/fees, and reconciliation cadence remain open operational follow-ups.</p>
+<p><strong>Superseded for MVP launch; kept as future option. WhatsApp manual payment is launch path per <a href="../0097-whatsapp-manual-payment.md">ADR 0097</a>.</strong> Midtrans Snap is no longer the launch payment path. The decision below describes the Midtrans option that may be reactivated post-MVP via a future ADR; the launch path is manual bank transfer / VA / QRIS off-platform with Admin "Mark as paid" verification in the Admin workspace.</p>
 <h2 id="context">Context</h2>
 <p>Seraya's MVP needs one Indonesia-first online payment gateway for single-session and full-upfront package purchases. The domain already isolates provider details behind <code>PaymentGatewayAdapter</code>, treats signed server-verified webhook/PaymentEvent as authority, and records refunds as separate <code>RefundAction</code> records. The team has not previously integrated either Midtrans or Xendit.</p>
 <h2 id="decision">Decision</h2>
@@ -42,7 +42,7 @@
 </main>
 <footer class="site">
 <p><a href="../index.html">Index</a> · <a href="../adr/index.html">All ADR</a> · <a href="../baseline/index.html">Baseline docs</a></p>
-<p>Generated from <code>/home/jar/output/psychology-research/seraya-psikologi-domain/</code> · Round 6 closure · 2026-08-31</p>
+<p>Generated from <code>/home/jar/output/psychology-research/seraya-psikologi-domain/</code> · 2026-09-01</p>
 </footer>
 </body>
 </html>
