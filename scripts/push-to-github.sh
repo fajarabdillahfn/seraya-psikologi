@@ -1,84 +1,68 @@
 #!/usr/bin/env bash
-# scripts/push-to-github.sh — push this repo to GitHub.
+# scripts/push-to-github.sh — auto-create GitHub repo and push.
+#
+# This script uses the SSH key at ~/.ssh/github which is already authorized
+# for the fajarabdillahfn account. It calls the GitHub API to create the
+# repo, then uses git+SSH to push.
+#
+# Requires:
+#   - SSH key in ssh-agent (ssh-add ~/.ssh/github)
+#   - One of:
+#     (a) GH_TOKEN env var with `repo` scope, OR
+#     (b) you run `gh auth login` first
 #
 # Usage:
-#   GH_TOKEN=<github_personal_access_token> ./scripts/push-to-github.sh
-#   ./scripts/push-to-github.sh <github_personal_access_token>
-#   ./scripts/push-to-github.sh --ssh
-#
-# This script will:
-#   1. Create the GitHub repo `seraya-psikologi` under your account.
-#   2. Push the local repo to `main`.
-#   3. Print the public URL.
-#
-# Requires: git, curl, jq (for the HTTPS path).
+#   GH_TOKEN=ghp_*** ./scripts/push-to-github.sh
+#   ./scripts/push-to-github.sh    # uses GH_TOKEN or asks gh
 
 set -euo pipefail
-
-REPO_NAME="seraya-psikologi"
-DESCRIPTION="Seraya Psikologi booking and payment MVP — Cloudflare Worker + D1"
-PRIVATE=false
+REPO="seraya-psikologi"
+DESC="Seraya Psikologi booking and payment MVP — Cloudflare Worker + D1"
+PRIVATE="${PRIVATE:-false}"
 
 cd "$(dirname "$0")/.."
 
-if [[ "${1:-}" == "--ssh" ]]; then
-  echo "==> SSH mode"
-  echo "    Make sure ~/.ssh/github (or another key) is added to https://github.com/settings/keys"
-  echo "    and that the SSH host key for github.com is trusted."
-  if ! git remote get-url origin 2>/dev/null; then
-    git remote add origin "git@github.com:fajarabdillahfn/${REPO_NAME}.git"
-  fi
-  echo "==> Pushing to git@github.com:fajarabdillahfn/${REPO_NAME}.git"
-  git push -u origin main
-  echo "==> Done. View at https://github.com/fajarabdillahfn/${REPO_NAME}"
-  exit 0
-fi
-
-if [[ "${1:-}" == "--create-only" ]]; then
-  TOKEN="${GH_TOKEN:-${2:-}}"
-  if [[ -z "$TOKEN" ]]; then
-    echo "ERROR: set GH_TOKEN env or pass as argument"
-    exit 1
-  fi
-  echo "==> Creating GitHub repo ${REPO_NAME} via API"
-  curl -sS -X POST -H "Authorization: token $TOKEN" -H "Accept: application/vnd.github+json" \
-    "https://api.github.com/user/repos" \
-    -d "{\"name\":\"${REPO_NAME}\",\"description\":\"${DESCRIPTION}\",\"private\":${PRIVATE}}"
-  echo ""
-  echo "==> Done. Push with:"
-  echo "    GH_TOKEN=$TOKEN ./scripts/push-to-github.sh"
-  exit 0
-fi
-
-TOKEN="${1:-${GH_TOKEN:-}}"
-if [[ -z "$TOKEN" ]]; then
-  cat <<EOF
-Usage:
-  GH_TOKEN=<github_pat> ./scripts/push-to-github.sh
-  ./scripts/push-to-github.sh <github_pat>
-  ./scripts/push-to-github.sh --ssh
-  ./scripts/push-to-github.sh --create-only
-
-Create a PAT at https://github.com/settings/tokens (classic, with 'repo' scope).
-EOF
+if [ ! -d .git ]; then
+  echo " No git repo here."
   exit 1
 fi
 
-USER=$(curl -sS -H "Authorization: token $TOKEN" https://api.github.com/user | jq -r .login)
-echo "==> Authenticated as ${USER}"
+# Make sure ssh-agent has the github key
+if ! ssh-add -l 2>/dev/null | grep -q "github"; then
+  echo " Loading ~/.ssh/github into ssh-agent..."
+  eval $(ssh-agent -s) >/dev/null
+  ssh-add ~/.ssh/github
+fi
 
-echo "==> Creating repo (if missing)"
-curl -sS -X POST -H "Authorization: token $TOKEN" -H "Accept: application/vnd.github+json" \
-  "https://api.github.com/user/repos" \
-  -d "{\"name\":\"${REPO_NAME}\",\"description\":\"${DESCRIPTION}\",\"private\":${PRIVATE}}" \
-  | jq -r '.html_url // empty' > /tmp/repo_url
+# Get/create token
+TOKEN="${GH_TOKEN:-}"
+if [ -z "$TOKEN" ]; then
+  if command -v gh >/dev/null 2>&1 && gh auth status >/dev/null 2>&1; then
+    TOKEN=$(gh auth token)
+  fi
+fi
 
-REPO_URL="https://github.com/${USER}/${REPO_NAME}.git"
-echo "==> Setting remote to ${REPO_URL}"
-git remote set-url origin "$REPO_URL" 2>/dev/null || git remote add origin "$REPO_URL"
+if [ -z "$TOKEN" ]; then
+  echo ""
+  echo "Need a GitHub token. Options:"
+  echo "  1) GH_TOKEN=ghp_*** ./scripts/push-to-github.sh"
+  echo "  2) gh auth login (then rerun this script)"
+  echo "  3) Create the repo manually at https://github.com/new then push:"
+  echo "     git -C $(pwd) remote set-url origin git@github.com:fajarabdillahfn/${REPO}.git"
+  echo "     git -C $(pwd) push -u origin main"
+  exit 1
+fi
 
-echo "==> Pushing to ${REPO_URL}"
-GIT_TERMINAL_PROMPT=0 git -c credential.helper="!f() { echo username=$USER; echo password=$TOKEN; }; f" \
-  push -u origin main
+# Check if repo exists
+if curl -s -H "Authorization: token $TOKEN"     "https://api.github.com/repos/fajarabdillahfn/${REPO}"     | grep -q '"id"'; then
+  echo " Repo fajarabdillahfn/${REPO} already exists, skipping create."
+else
+  echo " Creating repo fajarabdillahfn/${REPO}..."
+  curl -s -X POST -H "Authorization: token $TOKEN"        -H "Accept: application/vnd.github+json"        "https://api.github.com/user/repos"        -d "{\"name\":\"${REPO}\",\"description\":\"${DESC}\",\"private\":${PRIVATE}}"     | grep -E '"(html_url|full_name|message)"' | head -3
+fi
 
-echo "==> Done. View at https://github.com/${USER}/${REPO_NAME}"
+# Push via SSH
+git remote set-url origin "git@github.com:fajarabdillahfn/${REPO}.git"
+echo " Pushing to git@github.com:fajarabdillahfn/${REPO}.git"
+git push -u origin main
+echo " Done. Visit https://github.com/fajarabdillahfn/${REPO}"

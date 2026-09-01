@@ -84,3 +84,28 @@ For business-scope conflicts, **Non-Teknis sources** (Charter, Matrix, IA, JSON 
 - `docs/PRD-GUIDELINE-REVIEW.md` — 1,155 lines, Round 1–7 closure narrative.
 - `docs/adr/0089.html` ... `docs/adr/0096.html` — Round 4–6 closures.
 - `docs-site/index.html` — browseable HTML version.
+
+
+## Live deployments
+
+- **Static documentation site**: https://seraya-psikologi-docs.pages.dev (Cloudflare Pages, deployed 2026-08-31)
+- **MVP Worker**: https://seraya-psikologi.aurinko-jar-ai.workers.dev (Cloudflare Worker + D1)
+- **D1 database**: `prd-biro-psikologi` (id `8f193be1-59da-42ba-8ef7-9494cdd18f8c`)
+
+## Deployment steps used
+
+1. Cloudflare Pages project `seraya-psikologi-docs` created via wrangler.
+2. Docs site deployed: `wrangler pages deploy docs-site/ --project-name seraya-psikologi-docs`.
+3. D1 database already exists as `prd-biro-psikologi` (reused for MVP).
+4. Migration applied via `wrangler d1 execute DB --remote --file mvp/app/migrations/0001_init.sql --config wrangler.toml`.
+5. Worker deployed via `wrangler deploy --config wrangler.toml` → URL `seraya-psikologi.<account>.workers.dev`.
+
+## GitHub repository
+
+Push this repo to GitHub with:
+
+```
+GH_TOKEN=ghp_*** ./scripts/push-to-github.sh
+```
+
+The script creates `fajarabdillahfn/seraya-psikologi` via the GitHub API and pushes via SSH.
