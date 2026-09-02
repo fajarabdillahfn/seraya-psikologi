@@ -51,18 +51,17 @@ export class AvailabilityModule {
     // implementation filtered out same-day slots due to a space-vs-'T' mismatch).
     const { rows } = await this.db.query<AvailabilitySlotRow>({
       sql: `SELECT s.* FROM availability_slot s
-            LEFT JOIN capacity_reservation cr
-              ON cr.parent_id = s.id
-              AND cr.state IN ('hold_active','confirmed')
             LEFT JOIN slot_hold sh
               ON sh.slot_id = s.id
               AND sh.state = 'active'
               AND sh.expires_at > ?
+            LEFT JOIN capacity_reservation cr
+              ON cr.parent_id = sh.id
+              AND cr.state IN ('hold_active','confirmed')
             WHERE s.offering_id = ?
               AND s.withdrawn = 0
               AND datetime(s.starts_at_utc) > datetime(?)
               AND datetime(s.ends_at_utc) <= datetime(?)
-              AND cr.id IS NULL
               AND sh.id IS NULL
             ORDER BY datetime(s.starts_at_utc) ASC`,
       params: [
@@ -148,20 +147,42 @@ export class AvailabilityModule {
    * Returns true if no active reservation overlaps the proposed window.
    * ADR 0091 §6.
    */
+  /**
+   * Pre-flight overlap check before creating a CapacityReservation.
+   * Returns true if no active reservation overlaps the proposed window.
+   * ADR 0091 §6.
+   *
+   * An abandoned checkout leaves a 'hold_active' reservation whose
+   * slot_hold never expired; only hold reservations whose joined hold is
+   * still active-and-unexpired (or consumed, i.e. a confirmed session)
+   * count as blocking.
+   */
   async isSlotAvailable(args: {
     psychologistId: string;
     startsAtUtc: string;
     endsAtUtc: string;
+    now: Date;
   }): Promise<boolean> {
     const { rows } = await this.db.query<{ count: number }>({
-      sql: `SELECT COUNT(*) AS count FROM capacity_reservation
-            WHERE psychologist_id = ?
-              AND state IN ('hold_active','confirmed')
-              AND NOT (ends_at_utc <= ? OR starts_at_utc >= ?)`,
+      sql: `SELECT COUNT(*) AS count FROM capacity_reservation cr
+            LEFT JOIN slot_hold sh
+              ON cr.reservation_kind = 'slot_hold' AND sh.id = cr.parent_id
+            WHERE cr.psychologist_id = ?
+              AND cr.state IN ('hold_active','confirmed')
+              AND NOT (cr.ends_at_utc <= ? OR cr.starts_at_utc >= ?)
+              AND (
+                cr.reservation_kind = 'appointment'
+                OR (sh.id IS NOT NULL AND sh.state = 'consumed')
+                OR (
+                  sh.id IS NOT NULL AND sh.state = 'active'
+                  AND sh.expires_at > ?
+                )
+              )`,
       params: [
         args.psychologistId,
         args.startsAtUtc,
         args.endsAtUtc,
+        args.now.toISOString(),
       ],
     });
     const n = rows[0]?.count ?? 0;

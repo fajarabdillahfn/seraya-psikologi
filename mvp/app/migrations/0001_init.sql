@@ -396,10 +396,14 @@ CREATE TABLE IF NOT EXISTS cancellation_request (
   state                 TEXT NOT NULL DEFAULT 'pending'
                         CHECK (state IN ('pending','decided','withdrawn')),
   created_at            TEXT NOT NULL DEFAULT (datetime('now')),
-  decided_at            TEXT,
-  UNIQUE(target_kind, target_id, state)
-    WHERE state = 'pending'
+  decided_at            TEXT
 );
+
+-- At most one unresolved request per target (ADR 0095). SQLite does not
+-- allow WHERE on table constraints, so this is a partial unique index.
+CREATE UNIQUE INDEX IF NOT EXISTS idx_cancellation_target_pending
+  ON cancellation_request(target_kind, target_id)
+  WHERE state = 'pending';
 
 CREATE INDEX idx_cancellation_target ON cancellation_request(target_kind, target_id);
 

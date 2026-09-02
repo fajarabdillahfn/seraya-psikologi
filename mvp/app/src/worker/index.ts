@@ -25,6 +25,7 @@
  */
 
 import { Hono } from "hono";
+import { randomUUID } from "node:crypto";
 import { DomainError } from "../domain/types";
 import { createAdapter } from "../persistence/d1-adapter";
 import { CatalogModule } from "../modules/catalog";
@@ -461,6 +462,13 @@ app.post("/api/booking/create", async (c) => {
   if (!slotId) return c.redirect(`/book/${offeringId}/slots`);
   const offerSnapshot = await catalog.createCurrentOfferSnapshot(offeringId, "v1-2026-09-03");
   const availability = new AvailabilityModule(adapter);
+  // The consent checkbox is required client-side; a direct POST must not be
+  // able to create a booking without an explicit acknowledgment.
+  const consentAck =
+    body["consentAck"] === "on" || body["consentAck"] === "true";
+  if (!consentAck) {
+    return c.text("Kamu harus menyetujui Informed Consent dan Kebijakan Privasi untuk melanjutkan booking.", 400);
+  }
   const bookingModule = new BookingModule(adapter, availability);
   let result;
   try {

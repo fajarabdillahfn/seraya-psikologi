@@ -37,6 +37,26 @@ import type { Booking, PaymentMethod, PaymentProof } from "../domain/types";
 // Invoice generation (PDF + text) — ADR 0097
 // ---------------------------------------------------------------------------
 
+const WIB = "Asia/Jakarta";
+const wibExpiry = new Intl.DateTimeFormat("id-ID", {
+  weekday: "long",
+  day: "numeric",
+  month: "short",
+  year: "numeric",
+  hour: "2-digit",
+  minute: "2-digit",
+  hour12: false,
+  timeZone: WIB,
+});
+
+// Expiry is stored as UTC ISO; invoices present it in the client's local
+// timezone (Asia/Jakarta) like every other user-facing timestamp.
+function formatWibExpiry(iso: string): string {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return iso;
+  return `${wibExpiry.format(d)} WIB`;
+}
+
 export interface InvoiceInput {
   bookingId: string;
   clientDisplayName: string;
@@ -262,7 +282,9 @@ export class WhatsAppManualPaymentModule {
       clientContactEmail: row.client_contact_email,
       offeringName: row.offering_name,
       amountIdr: row.amount_idr,
-      expiresAt: row.expires_at ?? new Date(Date.now() + 10 * 60 * 1000).toISOString(),
+      expiresAt: row.expires_at
+        ? formatWibExpiry(row.expires_at)
+        : new Date(Date.now() + 10 * 60 * 1000).toISOString(),
       adminWhatsappNumber: this.config.adminWhatsappNumber,
       bankInstructions: {
         bankName: this.config.bankName,
