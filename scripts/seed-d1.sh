@@ -65,7 +65,11 @@ VALUES
 INSERT OR IGNORE INTO availability_rule
   (id, psychologist_id, weekday, starts_at_local, ends_at_local, effective_from)
 VALUES
-  ('rule_fuja_tue', 'fuja', 2, '09:00', '17:00', '2026-08-31');
+  ('rule_fuja_tue', 'fuja', 2, '09:00', '17:00', '2026-08-31'),
+  ('rule_fuja_mon', 'fuja', 1, '09:00', '17:00', '2026-08-31'),
+  ('rule_fuja_wed', 'fuja', 3, '09:00', '17:00', '2026-08-31'),
+  ('rule_fuja_thu', 'fuja', 4, '09:00', '17:00', '2026-08-31'),
+  ('rule_fuja_fri', 'fuja', 5, '09:00', '17:00', '2026-08-31');
 
 -- Admin staff (placeholder for MVP dev)
 INSERT OR IGNORE INTO staff_membership
