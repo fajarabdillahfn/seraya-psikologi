@@ -9,7 +9,7 @@ These are intentionally small and reviewable. Read them in this order:
 | 3 | [[03-website-content]] | Public pages, Layanan submenu, tone, claims, assets, language | **Business review closed** |
 | 4 | [[04-availability-scheduling]] | Schedule, slots, buffer, cutoff, exceptions | **In business review** |
 | 5 | [[05-cancellation-refund]] | WhatsApp-only handling, Admin status, evidence | **In business review** |
-| 6 | [[06-privacy-consent]] | Data boundary and consent | Copy/sign-off pending |
+| 6 | [[06-privacy-consent]] | Data scope, access, rights, breach notice, retention, minor policy | **In business review** |
 | 7 | [[07-staff-admin-operations]] | Staff roles and Admin procedures | Placeholder auth; production work next |
 | 8 | [[08-launch-gates]] | UAT and production readiness | Gate design exists; evidence pending |
 
