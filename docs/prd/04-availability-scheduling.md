@@ -11,7 +11,7 @@ Expose only slots that are genuinely bookable for the selected offering and prot
 - Transition buffer: 15 minutes before and after a reservation.
 - Slot grid: 30-minute granularity in the domain model; current demo fixtures use 60-minute starts.
 - Booking horizon: 90 days.
-- Booking cutoff: 1 hour before start.
+- Booking cutoff: 2 hours before start.
 - Overlapping active holds/reservations for the same psychologist are rejected.
 
 ## Current demo fixture

@@ -17,7 +17,7 @@ Last reviewed: 2026-09-02
 
 ## DOING — current focus
 
-- **W01 — PRD 01 product review** — login-required booking, required WhatsApp phone, 2-hour cutoff, individual-only catalog, and online By chat/By call pricing are being reviewed before implementation changes.
+- **W01 — PRD 01 product review** — required profile/address and counseling intake fields, individual online/offline catalog, 2-hour cutoff, and the remaining offline configuration are being reviewed before implementation changes.
 
 The documentation refactor is complete: this board and the focused PRDs are now the default reading path.
 

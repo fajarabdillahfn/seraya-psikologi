@@ -17,7 +17,7 @@
 - Launch bookable program: **SERAYA PULANG**.
 - Launch psychologist: **Fuja Rahayu Kinanti** (publication evidence still needs operational verification).
 - Session: individual online/offline counseling, 60 minutes.
-- Client: guest booking; minimum intake is name + email + consent; phone is optional.
+- Client: Google SSO login required; all profile/address fields and all counseling-intake fields are required before booking.
 - Cancellation/refund: Admin WhatsApp; no public cancellation/refund UI; outcomes are full refund or no refund.
 - Couple counseling: modeled, but launch timing is still deferred.
 - MVP does not store clinical notes, diagnosis, assessment results, transcripts, or session notes.

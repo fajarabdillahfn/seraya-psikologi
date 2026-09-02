@@ -12,7 +12,10 @@
 <li><strong>Online counseling has two services:</strong></li>
 <li>By chat — <strong>Rp99.000</strong></li>
 <li>By call — <strong>Rp125.000</strong></li>
-<li><strong>Reference UX:</strong> the supplied Ibunda screenshots are a field/layout reference only. They do not override Seraya's business scope or data boundary.</li>
+<li><strong>Reference UX:</strong> the supplied Ibunda screenshots are the approved reference for the required profile, address, and counseling-intake fields. They do not override Seraya's business scope or data boundary.</li>
+<li><strong>All reference profile/address fields are required</strong> for the client profile.</li>
+<li><strong>All reference counseling-intake fields are required</strong> for every booking.</li>
+<li><strong>Offline individual counseling is in launch scope.</strong> Its price, schedule, venue, and exact service details are still required before implementation.</li>
 </ul>
 <h2 id="client-flow">Client flow</h2>
 <ol>
@@ -21,9 +24,10 @@
 <li>On first login, client completes their profile.</li>
 <li>Required profile data is validated before the client can continue.</li>
 <li>Client chooses <strong>Konseling Individual</strong>.</li>
-<li>Client chooses the online service:
-   - By chat — Rp99.000.
-   - By call — Rp125.000.</li>
+<li>Client chooses the individual counseling mode:
+   - Online → By chat — Rp99.000.
+   - Online → By call — Rp125.000.
+   - Offline → individual counseling; launch scope confirmed, with price/schedule/venue still to be configured.</li>
 <li>Client chooses a future slot.</li>
 <li>Client completes the counseling intake form.</li>
 <li>Client reviews the booking summary: psychologist, service, mode, date/time, duration, price, and contact data.</li>
@@ -31,7 +35,7 @@
 <li>System creates Booking + immutable OfferSnapshot + SlotHold + CapacityReservation atomically.</li>
 <li>Booking enters <code>pending_manual_payment</code> and shows the manual payment handoff.</li>
 </ol>
-<p>Offline individual counseling is outside the current online-service pricing decision. It must remain unpublished or clearly unpriced until its price, schedule, venue, and flow are confirmed.</p>
+<p>Offline individual counseling is <strong>in launch scope</strong>, but it must remain unpublished until its price, schedule, venue, and online/offline joining instructions are confirmed.</p>
 <h2 id="reference-ux-profile-and-address">Reference UX: profile and address</h2>
 <p>Source files:</p>
 <ul>
@@ -52,10 +56,10 @@
 </ul>
 <p>For Seraya:</p>
 <ul>
-<li><strong>No. WhatsApp is required</strong> — this is a locked product decision.</li>
-<li>The remaining fields are reference-informed profile candidates, not yet individually marked as required by the product owner.</li>
-<li>The final form must explicitly decide whether each field is required, optional, or excluded before implementation.</li>
-<li>Do not collect a field only because another platform collects it; each field needs an operational purpose and approved privacy treatment.</li>
+<li><strong>All fields listed in the Profile and Address sections are required</strong> for the client profile.</li>
+<li>This requiredness follows the product-owner decision on 2026-09-02 and the approved reference structure.</li>
+<li>The product still needs an approved operational purpose and retention treatment for each field.</li>
+<li>Do not add fields beyond this list without a new product decision.</li>
 </ul>
 <h3 id="address-section-reference-informed-fields">Address section — reference-informed fields</h3>
 <p>The profile reference shows a separate <strong>Alamat Saya</strong> section:</p>
@@ -67,9 +71,9 @@
 </ul>
 <p>For Seraya:</p>
 <ul>
-<li>Address should be collected only if it is needed for the selected individual offline service or another explicitly approved operational purpose.</li>
-<li>Address is not required for the current online By chat / By call service based on the current decision.</li>
-<li>Exact requiredness and visibility of address fields remain open until the offline service is defined.</li>
+<li>All four address fields are required for every client profile because offline individual counseling is in launch scope.</li>
+<li>The approved profile UX groups them under <strong>Alamat Saya</strong>.</li>
+<li>The product must document the operational purpose and retention treatment for each address field before production.</li>
 </ul>
 <h2 id="reference-ux-counseling-intake">Reference UX: counseling intake</h2>
 <p>The counseling-form reference shows this sequence:</p>
@@ -110,23 +114,23 @@
 </tr>
 <tr>
 <td>Multiple topics</td>
-<td>Candidate intake field; final topic taxonomy belongs to the Website Content/Privacy review</td>
+<td><strong>Required</strong>; multiple selections are supported; final taxonomy must be versioned</td>
 </tr>
 <tr>
 <td>Problem description</td>
-<td>Candidate non-clinical intake field; do not store clinical narrative in MVP</td>
+<td><strong>Required</strong>; non-clinical intake only; minimum 50 characters and defined maximum length</td>
 </tr>
 <tr>
 <td>Minimum 50 characters</td>
-<td>Reference-only; not locked yet for Seraya</td>
+<td><strong>Required</strong> for the problem description</td>
 </tr>
 <tr>
 <td>Returning client</td>
-<td>Candidate profile/booking flag; define behavior before implementation</td>
+<td><strong>Required</strong> yes/no field</td>
 </tr>
 <tr>
 <td>Expected outcome</td>
-<td>Candidate field; must be checked against the no-clinical-record boundary</td>
+<td><strong>Required</strong> operational intake field; not a clinical record</td>
 </tr>
 <tr>
 <td>Informed consent</td>
@@ -139,41 +143,41 @@
 </tbody>
 </table>
 <h2 id="accountprofile-data-contract">Account/profile data contract</h2>
-<h3 id="required-now">Required now</h3>
+<h3 id="required-for-every-client-profile">Required for every client profile</h3>
 <ul>
 <li>Google identity authenticated through the login flow.</li>
-<li>Full name or approved display name.</li>
-<li>Verified account email.</li>
-<li>WhatsApp phone number.</li>
+<li>Nama panggilan.</li>
+<li>Tanggal lahir.</li>
+<li>Jenis kelamin.</li>
+<li>Pekerjaan.</li>
+<li>Pendidikan.</li>
+<li>Nomor WhatsApp.</li>
+<li>Status.</li>
+<li>Agama.</li>
+<li>Negara.</li>
+<li>Provinsi.</li>
+<li>Kota atau kabupaten.</li>
+<li>Alamat.</li>
 </ul>
-<h3 id="reference-informed-candidates-requirement-still-to-decide-per-field">Reference-informed candidates — requirement still to decide per field</h3>
-<ul>
-<li>Date of birth.</li>
-<li>Gender.</li>
-<li>Occupation.</li>
-<li>Education.</li>
-<li>Relationship/marital status.</li>
-<li>Religion.</li>
-<li>Country, province, city/regency, and address for offline operations only.</li>
-</ul>
-<p>The profile screen may group these into <strong>Profil Saya</strong> and <strong>Alamat Saya</strong> cards like the reference, but visual similarity is not a requirement to collect every field.</p>
+<p>The profile screen uses two grouped sections: <strong>Profil Saya</strong> and <strong>Alamat Saya</strong>, following the approved reference structure. All listed fields are required before the client can book.</p>
+<p>Address is collected because offline individual counseling is in launch scope. The product must still document the approved operational purpose and retention treatment for the address fields.</p>
 <h2 id="booking-form-data-contract">Booking-form data contract</h2>
 <h3 id="required">Required</h3>
 <ul>
 <li>Selected individual service: <code>by_chat</code> or <code>by_call</code> for online launch.</li>
 <li>Selected future slot.</li>
 <li>Profile name, email, and WhatsApp phone number.</li>
-<li>Versioned informed consent acknowledgement.</li>
 <li>Safety/crisis acknowledgement where required by the approved consent copy.</li>
 </ul>
-<h3 id="candidate-fields-from-the-reference-not-yet-locked">Candidate fields from the reference — not yet locked</h3>
+<h3 id="required-counseling-intake-for-every-booking">Required counseling intake for every booking</h3>
 <ul>
-<li>One or more counseling topics.</li>
-<li>Non-clinical short description.</li>
+<li>One or more counseling topics; multiple selections are supported.</li>
+<li>Non-clinical problem description; minimum 50 characters, following the approved reference behavior.</li>
 <li>Returning-client flag.</li>
-<li>Expected outcome.</li>
+<li>Expected outcome after counseling.</li>
+<li>Versioned informed consent acknowledgement.</li>
 </ul>
-<p>Until these are explicitly approved, the implementation must not make them blocking fields or store them as clinical records. If a description is enabled, it needs a short, non-clinical boundary message and a defined maximum length.</p>
+<p>The problem description and expected outcome are operational intake inputs only. They must not become clinical records, diagnosis, assessment results, transcripts, or session notes. The UI must display a clear non-clinical boundary and enforce a defined maximum length.</p>
 <h2 id="catalog">Catalog</h2>
 <table>
 <thead>
@@ -200,8 +204,8 @@
 <tr>
 <td>Offline</td>
 <td>Individual counseling</td>
-<td style="text-align: right;">Not specified</td>
-<td>Keep unpublished/unpriced until confirmed</td>
+<td style="text-align: right;"><strong>TBC-BOOKING-OFFLINE-01</strong></td>
+<td>In launch scope; publication waits for price/schedule/venue/instructions</td>
 </tr>
 </tbody>
 </table>
@@ -241,8 +245,8 @@
 <li>Invalid or missing phone blocks booking with a clear error.</li>
 <li>Verified Google email is shown in the booking summary.</li>
 <li>Profile is grouped into Profile and Address sections if the final UX keeps the reference structure.</li>
-<li>Address is not required for online By chat / By call.</li>
-<li>Exact requiredness of reference-informed fields is documented before implementation.</li>
+<li>All profile and address fields listed in this PRD are required before booking.</li>
+<li>The required fields are grouped as <strong>Profil Saya</strong> and <strong>Alamat Saya</strong>.</li>
 </ul>
 <h3 id="catalog-and-booking">Catalog and booking</h3>
 <ul>
@@ -257,29 +261,27 @@
 </ul>
 <h3 id="reference-informed-intake">Reference-informed intake</h3>
 <ul>
-<li>If topics are enabled, multiple selections are supported and the topic taxonomy is versioned.</li>
-<li>If problem description is enabled, the UI states the non-clinical boundary and maximum length.</li>
-<li>The 50-character minimum from the reference is not adopted until explicitly approved for Seraya.</li>
-<li>Returning-client behavior is defined before the field becomes functional.</li>
-<li>Expected outcome is not stored as a clinical record.</li>
+<li>Multiple counseling topics are required and support multiple selections.</li>
+<li>Problem description is required and has a minimum of 50 characters, plus a defined maximum length.</li>
+<li>Returning-client flag is required as an explicit yes/no answer.</li>
+<li>Expected outcome is required as operational intake data.</li>
 <li>Informed consent is versioned and required before submission.</li>
+<li>Problem description and expected outcome are not clinical records; the UI must state this boundary.</li>
 </ul>
 <h3 id="privacy-boundary">Privacy boundary</h3>
 <ul>
-<li>Google profile data is limited to approved account/contact fields.</li>
-<li>Phone/address data is used only for the approved operational purpose.</li>
+<li>Google profile data is limited to the approved account/contact fields.</li>
+<li>Phone/address data is required for the profile and used for the approved operational purpose, including offline counseling operations.</li>
 <li>No clinical notes, diagnosis, assessment results, transcripts, or session notes are accepted.</li>
-<li>Sensitive reference fields such as religion and gender are not silently made mandatory.</li>
+<li>Sensitive profile fields are mandatory because the product owner explicitly approved all reference profile fields; purpose, retention, and privacy copy must be documented before production.</li>
 </ul>
 <h2 id="still-open-for-this-prd">Still open for this PRD</h2>
 <ul>
-<li>Required/optional/excluded status for date of birth, gender, occupation, education, status, religion, and address fields.</li>
-<li>Whether topics, non-clinical description, returning-client flag, and expected outcome are included in launch.</li>
 <li>Final topic taxonomy and copy boundary.</li>
-<li>Offline individual counseling price, venue, schedule, and whether it is published at launch.</li>
+<li>Offline individual counseling price, venue, schedule, and exact joining/instruction details.</li>
 <li>Final Google SSO session, account-linking, recovery, and staff/client separation behavior.</li>
 <li>Final consent and safety copy.</li>
-<li>Add/review the two screenshot references as repository assets — now available under <code>docs-site/reference/screenshots/</code>.</li>
+<li>Document approved purpose, retention, and privacy copy for all required profile/address fields.</li>
 </ul>
 <h2 id="references">References</h2>
 <ul>
@@ -299,21 +301,22 @@
 <h2 id="change-log">Change log</h2>
 <ul>
 <li>2026-09-02: Removed guest booking; Google SSO required; WhatsApp phone required; cutoff changed from 1 hour to 2 hours; couple removed from current checkout; online catalog changed to By chat Rp99.000 and By call Rp125.000.</li>
-<li>2026-09-02: Mapped the Ibunda profile/address and counseling/payment references into explicit Seraya fields, preserving only the decisions that are actually locked.</li>
-<li>2026-09-02: Confirmed screenshot files are available under <code>docs-site/reference/screenshots/</code>; exact field requiredness remains a product decision rather than an inference from the reference UI.</li>
+<li>2026-09-02: Mapped the Ibunda profile/address and counseling/payment references into explicit Seraya fields.</li>
+<li>2026-09-02: Locked all visible profile/address fields and all visible counseling-intake fields as required; added offline individual counseling to launch scope.</li>
+<li>2026-09-02: Confirmed screenshot files are available under <code>docs-site/reference/screenshots/</code>; all visible profile/address and counseling-intake fields are now required by product decision.</li>
 </ul>
 <h2 id="decision-checkpoint">Decision checkpoint</h2>
 <p>Before implementation changes, review only these questions:</p>
 <ol>
-<li>Which profile fields besides WhatsApp are required at first booking?</li>
-<li>Are topics, description, returning-client flag, and expected outcome part of launch?</li>
-<li>Is offline individual counseling in launch, and if yes, what are its price, schedule, and address requirements?</li>
-<li>Should the booking flow use the labels <strong>By chat</strong> and <strong>By call</strong>, or retain Indonesian labels in the UI?</li>
+<li>What is the offline individual counseling price?</li>
+<li>What is the offline schedule and venue/address requirement?</li>
+<li>What are the online/offline joining instructions?</li>
+<li>Should the UI use the labels <strong>By chat</strong> and <strong>By call</strong>, or Indonesian labels?</li>
 </ol>
-<p>Until these are answered, the locked implementation scope is Google login + required WhatsApp + online By chat/By call + 2-hour cutoff.</p>
+<p>Until these are answered, the locked implementation scope is Google login + all required profile/intake fields + individual online By chat/By call + individual offline launch branch + 2-hour cutoff.</p>
 <h2 id="status-of-this-prd">Status of this PRD</h2>
 <p><strong>Ready for focused business review; not yet ready for implementation handoff.</strong></p>
-<p>The locked decisions are implementation-ready. The candidate fields and offline branch remain explicitly open so the developer does not invent requirements.</p>
+<p>The required fields and launch branches are now product-approved. Implementation remains blocked only by the concrete offline price/schedule/venue/instruction values and the operational/privacy copy needed to publish them.</p>
 <h2 id="notes">Notes</h2>
 <p>The reference screenshots are archived as visual inspiration and field inventory only. Seraya's final UI, copy, requiredness, privacy treatment, and data retention must be approved independently.</p>
 <h2 id="related">Related</h2>
