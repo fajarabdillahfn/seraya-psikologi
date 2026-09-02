@@ -12,6 +12,9 @@ Expose only slots that are genuinely bookable for the selected offering and prot
 - Slot grid: 30-minute granularity in the domain model; current demo fixtures use 60-minute starts.
 - Booking horizon: 90 days.
 - Booking cutoff: 2 hours before start.
+- Individual offline counseling launch schedule: 09.00–12.00 and 16.00–20.00 WIB.
+- Offline venue: Havana Park Blok H-3, Kepuharjo, Karangploso, Kab. Malang, 65152.
+- Online launch services: Chat and Call.
 - Overlapping active holds/reservations for the same psychologist are rejected.
 
 ## Current demo fixture

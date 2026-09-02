@@ -13,13 +13,19 @@ A client logs in, completes the required profile, chooses an individual counseli
 - **Scope:** individual counseling only. Couple counseling is not part of the current checkout.
 - **Phone number:** required in the client profile and available to the booking flow. It is not optional.
 - **Booking cutoff:** booking closes 2 hours before session start.
+- **Offline individual counseling:** Rp200.000, available 09.00–12.00 and 16.00–20.00 WIB at Havana Park Blok H-3, Kepuharjo, Karangploso, Kab. Malang, 65152.
+- **Online labels:** use **Chat** and **Call**.
 - **Online counseling has two services:**
-  - By chat — **Rp99.000**
-  - By call — **Rp125.000**
+  - Chat — **Rp99.000**
+  - Call — **Rp125.000**
 - **Reference UX:** the supplied Ibunda screenshots are the approved reference for the required profile, address, and counseling-intake fields. They do not override Seraya's business scope or data boundary.
 - **All reference profile/address fields are required** for the client profile.
 - **All reference counseling-intake fields are required** for every booking.
-- **Offline individual counseling is in launch scope.** Its price, schedule, venue, and exact service details are still required before implementation.
+- **Offline individual counseling is in launch scope.** Price, schedule, venue, and service details are now specified below.
+- **Online UI labels:** use **Chat** and **Call**.
+- **Offline price:** **Rp200.000**.
+- **Offline schedule:** **09.00–12.00 and 16.00–20.00 WIB**.
+- **Offline venue:** **Havana Park Blok H-3, Kepuharjo, Karangploso, Kab. Malang, 65152**.
 
 ## Client flow
 
@@ -29,9 +35,9 @@ A client logs in, completes the required profile, chooses an individual counseli
 4. Required profile data is validated before the client can continue.
 5. Client chooses **Konseling Individual**.
 6. Client chooses the individual counseling mode:
-   - Online → By chat — Rp99.000.
-   - Online → By call — Rp125.000.
-   - Offline → individual counseling; launch scope confirmed, with price/schedule/venue still to be configured.
+   - Online → Chat — Rp99.000.
+   - Online → Call — Rp125.000.
+   - Offline → individual counseling — Rp200.000, at Havana Park Blok H-3, Kepuharjo, Karangploso, Kab. Malang, 65152, during 09.00–12.00 or 16.00–20.00 WIB.
 7. Client chooses a future slot.
 8. Client completes the counseling intake form.
 9. Client reviews the booking summary: psychologist, service, mode, date/time, duration, price, and contact data.
@@ -39,7 +45,7 @@ A client logs in, completes the required profile, chooses an individual counseli
 11. System creates Booking + immutable OfferSnapshot + SlotHold + CapacityReservation atomically.
 12. Booking enters `pending_manual_payment` and shows the manual payment handoff.
 
-Offline individual counseling is **in launch scope**, but it must remain unpublished until its price, schedule, venue, and online/offline joining instructions are confirmed.
+Offline individual counseling is **in launch scope** with the price, schedule, and venue specified above. Publication still needs the final client-facing arrival instructions.
 
 ## Reference UX: profile and address
 
@@ -100,8 +106,8 @@ The counseling-form reference shows this sequence:
 
 | Reference element | Seraya decision |
 |---|---|
-| Chat | Keep as **By chat**, Rp99.000 |
-| Voice call | Keep as **By call**, Rp125.000 |
+| Chat | Keep as **Chat**, Rp99.000 |
+| Voice call | Map to **Call**, Rp125.000 |
 | Video call | Exclude from current launch scope |
 | Active Gmail | Login uses Google SSO; use the verified account email rather than asking for a second email by default |
 | Multiple topics | **Required**; multiple selections are supported; final taxonomy must be versioned |
@@ -157,9 +163,9 @@ The problem description and expected outcome are operational intake inputs only.
 
 | Mode | Service | Price | Status |
 |---|---|---:|---|
-| Online | By chat | Rp99.000 | **Confirmed for launch scope** |
-| Online | By call | Rp125.000 | **Confirmed for launch scope** |
-| Offline | Individual counseling | **TBC-BOOKING-OFFLINE-01** | In launch scope; publication waits for price/schedule/venue/instructions |
+| Online | Chat | Rp99.000 | **Confirmed for launch scope** |
+| Online | Call | Rp125.000 | **Confirmed for launch scope** |
+| Offline | Individual counseling | Rp200.000 | **Confirmed for launch scope**; Havana Park, 09.00–12.00 and 16.00–20.00 WIB |
 
 There is no couple offering in the current checkout. There is no assessment offering in this PRD. There is no online video-call service in the current launch scope.
 
@@ -238,7 +244,8 @@ A client must not reach the booking-submit command without an authenticated iden
 ## Still open for this PRD
 
 - Final topic taxonomy and copy boundary.
-- Offline individual counseling price, venue, schedule, and exact joining/instruction details.
+- Final client-facing session instructions: how a client receives online Chat/Call access or contact, when it is sent, how to arrive/check in at Havana Park, and what to do if late or unable to access the session.
+- Final copy/privacy treatment for the required profile and intake fields.
 - Final Google SSO session, account-linking, recovery, and staff/client separation behavior.
 - Final consent and safety copy.
 - Document approved purpose, retention, and privacy copy for all required profile/address fields.
@@ -264,23 +271,24 @@ A client must not reach the booking-submit command without an authenticated iden
 - 2026-09-02: Mapped the Ibunda profile/address and counseling/payment references into explicit Seraya fields.
 - 2026-09-02: Locked all visible profile/address fields and all visible counseling-intake fields as required; added offline individual counseling to launch scope.
 - 2026-09-02: Confirmed screenshot files are available under `docs-site/reference/screenshots/`; all visible profile/address and counseling-intake fields are now required by product decision.
+- 2026-09-02: Added offline price Rp200.000, schedule 09.00–12.00 and 16.00–20.00 WIB, Havana Park venue, and UI labels Chat/Call.
 
 ## Decision checkpoint
 
 Before implementation changes, review only these questions:
 
-1. What is the offline individual counseling price?
-2. What is the offline schedule and venue/address requirement?
-3. What are the online/offline joining instructions?
-4. Should the UI use the labels **By chat** and **By call**, or Indonesian labels?
+1. How should online Chat/Call access be delivered, and when?
+2. What are the client arrival/check-in instructions for Havana Park?
+3. What should the client do if they are late or cannot access the session?
+4. Is the final UI label exactly **Chat** and **Call** across all surfaces?
 
-Until these are answered, the locked implementation scope is Google login + all required profile/intake fields + individual online By chat/By call + individual offline launch branch + 2-hour cutoff.
+Until these are answered, the locked implementation scope is Google login + all required profile/intake fields + individual online Chat/Call + individual offline counseling at Rp200.000 in the specified schedule/venue + 2-hour cutoff. The remaining instruction details may use an explicitly marked placeholder during implementation, but must be resolved before production publication.
 
 ## Status of this PRD
 
 **Ready for focused business review; not yet ready for implementation handoff.**
 
-The required fields and launch branches are now product-approved. Implementation remains blocked only by the concrete offline price/schedule/venue/instruction values and the operational/privacy copy needed to publish them.
+The required fields, service prices, offline schedule/venue, and launch branches are product-approved. Implementation may proceed with a clearly marked instruction placeholder; production publication remains gated by final online/offline instructions and operational/privacy copy.
 
 ## Notes
 

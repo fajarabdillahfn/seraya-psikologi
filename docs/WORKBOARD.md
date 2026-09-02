@@ -17,20 +17,21 @@ Last reviewed: 2026-09-02
 
 ## DOING — current focus
 
-- **W01 — PRD 01 product review** — required profile/address and counseling intake fields, individual online/offline catalog, 2-hour cutoff, and the remaining offline configuration are being reviewed before implementation changes.
+- **W01 — PRD 01 implementation handoff** — business fields, prices, schedule, venue, and scope are locked; implementation can proceed with explicitly marked session-instruction placeholders while privacy/copy details remain production-gated.
 
 The documentation refactor is complete: this board and the focused PRDs are now the default reading path.
 
 ## NEXT — ordered
 
-- **N01 — Business review of focused PRDs** — user reviews `prd/01` through `prd/08`, starting with Booking and Payment.
-- **N02 — Replace demo payment configuration** — confirm real bank account, account holder, QRIS asset, and Admin operational procedure. Do not expose demo values in a production launch.
-- **N03 — Decide launch schedule** — replace demo weekday slots with Fuja's actual recurring availability and venue/online-meeting instructions.
-- **N04 — Finalize public copy** — clinical/ethics + privacy/legal review for consent, privacy, crisis, cancellation, and website claims.
-- **N05 — Define production staff access** — Google SSO, StaffMembership bootstrap, roles, session/CSRF/revocation behavior.
-- **N06 — Define Admin operations** — payment-proof review, duplicate/dispute handling, cancellation/refund handling, and evidence retention.
-- **N07 — Wire email** — provider, sender domain, confirmation/reminder templates, bounce handling, and ClientAccess delivery.
-- **N08 — Run UAT and launch gates** — execute the checklist in `prd/08-launch-gates.md` and record evidence.
+- **N01 — Business review of focused PRDs** — review `prd/01` through `prd/08`, starting with Booking and Payment.
+- **N02 — Replace demo payment configuration** — confirm real bank account, account holder, QRIS asset, and Admin procedure.
+- **N03 — Configure approved schedule** — replace demo slots with 09.00–12.00 and 16.00–20.00 WIB; venue Havana Park.
+- **N04 — Finalize session instructions** — define online Chat/Call access, offline arrival/check-in, and late/access-failure instructions.
+- **N05 — Finalize public copy** — clinical/ethics + privacy/legal review.
+- **N06 — Define production staff access** — Google SSO, StaffMembership, roles, session/CSRF/revocation.
+- **N07 — Define Admin operations** — payment proof, dispute, cancellation/refund, evidence retention.
+- **N08 — Wire email** — provider, sender domain, templates, bounce handling, ClientAccess delivery.
+- **N09 — Run UAT and launch gates** — execute `prd/08-launch-gates.md` and record evidence.
 
 ## BLOCKED / production gate
 

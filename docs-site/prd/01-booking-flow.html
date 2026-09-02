@@ -9,13 +9,19 @@
 <li><strong>Scope:</strong> individual counseling only. Couple counseling is not part of the current checkout.</li>
 <li><strong>Phone number:</strong> required in the client profile and available to the booking flow. It is not optional.</li>
 <li><strong>Booking cutoff:</strong> booking closes 2 hours before session start.</li>
+<li><strong>Offline individual counseling:</strong> Rp200.000, available 09.00–12.00 and 16.00–20.00 WIB at Havana Park Blok H-3, Kepuharjo, Karangploso, Kab. Malang, 65152.</li>
+<li><strong>Online labels:</strong> use <strong>Chat</strong> and <strong>Call</strong>.</li>
 <li><strong>Online counseling has two services:</strong></li>
-<li>By chat — <strong>Rp99.000</strong></li>
-<li>By call — <strong>Rp125.000</strong></li>
+<li>Chat — <strong>Rp99.000</strong></li>
+<li>Call — <strong>Rp125.000</strong></li>
 <li><strong>Reference UX:</strong> the supplied Ibunda screenshots are the approved reference for the required profile, address, and counseling-intake fields. They do not override Seraya's business scope or data boundary.</li>
 <li><strong>All reference profile/address fields are required</strong> for the client profile.</li>
 <li><strong>All reference counseling-intake fields are required</strong> for every booking.</li>
-<li><strong>Offline individual counseling is in launch scope.</strong> Its price, schedule, venue, and exact service details are still required before implementation.</li>
+<li><strong>Offline individual counseling is in launch scope.</strong> Price, schedule, venue, and service details are now specified below.</li>
+<li><strong>Online UI labels:</strong> use <strong>Chat</strong> and <strong>Call</strong>.</li>
+<li><strong>Offline price:</strong> <strong>Rp200.000</strong>.</li>
+<li><strong>Offline schedule:</strong> <strong>09.00–12.00 and 16.00–20.00 WIB</strong>.</li>
+<li><strong>Offline venue:</strong> <strong>Havana Park Blok H-3, Kepuharjo, Karangploso, Kab. Malang, 65152</strong>.</li>
 </ul>
 <h2 id="client-flow">Client flow</h2>
 <ol>
@@ -25,9 +31,9 @@
 <li>Required profile data is validated before the client can continue.</li>
 <li>Client chooses <strong>Konseling Individual</strong>.</li>
 <li>Client chooses the individual counseling mode:
-   - Online → By chat — Rp99.000.
-   - Online → By call — Rp125.000.
-   - Offline → individual counseling; launch scope confirmed, with price/schedule/venue still to be configured.</li>
+   - Online → Chat — Rp99.000.
+   - Online → Call — Rp125.000.
+   - Offline → individual counseling — Rp200.000, at Havana Park Blok H-3, Kepuharjo, Karangploso, Kab. Malang, 65152, during 09.00–12.00 or 16.00–20.00 WIB.</li>
 <li>Client chooses a future slot.</li>
 <li>Client completes the counseling intake form.</li>
 <li>Client reviews the booking summary: psychologist, service, mode, date/time, duration, price, and contact data.</li>
@@ -35,7 +41,7 @@
 <li>System creates Booking + immutable OfferSnapshot + SlotHold + CapacityReservation atomically.</li>
 <li>Booking enters <code>pending_manual_payment</code> and shows the manual payment handoff.</li>
 </ol>
-<p>Offline individual counseling is <strong>in launch scope</strong>, but it must remain unpublished until its price, schedule, venue, and online/offline joining instructions are confirmed.</p>
+<p>Offline individual counseling is <strong>in launch scope</strong> with the price, schedule, and venue specified above. Publication still needs the final client-facing arrival instructions.</p>
 <h2 id="reference-ux-profile-and-address">Reference UX: profile and address</h2>
 <p>Source files:</p>
 <ul>
@@ -98,11 +104,11 @@
 <tbody>
 <tr>
 <td>Chat</td>
-<td>Keep as <strong>By chat</strong>, Rp99.000</td>
+<td>Keep as <strong>Chat</strong>, Rp99.000</td>
 </tr>
 <tr>
 <td>Voice call</td>
-<td>Keep as <strong>By call</strong>, Rp125.000</td>
+<td>Map to <strong>Call</strong>, Rp125.000</td>
 </tr>
 <tr>
 <td>Video call</td>
@@ -191,21 +197,21 @@
 <tbody>
 <tr>
 <td>Online</td>
-<td>By chat</td>
+<td>Chat</td>
 <td style="text-align: right;">Rp99.000</td>
 <td><strong>Confirmed for launch scope</strong></td>
 </tr>
 <tr>
 <td>Online</td>
-<td>By call</td>
+<td>Call</td>
 <td style="text-align: right;">Rp125.000</td>
 <td><strong>Confirmed for launch scope</strong></td>
 </tr>
 <tr>
 <td>Offline</td>
 <td>Individual counseling</td>
-<td style="text-align: right;"><strong>TBC-BOOKING-OFFLINE-01</strong></td>
-<td>In launch scope; publication waits for price/schedule/venue/instructions</td>
+<td style="text-align: right;">Rp200.000</td>
+<td><strong>Confirmed for launch scope</strong>; Havana Park, 09.00–12.00 and 16.00–20.00 WIB</td>
 </tr>
 </tbody>
 </table>
@@ -278,7 +284,8 @@
 <h2 id="still-open-for-this-prd">Still open for this PRD</h2>
 <ul>
 <li>Final topic taxonomy and copy boundary.</li>
-<li>Offline individual counseling price, venue, schedule, and exact joining/instruction details.</li>
+<li>Final client-facing session instructions: how a client receives online Chat/Call access or contact, when it is sent, how to arrive/check in at Havana Park, and what to do if late or unable to access the session.</li>
+<li>Final copy/privacy treatment for the required profile and intake fields.</li>
 <li>Final Google SSO session, account-linking, recovery, and staff/client separation behavior.</li>
 <li>Final consent and safety copy.</li>
 <li>Document approved purpose, retention, and privacy copy for all required profile/address fields.</li>
@@ -304,19 +311,20 @@
 <li>2026-09-02: Mapped the Ibunda profile/address and counseling/payment references into explicit Seraya fields.</li>
 <li>2026-09-02: Locked all visible profile/address fields and all visible counseling-intake fields as required; added offline individual counseling to launch scope.</li>
 <li>2026-09-02: Confirmed screenshot files are available under <code>docs-site/reference/screenshots/</code>; all visible profile/address and counseling-intake fields are now required by product decision.</li>
+<li>2026-09-02: Added offline price Rp200.000, schedule 09.00–12.00 and 16.00–20.00 WIB, Havana Park venue, and UI labels Chat/Call.</li>
 </ul>
 <h2 id="decision-checkpoint">Decision checkpoint</h2>
 <p>Before implementation changes, review only these questions:</p>
 <ol>
-<li>What is the offline individual counseling price?</li>
-<li>What is the offline schedule and venue/address requirement?</li>
-<li>What are the online/offline joining instructions?</li>
-<li>Should the UI use the labels <strong>By chat</strong> and <strong>By call</strong>, or Indonesian labels?</li>
+<li>How should online Chat/Call access be delivered, and when?</li>
+<li>What are the client arrival/check-in instructions for Havana Park?</li>
+<li>What should the client do if they are late or cannot access the session?</li>
+<li>Is the final UI label exactly <strong>Chat</strong> and <strong>Call</strong> across all surfaces?</li>
 </ol>
-<p>Until these are answered, the locked implementation scope is Google login + all required profile/intake fields + individual online By chat/By call + individual offline launch branch + 2-hour cutoff.</p>
+<p>Until these are answered, the locked implementation scope is Google login + all required profile/intake fields + individual online Chat/Call + individual offline counseling at Rp200.000 in the specified schedule/venue + 2-hour cutoff. The remaining instruction details may use an explicitly marked placeholder during implementation, but must be resolved before production publication.</p>
 <h2 id="status-of-this-prd">Status of this PRD</h2>
 <p><strong>Ready for focused business review; not yet ready for implementation handoff.</strong></p>
-<p>The required fields and launch branches are now product-approved. Implementation remains blocked only by the concrete offline price/schedule/venue/instruction values and the operational/privacy copy needed to publish them.</p>
+<p>The required fields, service prices, offline schedule/venue, and launch branches are product-approved. Implementation may proceed with a clearly marked instruction placeholder; production publication remains gated by final online/offline instructions and operational/privacy copy.</p>
 <h2 id="notes">Notes</h2>
 <p>The reference screenshots are archived as visual inspiration and field inventory only. Seraya's final UI, copy, requiredness, privacy treatment, and data retention must be approved independently.</p>
 <h2 id="related">Related</h2>
