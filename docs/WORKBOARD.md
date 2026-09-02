@@ -17,7 +17,7 @@ Last reviewed: 2026-09-02
 
 ## DOING — current focus
 
-- No active product-owner implementation item. Pick the next item from NEXT after reviewing PRD 01.
+- **W01 — PRD 01 product review** — login-required booking, required WhatsApp phone, 2-hour cutoff, individual-only catalog, and online By chat/By call pricing are being reviewed before implementation changes.
 
 The documentation refactor is complete: this board and the focused PRDs are now the default reading path.
 

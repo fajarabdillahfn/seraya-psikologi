@@ -38,7 +38,7 @@ Professional session notes, diagnosis, assessment results, treatment details, an
 
 ## Working relationship
 
-`Client` requests a `Booking` for one `ServiceOffering` or bound `ServicePackage`; the Booking may create one single-session `Appointment` or a `PackagePurchase` with multiple entitlement-linked Appointments, and may have one or more Payment attempts/events. State transitions are defined in the lifecycle/payment ADRs; late-payment reconciliation, package unavailability, and exact exceptional refund policy are governed by ADR 0059/0060/0063.
+An authenticated `Client` requests a `Booking` for one published individual `ServiceOffering`; the Booking creates the relevant `Appointment` after the manual payment proof is verified. Guest booking is not part of the current launch path. Package/couple concepts remain reference/deferred scope unless the focused PRD explicitly reopens them. Current payment truth is an Admin-verified `payment_proof`; Midtrans/gateway events are post-MVP reference only.
 
 ### Client
 

@@ -4,7 +4,7 @@ These are intentionally small and reviewable. Read them in this order:
 
 | Order | Document | Purpose | Current status |
 |---|---|---|---|
-| 1 | [[01-booking-flow]] | Customer booking, intake, slot hold | MVP working; business review next |
+| 1 | [[01-booking-flow]] | Login, profile, individual service, slot hold | **Updated; product-owner review now** |
 | 2 | [[02-payment-flow]] | Manual payment, invoice, Admin verification | MVP working; operational details next |
 | 3 | [[03-website-content]] | Public pages, copy, claims, CTA | Draft/placeholder copy |
 | 4 | [[04-availability-scheduling]] | Schedule, slots, buffer, cutoff | Demo schedule; real schedule next |
