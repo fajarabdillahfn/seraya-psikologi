@@ -1,6 +1,6 @@
 # PRD 01 — Booking Flow
 
-Status: Updated from product-owner decisions on 2026-09-02. Business review source.
+Status: **Business review closed** on 2026-09-02. Implementation intentionally deferred while the remaining PRDs are reviewed.
 
 ## Goal
 
@@ -286,9 +286,9 @@ Until these are answered, the locked implementation scope is Google login + all 
 
 ## Status of this PRD
 
-**Ready for focused business review; not yet ready for implementation handoff.**
+**Business review closed. Implementation intentionally deferred.**
 
-The required fields, service prices, offline schedule/venue, and launch branches are product-approved. Implementation may proceed with a clearly marked instruction placeholder; production publication remains gated by final online/offline instructions and operational/privacy copy.
+The required fields, service prices, offline schedule/venue, and launch branches are product-approved. The remaining session-instruction and privacy/copy details are tracked for later implementation/production hardening and are not being decided in this review.
 
 ## Notes
 

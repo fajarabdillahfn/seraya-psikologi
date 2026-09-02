@@ -14,10 +14,14 @@ Last reviewed: 2026-09-02
 - **D06 — D1 demo data exists** — Fuja, two offerings, weekday demo slots, and a placeholder staff row are seeded.
 - **D07 — GitHub repository is pushed** — source and generated docs are in `fajarabdillahfn/seraya-psikologi`.
 - **D08 — Domain decisions are recorded** — booking, capacity, intake, no-show, cancellation, and payment decisions are documented in ADRs 0089–0097.
+- **D10 — Documentation refactor published** — overview + kanban + focused PRDs + reference archive.
+- **D11 — PRD 01 business review closed** — profile/address fields, counseling intake, individual-only scope, online prices, offline price/schedule/venue, cutoff, and labels are approved. Implementation is intentionally deferred.
 
 ## DOING — current focus
 
-- **W01 — PRD 01 implementation handoff** — business fields, prices, schedule, venue, and scope are locked; implementation can proceed with explicitly marked session-instruction placeholders while privacy/copy details remain production-gated.
+- **W02 — PRD 02 Payment Flow review** — review the manual WhatsApp payment flow before any implementation changes.
+
+Implementation of PRD 01 is deferred until the PRD review sequence is complete and implementation is explicitly resumed.
 
 The documentation refactor is complete: this board and the focused PRDs are now the default reading path.
 
