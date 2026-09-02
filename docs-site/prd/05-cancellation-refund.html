@@ -1,26 +1,151 @@
 <!doctype html><html lang="id"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>PRD 05 — Cancellation &amp; Refund — Seraya Psikologi</title><link rel="stylesheet" href="../assets/main.css"></head><body><div class="shell"><header class="site-header"><div><a class="brand" href="../index.html">Seraya Psikologi</a><div class="subtitle">Project control center · MVP review</div></div><nav class="topnav"><a href="../index.html">Overview</a><a href="../workboard.html">Workboard</a><a href="../prd/index.html">Focused PRDs</a><a href="../reference/index.html">Reference</a></nav></header><div class="muted" style="font-size:.84rem;margin-bottom:18px"><a href="../index.html">Home</a> / Focused PRD</div><main><h1 id="prd-05-cancellation-refund">PRD 05 — Cancellation &amp; Refund</h1>
-<h2 id="locked-business-rule">Locked business rule</h2>
+<p>Status: <strong>Business review in progress</strong> (2026-09-02). Client-side handling and the Admin-side evidence model are now defined.</p>
+<h2 id="goal">Goal</h2>
+<p>Make cancellation and refund straightforward for the client (one channel, manual handling) and auditable for the Admin (clear status, evidence, and decision history). No public cancellation/refund form is added; the website only displays the policy in Terms and Conditions.</p>
+<h2 id="client-side">Client side</h2>
 <ul>
-<li>Client requests cancellation/refund through Admin WhatsApp.</li>
-<li>Website has no public cancellation/refund UI.</li>
-<li>Admin reviews case by case.</li>
-<li>Public refund outcomes are <code>full_refund</code> or <code>no_refund</code> only.</li>
-<li>Refund execution is separate from cancellation approval.</li>
+<li>All cancellation and refund requests from the client are handled manually through Admin WhatsApp.</li>
+<li>The website does not host a self-service cancel or refund button, and the booking confirmation page does not include public cancel/refund links.</li>
+<li>The public statement in Terms and Conditions captures the policy summary:</li>
+<li>Cancellation and refund are handled manually by Admin via WhatsApp.</li>
+<li>The client can ask for a full refund (<code>full_refund</code>) or no refund (<code>no_refund</code>); partial refund is not offered in launch.</li>
+<li>Admin reviews each case and the final decision is recorded in the booking.</li>
+<li>Admin may also ask the client to top up an underpayment or return an overpayment, in line with PRD 02.</li>
+<li>The Terms and Conditions page is the single public source for the cancellation and refund wording; the FAQ page links to it.</li>
 </ul>
-<h2 id="system-behavior">System behavior</h2>
+<h2 id="admin-side-status">Admin side: status</h2>
+<p>A booking has a <code>cancellation_status</code> field that is independent of <code>booking.state</code>. The status represents where the booking sits in the cancellation/refund workflow, not the operational state of the session.</p>
+<table>
+<thead>
+<tr>
+<th>Status</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>none</code></td>
+<td>The booking has not been discussed for cancellation/refund. This is the default for any confirmed booking.</td>
+</tr>
+<tr>
+<td><code>requested</code></td>
+<td>A cancellation or refund request has been received from the client (for example via WhatsApp), but Admin has not yet decided.</td>
+</tr>
+<tr>
+<td><code>approved</code></td>
+<td>Admin has approved the cancellation; the booking is closed and the slot/capacity is released or rolled back per the cancellation matrix.</td>
+</tr>
+<tr>
+<td><code>rejected</code></td>
+<td>Admin has rejected the cancellation/refund request; the booking continues as confirmed.</td>
+</tr>
+<tr>
+<td><code>refund_pending</code></td>
+<td>A refund has been approved and the client has been notified; the refund itself has not yet been transferred.</td>
+</tr>
+<tr>
+<td><code>refund_completed</code></td>
+<td>The refund transfer is complete and the evidence is attached.</td>
+</tr>
+<tr>
+<td><code>refund_failed</code></td>
+<td>The refund transfer was attempted but did not succeed; the booking remains <code>approved</code> and the slot/capacity is closed until the refund is retried successfully.</td>
+</tr>
+</tbody>
+</table>
+<p>The status is <code>none</code> by default and only changes when an Admin takes an action or records a client request. Status changes are append-only at the audit level; the current status is the latest in the audit chain.</p>
+<h2 id="admin-evidence">Admin evidence</h2>
+<p>Two evidence types are required for the Admin-side procedure:</p>
+<ol>
+<li>
+<p><strong>Cancellation evidence</strong>
+   - Required: a screenshot of the WhatsApp conversation that contains the client’s request.
+   - Stored as <code>cancellation_evidence</code> on the booking or its cancellation record, with file URL or attachment reference, the Admin actor, and the timestamp.
+   - Captures the channel (Admin WhatsApp), the date, the request, and any reply sent by the Admin.
+   - Acceptable file types: PNG, JPG, or PDF. The Admin workspace validates that at least one file is uploaded before the request can move to <code>approved</code> or <code>rejected</code>.</p>
+</li>
+<li>
+<p><strong>Refund evidence</strong>
+   - Required: proof of the refund transfer (bank/QRIS confirmation screenshot, transaction reference, or e-wallet receipt).
+   - Stored as <code>refund_evidence</code> on the <code>RefundAction</code> record, with file URL, the Admin actor, the timestamp of the transfer, and the external transfer reference.
+   - Captures the manual channel used (bank, e-wallet, or QRIS refund), the transfer amount, the recipient, and the confirmation.
+   - Acceptable file types: PNG, JPG, or PDF. The Admin workspace validates that at least one file is uploaded before the refund can be marked <code>refund_completed</code>.</p>
+</li>
+</ol>
+<p>Evidence files are stored with the rest of the operational records; the specific storage backend is part of PRD 07 and is not defined here. A placeholder storage URL is acceptable during development, as long as the URL points to a real, accessible file when the audit requires it.</p>
+<h2 id="admin-workflow">Admin workflow</h2>
+<ol>
+<li>
+<p><strong>Capture the request</strong> (required to leave <code>none</code>)
+   - Admin receives the cancellation/refund request on WhatsApp.
+   - Admin records the request in the workspace: client booking reference, request summary, and the date of the request.
+   - Admin uploads the WhatsApp screenshot.
+   - The <code>cancellation_status</code> becomes <code>requested</code>.</p>
+</li>
+<li>
+<p><strong>Decide</strong> (required to leave <code>requested</code>)
+   - Admin reviews the case against the public policy in Terms and Conditions.
+   - Admin selects <code>approve</code> or <code>reject</code>, with a short reason in free text.
+   - On <code>approve</code>:</p>
 <ul>
-<li>CancellationDecision is append-only.</li>
-<li>Pending cancellation preserves the current appointment/reservation.</li>
-<li>Approval and eligible capacity release are one atomic command.</li>
-<li>Refund is a separate audited action.</li>
-<li>Pending-vs-outcome races follow the accepted cancellation matrix.</li>
+<li>The booking state transitions per the cancellation matrix (booking, appointment, or package). The slot and capacity are released.</li>
+<li>The status becomes <code>approved</code> immediately.</li>
+<li>On <code>reject</code>:</li>
+<li>The booking state remains <code>confirmed</code>. No slot or capacity is released.</li>
+<li>The status becomes <code>rejected</code> and a reason is recorded.</li>
+</ul>
+</li>
+<li>
+<p><strong>Refund</strong> (separate from approve, when applicable)
+   - After <code>approved</code>, Admin decides whether the refund amount is <code>full_refund</code> or <code>no_refund</code>. The default for a cancellation by the client with no fault is <code>full_refund</code>, but the Admin can choose <code>no_refund</code> if the policy or the case supports it.
+   - On <code>full_refund</code> decision, the status becomes <code>refund_pending</code> and the <code>RefundAction</code> is recorded.
+   - When the manual refund transfer is done, Admin uploads the refund evidence and the status becomes <code>refund_completed</code>.
+   - If the transfer fails, the status becomes <code>refund_failed</code> and Admin retries. The booking state is not re-opened during retry; only the <code>RefundAction</code> is updated.</p>
+</li>
+</ol>
+<h2 id="required-admin-fields">Required Admin fields</h2>
+<p>For each cancellation/refund action, the workspace records:</p>
+<ul>
+<li><code>actor_membership_id</code> — which Admin took the action.</li>
+<li><code>actor_at</code> — the timestamp.</li>
+<li><code>decision_reason</code> — short free text.</li>
+<li><code>evidence_file_url</code> — at least one evidence file URL (WhatsApp screenshot for cancellation, transfer proof for refund).</li>
+<li><code>external_reference</code> — for refund, the external transfer reference.</li>
+<li><code>status_before</code> and <code>status_after</code> — for audit clarity.</li>
 </ul>
 <h2 id="acceptance-checks">Acceptance checks</h2>
 <ul>
-<li>No public endpoint lets a client directly mutate cancellation/refund state.</li>
-<li>Admin actions have actor, timestamp, reason, and audit record.</li>
-<li>A repeated command is idempotent.</li>
-<li>Package and appointment targets follow the matrix in ADR 0095.</li>
+<li>The website does not expose a public cancel or refund endpoint.</li>
+<li>A cancellation/refund request cannot move beyond <code>none</code> without WhatsApp evidence uploaded by Admin.</li>
+<li>A refund cannot be marked <code>refund_completed</code> without refund evidence uploaded by Admin.</li>
+<li>Every status change writes a new audit record with actor, timestamp, decision reason, and evidence reference.</li>
+<li>A status change is idempotent: repeating the same action with the same inputs does not create duplicate state changes.</li>
+<li>The current status is the latest in the audit chain and can be reconstructed from the audit history.</li>
+<li>The accepted public policy in Terms and Conditions is reachable from the booking confirmation page, from the FAQ, and from the footer.</li>
 </ul>
-<h2 id="next-work">Next work</h2>
-<p>Write the Admin operating procedure and evidence template; do not change the business rule without a new decision.</p></main><footer>Seraya Psikologi · generated from repository · <a href="../reference/index.html">Long-form reference</a></footer></div></body></html>
+<h2 id="still-open-for-this-prd">Still open for this PRD</h2>
+<ul>
+<li>The exact free-text reasons and their default values per case type. The PRD records the requirement; the operational templates are owned by PRD 07.</li>
+<li>The storage backend for the evidence files. The PRD requires a real, accessible URL when the audit requires it; the implementation detail is in PRD 07.</li>
+<li>The acceptance threshold for refund evidence: any signed screenshot of a transfer confirmation, a real bank mutation row, or a real e-wallet receipt. The PRD allows any of these; a stricter rule can be added later.</li>
+<li>The retention duration of the cancellation/refund records and the evidence files, and whether the public-facing version of these records exists. Retention is owned by PRD 06.</li>
+<li>The Admin-side SLA for responding to a cancellation or refund request. The default is “during business hours, as soon as practical,” and the PRD records this; tightening to a fixed SLA is a separate operational decision.</li>
+<li>The UX of the Admin workspace for status transitions, evidence upload, and reason input. The PRD records the required fields; the UI is owned by PRD 07.</li>
+</ul>
+<h2 id="references">References</h2>
+<ul>
+<li><code>docs/prd/01-booking-flow.md</code></li>
+<li><code>docs/prd/02-payment-flow.md</code></li>
+<li><code>docs/prd/03-website-content.md</code></li>
+<li><code>docs/prd/04-availability-scheduling.md</code></li>
+<li><code>docs/prd/06-privacy-consent.md</code></li>
+<li><code>docs/prd/07-staff-admin-operations.md</code></li>
+<li><code>docs/adr/0076-case-by-case-cancellation.md</code></li>
+<li><code>docs/adr/0077-launch-full-or-no-refund.md</code></li>
+<li><code>docs/adr/0095-package-cancellation-matrix.md</code></li>
+</ul>
+<h2 id="change-log">Change log</h2>
+<ul>
+<li>2026-09-02: Initial rule from PRD 04: cancellation/refund handled by Admin via WhatsApp; no public UI; public policy in Terms and Conditions.</li>
+<li>2026-09-02: Expanded with Admin status model (<code>none</code>, <code>requested</code>, <code>approved</code>, <code>rejected</code>, <code>refund_pending</code>, <code>refund_completed</code>, <code>refund_failed</code>) and evidence requirements (WhatsApp screenshot for cancellation, transfer proof for refund), and the required fields per Admin action.</li>
+</ul></main><footer>Seraya Psikologi · generated from repository · <a href="../reference/index.html">Long-form reference</a></footer></div></body></html>
