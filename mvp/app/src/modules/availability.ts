@@ -146,6 +146,11 @@ export class AvailabilityModule {
    * Pre-flight overlap check before creating a CapacityReservation.
    * Returns true if no active reservation overlaps the proposed window.
    * ADR 0091 §6.
+   *
+   * An abandoned checkout leaves a 'hold_active' reservation whose
+   * slot_hold never expired; only hold reservations whose joined hold is
+   * still active-and-unexpired (or consumed, i.e. a confirmed session)
+   * count as blocking.
    */
   /**
    * Pre-flight overlap check before creating a CapacityReservation.

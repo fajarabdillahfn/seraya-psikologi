@@ -497,6 +497,11 @@ app.post("/api/booking/create", async (c) => {
     }
     throw e;
   }
+  if (!consentAck) {
+    // The consent checkbox is required client-side; a direct POST must not
+    // be able to create a booking without an explicit acknowledgment.
+    return c.text("Kamu harus menyetujui Informed Consent dan Kebijakan Privasi untuk melanjutkan booking.", 400);
+  }
 
   const payment = new WhatsAppManualPaymentModule(adapter);
   await payment.generateInvoice(result.bookingId, "text", "preliminary");
