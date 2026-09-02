@@ -1,44 +1,116 @@
 <!doctype html><html lang="id"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>PRD 02 — Payment Flow — Seraya Psikologi</title><link rel="stylesheet" href="../assets/main.css"></head><body><div class="shell"><header class="site-header"><div><a class="brand" href="../index.html">Seraya Psikologi</a><div class="subtitle">Project control center · MVP review</div></div><nav class="topnav"><a href="../index.html">Overview</a><a href="../workboard.html">Workboard</a><a href="../prd/index.html">Focused PRDs</a><a href="../reference/index.html">Reference</a></nav></header><div class="muted" style="font-size:.84rem;margin-bottom:18px"><a href="../index.html">Home</a> / Focused PRD</div><main><h1 id="prd-02-payment-flow">PRD 02 — Payment Flow</h1>
+<p>Status: <strong>Business review in progress</strong> (2026-09-02). All product-owner decisions so far are recorded below.</p>
 <h2 id="goal">Goal</h2>
-<p>MVP collects payment manually without a payment gateway. The system gives the client a clear invoice and gives Admin a controlled verification action.</p>
-<h2 id="launch-decision">Launch decision</h2>
+<p>The MVP collects payment manually without a payment gateway. The flow lets the client transfer money, send proof to Admin via WhatsApp, and only then does Admin verify and generate the official invoice. Admin operations are the only path that can move a booking to <code>confirmed</code>.</p>
+<h2 id="launch-decision-locked">Launch decision (locked)</h2>
 <ul>
-<li>Payment gateway is <strong>deferred</strong>.</li>
-<li>Client pays via bank transfer or manual QRIS.</li>
-<li>Client sends proof to Admin via WhatsApp.</li>
-<li>Admin verifies in the Admin workspace.</li>
-<li>Only verified proof can move a booking to <code>confirmed</code>.</li>
+<li>Payment gateway is deferred. Midtrans and other Indonesian gateways are not in the launch path.</li>
+<li>Settlement is manual: bank transfer or manual QRIS to a Seraya-controlled account.</li>
+<li>The official PDF/text invoice is generated <strong>after Admin verifies and approves the booking</strong>, not before payment. The booking confirmation page at the end of the booking flow shows an intermediate "preliminary payment instructions" view that the client follows; the official invoice replaces it after approval.</li>
+<li>The system does not promise a confirmed appointment to the client before Admin approval.</li>
+<li>Chat and Call sessions are delivered through the Admin WhatsApp channel.</li>
 </ul>
-<h2 id="client-flow">Client flow</h2>
+<h2 id="payment-flow">Payment flow</h2>
 <ol>
-<li>Booking is created with <code>pending_manual_payment</code>.</li>
-<li>System generates a text invoice and a downloadable PDF invoice.</li>
-<li>Client receives a WhatsApp deep-link with booking ID, amount, expiry, and instructions.</li>
-<li>Client transfers money and sends proof to Admin.</li>
-<li>Client waits for Admin confirmation.</li>
+<li>Client completes the booking intake.</li>
+<li>System creates the Booking, immutable OfferSnapshot, SlotHold, and CapacityReservation atomically.</li>
+<li>System shows the client a preliminary payment view with the booking ID, total amount, payment method options (bank transfer and/or manual QRIS), the Seraya account details, the booking expiry, and the WhatsApp deep-link to Admin.</li>
+<li>Client transfers the money to the Seraya account and sends proof (screenshot, photo, or text reference) to Admin via WhatsApp.</li>
+<li>Admin checks the bank account for the incoming transfer.</li>
+<li>Admin verifies the booking in the web admin dashboard and records the verification.</li>
+<li>On verify, the system generates the official PDF and text invoice for the booking, marks the booking as <code>confirmed</code>, and emails or delivers the invoice to the client through the agreed channel.</li>
+<li>Client is informed that the booking is confirmed and receives the official invoice.</li>
 </ol>
-<h2 id="admin-flow">Admin flow</h2>
-<ol>
-<li>Admin opens the payment queue.</li>
-<li>Admin records proof metadata: method, evidence URL/note, and booking.</li>
-<li>Admin verifies or rejects the proof.</li>
-<li>Verify atomically updates proof + booking; reject records the reason and closes the booking according to the accepted rule.</li>
-<li>Every privileged action is audited.</li>
-</ol>
-<h2 id="data-boundary">Data boundary</h2>
-<p><code>payment_proof</code> is the launch payment record. It stores payment evidence metadata and verification status. It must not store unnecessary clinical content.</p>
-<h2 id="acceptance-checks">Acceptance checks</h2>
+<h2 id="invoice-format">Invoice format</h2>
 <ul>
-<li>Invoice amount comes from the immutable OfferSnapshot.</li>
-<li>Invoice includes a real configured Admin number and real payment instructions before production.</li>
-<li>Same proof verification repeated is idempotent.</li>
-<li>A rejected proof cannot confirm a booking.</li>
-<li>Demo bank details and placeholder Admin auth never pass production launch gates.</li>
+<li>Header: <strong>Seraya Psikologi</strong>.</li>
+<li>Required sections:</li>
+<li>Booking identifier and issue date.</li>
+<li>Client profile data (name, email, phone, address) and any required intake summary.</li>
+<li>Psychologist and selected service (mode: Chat, Call, or Offline), date, time, duration, and location when applicable.</li>
+<li>Package label and total amount in IDR.</li>
+<li>Payment status and verification reference (e.g., verified by, verified at, payment_proof identifier).</li>
+<li>Cancellation, contact, and privacy notices.</li>
+<li>The invoice PDF and plain text render from the immutable OfferSnapshot; the verified <code>payment_proof</code> reference is attached for audit.</li>
+<li>Invoice filenames use the booking identifier so a client can search by booking ID.</li>
 </ul>
-<h2 id="later-option">Later option</h2>
-<p>Midtrans remains a separate future adapter/decision. Do not mix gateway assumptions into this MVP flow.</p>
+<h2 id="admin-verification-rules">Admin verification rules</h2>
+<ul>
+<li>The Admin is the only source of truth for moving a booking to <code>confirmed</code>.</li>
+<li>Verification runs against the <code>payment_proof</code> record created from the WhatsApp conversation, not the web form alone.</li>
+<li>The web/dashboard must show every recorded verification attempt and the Admin actor, timestamp, and decision reason.</li>
+<li>Verification actions are idempotent and atomic. Repeated verifications with the same input do not create duplicate state changes.</li>
+<li>The dashboard is the only place the Admin may verify, reject, or annotate a payment.</li>
+</ul>
+<h2 id="amount-mismatch-handling">Amount mismatch handling</h2>
+<ul>
+<li><strong>Underpayment</strong>: Admin notifies the client to top up the difference. The booking remains in a held state and is not <code>confirmed</code> until the balance is settled. Admin may extend the slot hold if needed; if no top-up arrives, Admin may cancel the booking per the cancellation rules in PRD 05.</li>
+<li><strong>Overpayment</strong>: Admin returns the difference to the client through a manual channel and records the returned amount in the payment_proof notes. The booking may be <code>confirmed</code> for the full price of the selected service; the refund is processed out of band and tracked as a separate <code>RefundAction</code> later.</li>
+<li><strong>Same amount (no fee)</strong>: verify and confirm.</li>
+<li><strong>Excess appears in same transfer but under the same booking</strong>: same as overpayment, but Admin is responsible for the return.</li>
+</ul>
+<h2 id="cancellation-because-no-payment">Cancellation because no payment</h2>
+<ul>
+<li>If the Admin receives no payment evidence, the Admin records a cancellation note in the admin dashboard's cancellation field.</li>
+<li>A booking with no cancellation note is treated as a payment in progress and is <strong>not</strong> automatically cancelled. The slot hold expires on its own (10-minute default from booking; PRD 04 may extend this with the schedule).</li>
+<li>A cancellation note in the admin dashboard is the explicit signal that the booking is being treated as not paid and is being closed.</li>
+</ul>
+<h2 id="channel-and-communication">Channel and communication</h2>
+<ul>
+<li>Automated channel: email for the official invoice and any system confirmation. The PRD defers provider selection (TBC-NOTIFY-01).</li>
+<li>Manual channel: WhatsApp with the Admin for the pre-confirmation payment conversation. WhatsApp is operational, not a system-of-record channel.</li>
+<li>All official confirmation goes through the system, not only through WhatsApp, so the client has a record in their email.</li>
+</ul>
+<h2 id="privacy-and-data-boundary">Privacy and data boundary</h2>
+<ul>
+<li>The <code>payment_proof</code> table stores: payment method, amount, evidence metadata, verification actor, verification timestamp, and status. It does not store raw WhatsApp transcripts, full bank account details beyond what is needed, or clinical content.</li>
+<li>The booking shows the minimum profile data needed to issue the invoice; the full profile is not duplicated into the invoice.</li>
+<li>Retention and privacy treatment follow PRD 06 and are production-gated, not enforced by this PRD.</li>
+</ul>
+<h2 id="data-flow">Data flow</h2>
+<pre><code>Booking submission
+  → System creates booking + OfferSnapshot + SlotHold + CapacityReservation
+  → Booking state: pending_manual_payment
+  → Client sees preliminary payment view (booking ID, amount, Seraya account, WhatsApp to Admin)
+  → Client transfers money → notifies Admin via WhatsApp with proof
+  → Admin checks bank account
+  → Admin verifies in the web admin dashboard
+    → System generates official invoice (PDF + text)
+    → Booking state: confirmed
+    → Client receives confirmation and official invoice
+</code></pre>
+<h2 id="acceptance-criteria">Acceptance criteria</h2>
+<ul>
+<li>Booking is <code>pending_manual_payment</code> immediately after submission; the client cannot see a confirmed state before Admin verification.</li>
+<li>The preliminary view shows booking ID, amount, Seraya account, booking expiry, and a WhatsApp deep-link to Admin.</li>
+<li>The official invoice is only generated after Admin verification; it is not shown on the preliminary view.</li>
+<li>Underpayment produces a recorded top-up request and the booking remains unconfirmed until settled.</li>
+<li>Overpayment produces a recorded manual return and a separate <code>RefundAction</code>; the booking can be confirmed at the service price.</li>
+<li>Cancellation because no payment is recorded as an explicit cancellation note in the admin dashboard; absence of note means the booking is in progress.</li>
+<li>The same Admin verification repeated does not create duplicate state changes.</li>
+<li>All verification, rejection, and refund actions are logged with actor, timestamp, and reason.</li>
+<li>WhatsApp is a manual communication channel only; it is not a system-of-record or state-change trigger.</li>
+<li>The invoice PDF and text render from the immutable OfferSnapshot and include the verified <code>payment_proof</code> reference.</li>
+</ul>
+<h2 id="still-open-for-this-prd">Still open for this PRD</h2>
+<ul>
+<li>The exact Seraya bank account number, account holder, and bank/QRIS method labels that the client will see. Placeholder text is acceptable for the system, but the production deployment must replace it before going live.</li>
+<li>The exact WhatsApp message that the system generates and prefills for the client. Placeholder text is acceptable here as well, as long as it carries booking ID, amount, and expiry.</li>
+<li>Email provider and template copy (TBC-NOTIFY-01).</li>
+<li>Admin verification SLA. Today, it is “when the bank statement shows the transfer.” A target SLA may be added later, but it does not block this PRD.</li>
+<li>Audit retention window for <code>payment_proof</code> and the resulting invoice file.</li>
+<li>How the Admin dashboard surfaces the explicit "no payment, treat as cancelled" status when the slot hold has expired.</li>
+<li>Internal RefundAction flow (manual transfer) is referenced but not defined here; PRD 05 will cover it.</li>
+</ul>
 <h2 id="references">References</h2>
 <ul>
+<li><code>docs/prd/01-booking-flow.md</code></li>
+<li><code>docs/prd/05-cancellation-refund.md</code></li>
+<li><code>docs/prd/06-privacy-consent.md</code></li>
 <li><code>docs/adr/0097-whatsapp-manual-payment.md</code></li>
-<li><code>docs/adr/0068-midtrans-snap-launch-gateway.md</code> (deferred/superseded for current launch)</li>
+<li><code>docs/adr/0093-payment-settlement-uniqueness.md</code></li>
+</ul>
+<h2 id="change-log">Change log</h2>
+<ul>
+<li>2026-09-02: Rewrote PRD 02 to reflect the product-owner decision: client transfers first, sends proof via WhatsApp, Admin checks the bank, Admin verifies in the web dashboard, then the official invoice is generated and the booking is confirmed. Underpayment and overpayment handling is documented. The "no payment, treat as cancelled" rule is recorded as an explicit admin cancellation note rather than automatic cancellation.</li>
 </ul></main><footer>Seraya Psikologi · generated from repository · <a href="../reference/index.html">Long-form reference</a></footer></div></body></html>
