@@ -1,6 +1,6 @@
 # PRD 03 — Website Content
 
-Status: **Business review in progress** (2026-09-02). All product-owner decisions so far are recorded below.
+Status: **Business review closed** on 2026-09-02. Implementation intentionally deferred.
 
 ## Goal
 

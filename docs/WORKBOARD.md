@@ -16,12 +16,14 @@ Last reviewed: 2026-09-02
 - **D08 — Domain decisions are recorded** — booking, capacity, intake, no-show, cancellation, and payment decisions are documented in ADRs 0089–0097.
 - **D10 — Documentation refactor published** — overview + kanban + focused PRDs + reference archive.
 - **D11 — PRD 01 business review closed** — profile/address fields, counseling intake, individual-only scope, online prices, offline price/schedule/venue, cutoff, and labels are approved. Implementation is intentionally deferred.
+- **D12 — PRD 02 business review closed** — manual payment flow: client transfers, sends proof via WhatsApp, Admin verifies in the web admin dashboard, then the official invoice is generated and the booking is confirmed; under/overpayment rules and cancellation note defined. Implementation is intentionally deferred.
+- **D13 — PRD 03 business review closed** — public navigation (Beranda, Layanan with four-pillar hover submenu, List Psikolog, About, FAQ), warm-professional tone, public-claim policy, 100% Bahasa Indonesia, placeholder visual assets. Implementation is intentionally deferred.
 
 ## DOING — current focus
 
-- **W02 — PRD 02 Payment Flow review** — review the manual WhatsApp payment flow before any implementation changes.
+- **W02 — PRD 04 Availability & Scheduling review** — confirm the availability surface, schedule windows, buffer, cutoff, and the remaining session-instruction details that affect the slot list.
 
-Implementation of PRD 01 is deferred until the PRD review sequence is complete and implementation is explicitly resumed.
+Implementation of PRD 01, 02, and 03 remains deferred while the PRD review sequence continues.
 
 The documentation refactor is complete: this board and the focused PRDs are now the default reading path.
 
