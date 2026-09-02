@@ -2,7 +2,7 @@
 
 ## Status
 
-**Superseded for MVP launch; kept as future option. WhatsApp manual payment is launch path per [ADR 0097](../0097-whatsapp-manual-payment.md).** Midtrans Snap is no longer the launch payment path. The decision below describes the Midtrans option that may be reactivated post-MVP via a future ADR; the launch path is manual bank transfer / VA / QRIS off-platform with Admin "Mark as paid" verification in the Admin workspace.
+**Superseded for MVP launch; kept as future option. WhatsApp manual payment is launch path per [ADR 0097](0097.html).** Midtrans Snap is no longer the launch payment path. The decision below describes the Midtrans option that may be reactivated post-MVP via a future ADR; the launch path is manual bank transfer / VA / QRIS off-platform with Admin "Mark as paid" verification in the Admin workspace.
 
 ## Context
 

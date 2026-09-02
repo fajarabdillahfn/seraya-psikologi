@@ -1,1 +1,50 @@
-<!doctype html><html lang="id"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Project Overview — Seraya Psikologi</title><link rel="stylesheet" href="assets/main.css"></head><body><div class="shell"><header class="site-header"><div><a class="brand" href="index.html">Seraya Psikologi</a><div class="subtitle">Project control center · MVP review</div></div><nav class="topnav"><a href="index.html">Overview</a><a href="workboard.html">Workboard</a><a href="prd/index.html">Focused PRDs</a><a href="reference/index.html">Reference</a></nav></header><div class="muted" style="font-size:.84rem;margin-bottom:18px"><a href="index.html">Home</a> / Home</div><main><section class="hero"><div class="eyebrow">Seraya Psikologi · Project overview</div><h1>Bangun dengan urutan yang jelas.</h1><p>Halaman ini adalah titik masuk utama. Cek status di Workboard, review PRD kecil sesuai urutan, lalu buka ADR hanya kalau perlu detail keputusan teknis.</p></section><div class="callout warn"><strong>Status saat ini:</strong> MVP sudah live untuk review. Ini belum production launch. Payment launch path adalah manual transfer/QRIS + verifikasi Admin WhatsApp; Midtrans ditunda.</div><div class="grid"><section class="card"><h2>Mulai di sini</h2><ol><li><a href="workboard.html"><strong>Workboard</strong></a> — apa yang selesai, sedang dikerjakan, berikutnya, blocked, dan deferred.</li><li><a href="prd/index.html"><strong>Focused PRDs</strong></a> — dokumen kecil per area.</li><li><a href="prd/01-booking-flow.html"><strong>Booking Flow</strong></a> — mulai review dari sini.</li><li><a href="prd/02-payment-flow.html"><strong>Payment Flow</strong></a> — lanjut setelah booking.</li></ol></section><section class="card"><h2>Business scope locked</h2><ul><li>Brand: <strong>Seraya Psikologi</strong>.</li><li>Launch bookable: <strong>SERAYA PULANG</strong>.</li><li>Launch psychologist: <strong>Fuja Rahayu Kinanti</strong>.</li><li>Guest booking, 60-minute session, name + email + consent.</li><li>Cancellation/refund lewat Admin WhatsApp.</li><li>No clinical records in this product.</li></ul></section></div><section class="card"><h2>Current architecture</h2><div class="grid"><div><strong>Cloudflare Worker + Hono</strong><br><span class="muted">Public pages, booking routes, Admin routes.</span></div><div><strong>Cloudflare D1</strong><br><span class="muted">Bookings, slots, holds, reservations, payment proofs.</span></div><div><strong>Manual payment</strong><br><span class="muted">PDF/text invoice → WhatsApp Admin → Admin verifies.</span></div><div><strong>Placeholder auth</strong><br><span class="muted">For review only; production staff auth is not finished.</span></div></div></section><section class="card"><h2>Live links</h2><ul><li><a href="https://seraya-psikologi.aurinko-jar-ai.workers.dev">MVP Worker</a></li><li><a href="https://seraya-psikologi-docs.pages.dev">Documentation site</a></li><li><a href="https://github.com/fajarabdillahfn/seraya-psikologi">GitHub repository</a></li></ul></section></main><footer>Seraya Psikologi · Documentation generated from the repository · <a href="reference/index.html">Long-form reference</a></footer></div></body></html>
+<!doctype html><html lang="id"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Project Overview — Seraya Psikologi</title><link rel="stylesheet" href="./assets/main.css"></head><body><div class="shell"><header class="site-header"><div><a class="brand" href="./index.html">Seraya Psikologi</a><div class="subtitle">Project control center · MVP review</div></div><nav class="topnav"><a href="./index.html">Overview</a><a href="./workboard.html">Workboard</a><a href="./prd/index.html">Focused PRDs</a><a href="./reference/index.html">Reference</a></nav></header><div class="muted" style="font-size:.84rem;margin-bottom:18px"><a href="./index.html">Home</a> / Home</div><main><h1 id="seraya-psikologi-project-overview">Seraya Psikologi — Project Overview</h1>
+<blockquote>
+<p>One-page orientation. Start here before opening ADRs or the implementation guide.</p>
+</blockquote>
+<h2 id="current-status">Current status</h2>
+<p><strong>MVP is live for review, not production launch.</strong></p>
+<ul>
+<li>Public website + booking flow: deployed on Cloudflare Worker.</li>
+<li>Payment launch path: manual bank transfer/QRIS + WhatsApp Admin verification.</li>
+<li>Documentation: this control center is the entry point; long-form ADRs are reference material.</li>
+<li>Production: blocked until the launch gates below are completed and signed off.</li>
+</ul>
+<h2 id="business-scope-that-is-already-decided">Business scope that is already decided</h2>
+<ul>
+<li>Brand: <strong>Seraya Psikologi</strong>.</li>
+<li>Launch bookable program: <strong>SERAYA PULANG</strong>.</li>
+<li>Launch psychologist: <strong>Fuja Rahayu Kinanti</strong> (publication evidence still needs operational verification).</li>
+<li>Session: individual online/offline counseling, 60 minutes.</li>
+<li>Client: guest booking; minimum intake is name + email + consent; phone is optional.</li>
+<li>Cancellation/refund: Admin WhatsApp; no public cancellation/refund UI; outcomes are full refund or no refund.</li>
+<li>Couple counseling: modeled, but launch timing is still deferred.</li>
+<li>MVP does not store clinical notes, diagnosis, assessment results, transcripts, or session notes.</li>
+</ul>
+<h2 id="current-technical-shape">Current technical shape</h2>
+<ul>
+<li>Runtime: Cloudflare Worker + Hono.</li>
+<li>Database: Cloudflare D1.</li>
+<li>Persistence boundary: <code>PersistenceAdapter</code>.</li>
+<li>Booking: slot hold + capacity reservation + overlap protection.</li>
+<li>Payment: <code>payment_proof</code> + Admin mark-as-paid; Midtrans is deferred.</li>
+<li>Auth: placeholder for development; not acceptable for production staff access.</li>
+</ul>
+<h2 id="where-to-go-next">Where to go next</h2>
+<ol>
+<li>[[WORKBOARD]] — what is done, active, next, blocked, and deferred.</li>
+<li>[[prd/README]] — small PRD index.</li>
+<li>[[prd/01-booking-flow]] — customer booking flow.</li>
+<li>[[prd/02-payment-flow]] — WhatsApp manual payment flow.</li>
+<li>[[prd/03-website-content]] — website pages and copy boundaries.</li>
+<li>[[prd/08-launch-gates]] — what must be true before production.</li>
+<li><code>docs/adr/</code> — detailed historical/technical decisions; do not use as the first reading path.</li>
+</ol>
+<h2 id="live-links">Live links</h2>
+<ul>
+<li>Docs website: https://seraya-psikologi-docs.pages.dev</li>
+<li>MVP Worker: https://seraya-psikologi.aurinko-jar-ai.workers.dev</li>
+<li>GitHub: https://github.com/fajarabdillahfn/seraya-psikologi</li>
+</ul>
+<h2 id="source-of-truth-rule">Source-of-truth rule</h2>
+<p>For business scope, the accepted non-technical decision wins. For technical behavior, the current implementation baseline and accepted ADR win. If they conflict, record the conflict on <code>WORKBOARD.md</code>; do not silently resolve it in code.</p></main><footer>Seraya Psikologi · generated from repository · <a href="./reference/index.html">Long-form reference</a></footer></div></body></html>

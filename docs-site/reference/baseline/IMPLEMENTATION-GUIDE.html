@@ -6,8 +6,8 @@
 <li>Technical PRD canonical closure baseline: revision <code>168</code></li>
 <li>Non-technical PRD closure baseline: revision <code>46</code></li>
 <li>Domain model: <code>DOMAIN-MODEL.md</code></li>
-<li>Decision history: <code>docs/adr/0001–0095</code></li>
-<li>Live endpoint may advance beyond the baseline; the accepted ADRs and this guide remain the implementation authority until the live form is reconciled.</li>
+<li>Decision history: <code>docs/adr/0001–0097</code></li>
+<li>Live endpoint may advance beyond the baseline; this guide describes implementation intent, while <code>docs/WORKBOARD.md</code> and <code>docs/prd/</code> describe the current project status and launch path.</li>
 </ul>
 <p>Dokumen ini sengaja tidak menunggu semua jawaban pada dua PRD form. Keputusan yang sudah confirmed menjadi aturan implementasi. Hal yang belum diputuskan ditulis sebagai <code>TBC</code> dan harus diisolasi di configuration/adapter/policy seam, bukan ditebak sebagai keputusan bisnis.</p>
 <h2 id="1-cara-membaca-dokumen-ini">1. Cara membaca dokumen ini</h2>
@@ -204,10 +204,8 @@
 <li><code>PackageModule</code></li>
 <li>purchase, ordered entitlements, consume/restore/expire.</li>
 <li><code>PaymentModule</code></li>
-<li>Payment state, verified events, idempotency, late payment.</li>
-<li><code>PaymentGatewayAdapter</code></li>
-<li>provider-neutral interface;</li>
-<li><code>MidtransSnapAdapter</code> adalah adapter launch.</li>
+<li>manual payment proof, invoice generation, Admin verification, idempotency.</li>
+<li>Midtrans/payment gateway is deferred; do not add provider behavior to the MVP.</li>
 <li><code>CancellationModule</code></li>
 <li>request, approve/deny, atomic appointment/slot/entitlement effect.</li>
 <li><code>RefundModule</code></li>
@@ -1089,11 +1087,11 @@ interface RefundProviderResult {
 </ul>
 <h3 id="132-integration-tests">13.2 Integration tests</h3>
 <ul>
-<li>Midtrans adapter request/verification/refund mapping.</li>
-<li>Signature/API verification failure.</li>
-<li>Unknown/duplicate provider event.</li>
-<li>Provider timeout/retry/dead-letter.</li>
-<li>Payment and refund reconciliation.</li>
+<li>Manual payment proof recording, amount match, verification, and rejection.</li>
+<li>Duplicate/repeated Admin verification is idempotent.</li>
+<li>Invoice PDF/text generation uses the immutable OfferSnapshot.</li>
+<li>Refund remains a separate audited off-platform action.</li>
+<li>Midtrans adapter tests are deferred until the payment decision is reopened.</li>
 <li>Google SSO + membership enforcement.</li>
 <li>Email delivery failure without domain rollback.</li>
 </ul>
@@ -1102,7 +1100,7 @@ interface RefundProviderResult {
 <li>Four program pillars public; only SERAYA PULANG has checkout.</li>
 <li>Counseling online/offline catalog and package pricing.</li>
 <li>Guest booking and hold expiry.</li>
-<li>Payment success/failure/late webhook.</li>
+<li>Manual payment invoice, WhatsApp handoff, proof review, acceptance, and rejection.</li>
 <li>Package next-session scheduling.</li>
 <li>Admin cancellation approve/deny and separate refund.</li>
 <li>Staff role visibility.</li>
@@ -1139,10 +1137,10 @@ interface RefundProviderResult {
 <td>Business + technical</td>
 </tr>
 <tr>
-<td>TBC-PAY-01</td>
-<td>Midtrans onboarding/method codes/fees/limits/refund</td>
-<td>Adapter/config; fake provider for development</td>
-<td>Business/ops; production gate</td>
+<td>TBC-PAY-MANUAL-01</td>
+<td>Admin verification SLA, payment-proof retention, dispute handling, real account/QRIS configuration</td>
+<td>Keep manual flow behind <code>WhatsAppManualPaymentModule</code>; demo configuration cannot pass production gate</td>
+<td>Operations/finance; production gate</td>
 </tr>
 <tr>
 <td>TBC-PRIVACY-01</td>
@@ -1541,4 +1539,4 @@ interface RefundProviderResult {
 <li><strong>Finance</strong> — G-4 (account mapping), G-11 (canonical truth).</li>
 <li><strong>Technical</strong> — G-1 (non-Fuja publish_status), G-2 (no <code>anytime</code> slots), G-4 (signature + value match), G-5 (email delivery), G-6 (if launch-ready), G-7 (architecture), G-8 (intake/cutoff), G-9 (T+15m cron), G-10 (cancellation triggers), G-11 (settlement uniqueness), G-12 (Admin guard + SSO), G-13 (UAT infrastructure), G-14 (consolidated).</li>
 </ul>
-<p>Until G-14 is signed, development may use fixtures and sandbox behavior, but production must not infer or silently invent the missing business decisions.</p></main><footer>Seraya Psikologi · Documentation generated from the repository · <a href="../../reference/index.html">Long-form reference</a></footer></div></body></html>
+<p>Until G-14 is signed, development may use fixtures and sandbox behavior, but production must not infer or silently invent the missing business decisions.</p></main><footer>Seraya Psikologi · generated from repository · <a href="../../reference/index.html">Long-form reference</a></footer></div></body></html>

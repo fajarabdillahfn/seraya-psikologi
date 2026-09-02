@@ -13,7 +13,7 @@
 1. <code>wrangler d1 create seraya-db</code> → copy <code>database_id</code> into <code>wrangler.toml</code>.
 2. <code>wrangler d1 migrations apply seraya-db --remote</code>.
 3. <code>wrangler deploy</code>.</p>
-<p>Migration is in <code>app/migrations/0001_init.sql</code> and references ADRs 0089–0095 (couple participant, capacity overlap, no-show timing, settlement uniqueness, intake schema, package cancellation).</p>
+<p>Migrations are in <code>app/migrations/0001_init.sql</code>, <code>0002_whatsapp_payment.sql</code>, and <code>0003_booking_state_whatsapp.sql</code>.</p>
 <h2 id="2-authorization-placeholder-per-user-instruction">2. Authorization (placeholder, per user instruction)</h2>
 <ul>
 <li><strong>Public routes</strong>: <code>/</code>, <code>/pulang</code>, <code>/about</code>, <code>/fuja</code>, <code>/faq</code>, <code>/safety/crisis</code>, <code>/privacy</code>, <code>/consent</code>, <code>/cancellation</code>, <code>/book/*</code> — open to all.</li>
@@ -35,16 +35,17 @@
 <li>The client pays via bank transfer or QRIS, then sends the screenshot/slip to Admin on WhatsApp.</li>
 <li>Admin opens <code>/admin/payments</code>, reviews each <code>payment_proof</code>, and either:</li>
 <li><strong>verify</strong> (<code>/api/payment/manual/verify</code> with <code>status=verified</code>) → atomic flip of <code>payment_proof.status='verified'</code> AND <code>booking.state='confirmed'</code>.</li>
-<li><strong>reject</strong> (<code>status=rejected</code>) → atomic flip of <code>payment_proof.status='rejected'</code> AND <code>booking.state='cancelled'</code>.</li>
+<li><strong>reject</strong> (<code>status=rejected</code>) → records the rejection reason; the booking is not confirmed. Cancellation/expiry is handled by its own Admin command.</li>
 </ul>
 <p>Both transitions are <strong>idempotent</strong> (re-applying the same terminal status is a no-op) and <strong>atomic</strong> (single <code>db.batch</code>).</p>
 <p>Key files:
 - <code>app/src/modules/payment.ts</code> — <code>WhatsAppManualPaymentModule</code> (generator, recordPayment, verifyPayment, listPendingPayments).
 - <code>app/src/modules/admin.ts</code> — <code>markAsPaid</code>, <code>rejectPayment</code>, <code>listPendingPayments</code>.
 - <code>app/src/modules/booking.ts</code> — <code>confirmPayment</code> for the booking-side state flip.
-- <code>app/migrations/0002_payment_proof.sql</code> — <code>payment_proof</code> table schema.</p>
+- <code>app/migrations/0002_whatsapp_payment.sql</code> — <code>payment_proof</code> table schema.
+- <code>app/migrations/0003_booking_state_whatsapp.sql</code> — booking state constraint update.</p>
 <h3 id="pre-adr-0097-legacy-midtrans-path-removed">Pre-ADR 0097 (legacy Midtrans path, removed)</h3>
-<p>The previous <code>app/src/adapters/midtrans-snap.ts</code> (placeholder Midtrans Snap adapter) and the <code>payment</code> table webhook flow (<code>/api/payment/notification</code>, <code>applyVerifiedPaymentEvent</code>, <code>executeRefundAction</code>) have been <strong>removed entirely</strong>. The <code>payment</code> table is retained for read-only audit of any pre-existing settled rows. New bookings go through <code>payment_proof</code> only.</p>
+<p>The previous <code>app/src/adapters/midtrans-snap.ts</code> (placeholder Midtrans Snap adapter) and the <code>payment</code> table webhook flow (<code>/api/payment/notification</code>, <code>applyVerifiedPaymentEvent</code>, <code>executeRefundAction</code>) have been <strong>removed entirely</strong>. The legacy gateway tables are removed by migration 0002. New bookings go through <code>payment_proof</code> only; Admin legacy refund/read paths are tracked on <code>docs/WORKBOARD.md</code> until reconciled.</p>
 <h2 id="4-notification-and-email-placeholder">4. Notification and email (placeholder)</h2>
 <ul>
 <li>The Worker does not call any email provider in this skeleton.</li>
@@ -173,11 +174,11 @@
 <li>Start Worker: <code>pnpm dev</code>. Open <code>http://localhost:8787</code>.</li>
 <li>Admin (placeholder): set <code>ALLOW_PLACEHOLDER_ADMIN_AUTH=true</code> in <code>.dev.vars</code>, then visit <code>/admin</code>.</li>
 </ol>
-<p>Local DB is a fresh D1 binding. Seed data is <strong>not</strong> included; minimal seed script under <code>scripts/seed.mjs</code> is referenced in <code>package.json</code> but not implemented (TBC).</p>
+<p>Local DB is a fresh D1 binding. Demo seed data can be created with <code>../scripts/seed-d1.sh</code> (remote/local target). Demo values are not production evidence.</p>
 <h2 id="12-verification-artifacts-already-produced">12. Verification artifacts (already produced)</h2>
 <ul>
 <li><code>docs/adr/0089–0096</code> — eight ADRs covering all top-priority ticket closures.</li>
 <li><code>docs/IMPLEMENTATION-GUIDE.md</code>, <code>docs/DOMAIN-MODEL.md</code>, <code>docs/CONTEXT.md</code> — patched and consistent with the ADRs.</li>
 <li><code>docs/PRD-GUIDELINE-REVIEW.md</code> — 1,075 lines, Round 1–6 closure summary.</li>
 <li><code>output/seraya-psikologi-prd-review-001.zip</code> — review bundle (125 members, 96 ADR, MVP skeleton files).</li>
-</ul></main><footer>Seraya Psikologi · Documentation generated from the repository · <a href="../reference/index.html">Long-form reference</a></footer></div></body></html>
+</ul></main><footer>Seraya Psikologi · generated from repository · <a href="../reference/index.html">Long-form reference</a></footer></div></body></html>

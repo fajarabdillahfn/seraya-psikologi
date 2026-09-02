@@ -1,1 +1,55 @@
-<!doctype html><html lang="id"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Workboard — Seraya Psikologi</title><link rel="stylesheet" href="assets/main.css"></head><body><div class="shell"><header class="site-header"><div><a class="brand" href="index.html">Seraya Psikologi</a><div class="subtitle">Project control center · MVP review</div></div><nav class="topnav"><a href="index.html">Overview</a><a href="workboard.html">Workboard</a><a href="prd/index.html">Focused PRDs</a><a href="reference/index.html">Reference</a></nav></header><div class="muted" style="font-size:.84rem;margin-bottom:18px"><a href="index.html">Home</a> / Workboard</div><main><h1>Workboard</h1><p class="muted">Last reviewed: 2026-09-02 · Satu control center untuk menjaga pekerjaan tidak lompat-lompat.</p><div class="board"><section class="column done"><h3>DONE · verified</h3><div class="ticket"><strong>D01–D08</strong>Architecture, domain decisions, public pages, booking happy path, manual payment handoff, D1 demo data, docs site, GitHub.</div><div class="ticket"><strong>D09</strong>Booking e2e bug fixed: state constraint, slot hold FK, invoice query.</div></section><section class="column doing"><h3>DOING · current</h3><div class="ticket"><strong>W01</strong>Documentation refactor into this overview, workboard, and focused PRDs.</div></section><section class="column next"><h3>NEXT · ordered</h3><div class="ticket"><strong>N01</strong>Business review focused PRDs.</div><div class="ticket"><strong>N02</strong>Replace demo payment configuration.</div><div class="ticket"><strong>N03</strong>Confirm real schedule and meeting/venue details.</div><div class="ticket"><strong>N04</strong>Review public copy.</div><div class="ticket"><strong>N05</strong>Production staff access.</div><div class="ticket"><strong>N06</strong>Admin operating procedure.</div><div class="ticket"><strong>N07</strong>Email provider.</div><div class="ticket"><strong>N08</strong>UAT and launch gates.</div></section><section class="column blocked"><h3>BLOCKED · production</h3><div class="ticket"><strong>B01</strong>Production launch — real auth, config, copy, email, backup, UAT.</div><div class="ticket"><strong>B02</strong>Couple launch decision — launch-ready or coming soon.</div><div class="ticket"><strong>B03</strong>Real Admin payment verification — auth/config required.</div></section><section class="column deferred"><h3>DEFERRED</h3><div class="ticket"><strong>F01</strong>Midtrans/payment gateway.</div><div class="ticket"><strong>F02</strong>Couple bookable checkout.</div><div class="ticket"><strong>F03</strong>CMS/editor workflow.</div><div class="ticket"><strong>F04</strong>Clinical record / EMR.</div><div class="ticket"><strong>F05</strong>Automated WhatsApp provider.</div></section></div><section class="card"><h2>Working rules</h2><ul><li>Hanya satu item aktif untuk product-owner review.</li><li>Business decision masuk ke PRD terkecil yang relevan.</li><li>Technical decision yang durable masuk ADR.</li><li>Demo fixture bukan production evidence.</li><li>Production blocker harus punya evidence sebelum dipindahkan ke Done.</li></ul></section><section class="card"><h2>Production gate summary</h2><p>Detail tetap ada di <a href="reference/adr/0096.html">ADR 0096</a>. Ringkasnya: real payment instructions, real schedule, profile evidence, Google SSO/StaffMembership, approved copy, email, backup/restore, rate limits, UAT, and sign-offs.</p></section></main><footer>Seraya Psikologi · Documentation generated from the repository · <a href="reference/index.html">Long-form reference</a></footer></div></body></html>
+<!doctype html><html lang="id"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Workboard — Seraya Psikologi</title><link rel="stylesheet" href="./assets/main.css"></head><body><div class="shell"><header class="site-header"><div><a class="brand" href="./index.html">Seraya Psikologi</a><div class="subtitle">Project control center · MVP review</div></div><nav class="topnav"><a href="./index.html">Overview</a><a href="./workboard.html">Workboard</a><a href="./prd/index.html">Focused PRDs</a><a href="./reference/index.html">Reference</a></nav></header><div class="muted" style="font-size:.84rem;margin-bottom:18px"><a href="./index.html">Home</a> / Workboard</div><main><h1 id="seraya-psikologi-workboard">Seraya Psikologi — Workboard</h1>
+<blockquote>
+<p>Lightweight Kanban. This is the current project-control document. Move an item only when the stated evidence exists.</p>
+</blockquote>
+<p>Last reviewed: 2026-09-02</p>
+<h2 id="done-verified">DONE — verified</h2>
+<ul>
+<li><strong>D01 — Project documentation is organized</strong> — this control center, small PRDs, and reference links exist.</li>
+<li><strong>D02 — Public docs site is live</strong> — Cloudflare Pages deployment responds successfully.</li>
+<li><strong>D03 — Public MVP pages are live</strong> — home, SERAYA PULANG, Fuja, FAQ, safety, privacy, consent, cancellation, and booking pages respond successfully.</li>
+<li><strong>D04 — Booking happy path works</strong> — a valid client + offer + future slot creates a booking in <code>pending_manual_payment</code> and creates the hold/reservation.</li>
+<li><strong>D05 — Manual payment handoff works</strong> — confirmation page provides text invoice, PDF invoice, and WhatsApp deep-link.</li>
+<li><strong>D06 — D1 demo data exists</strong> — Fuja, two offerings, weekday demo slots, and a placeholder staff row are seeded.</li>
+<li><strong>D07 — GitHub repository is pushed</strong> — source and generated docs are in <code>fajarabdillahfn/seraya-psikologi</code>.</li>
+<li><strong>D08 — Domain decisions are recorded</strong> — booking, capacity, intake, no-show, cancellation, and payment decisions are documented in ADRs 0089–0097.</li>
+</ul>
+<h2 id="doing-current-focus">DOING — current focus</h2>
+<ul>
+<li>No active product-owner implementation item. Pick the next item from NEXT after reviewing PRD 01.</li>
+</ul>
+<p>The documentation refactor is complete: this board and the focused PRDs are now the default reading path.</p>
+<h2 id="next-ordered">NEXT — ordered</h2>
+<ul>
+<li><strong>N01 — Business review of focused PRDs</strong> — user reviews <code>prd/01</code> through <code>prd/08</code>, starting with Booking and Payment.</li>
+<li><strong>N02 — Replace demo payment configuration</strong> — confirm real bank account, account holder, QRIS asset, and Admin operational procedure. Do not expose demo values in a production launch.</li>
+<li><strong>N03 — Decide launch schedule</strong> — replace demo weekday slots with Fuja's actual recurring availability and venue/online-meeting instructions.</li>
+<li><strong>N04 — Finalize public copy</strong> — clinical/ethics + privacy/legal review for consent, privacy, crisis, cancellation, and website claims.</li>
+<li><strong>N05 — Define production staff access</strong> — Google SSO, StaffMembership bootstrap, roles, session/CSRF/revocation behavior.</li>
+<li><strong>N06 — Define Admin operations</strong> — payment-proof review, duplicate/dispute handling, cancellation/refund handling, and evidence retention.</li>
+<li><strong>N07 — Wire email</strong> — provider, sender domain, confirmation/reminder templates, bounce handling, and ClientAccess delivery.</li>
+<li><strong>N08 — Run UAT and launch gates</strong> — execute the checklist in <code>prd/08-launch-gates.md</code> and record evidence.</li>
+</ul>
+<h2 id="blocked-production-gate">BLOCKED / production gate</h2>
+<ul>
+<li><strong>B01 — Production launch</strong> — blocked by real staff authentication, approved copy, real payment instructions, real availability, email delivery, backup/restore evidence, and UAT sign-off.</li>
+<li><strong>B02 — Couple launch</strong> — blocked by the explicit business decision: launch-ready or keep “coming soon”. The data model exists; the launch decision does not.</li>
+<li><strong>B03 — Real Admin payment verification</strong> — blocked until Admin auth and real bank/QRIS configuration are available.</li>
+<li><strong>B04 — Legacy Admin read paths</strong> — current Admin detail/refund helpers still contain queries for legacy <code>payment</code>/<code>refund_action</code> tables removed by the manual-payment migration; must be reconciled before those Admin actions are considered working.</li>
+</ul>
+<h2 id="deferred-intentional">DEFERRED — intentional</h2>
+<ul>
+<li><strong>F01 — Midtrans/payment gateway</strong> — post-MVP option; do not implement until the team reopens the payment decision.</li>
+<li><strong>F02 — Couple bookable checkout</strong> — modeled but not in the current launch path.</li>
+<li><strong>F03 — CMS/editor workflow</strong> — current public pages use code-backed content.</li>
+<li><strong>F04 — Clinical record / EMR</strong> — outside this product.</li>
+<li><strong>F05 — Automated WhatsApp provider</strong> — WhatsApp remains a manual human channel.</li>
+</ul>
+<h2 id="working-rules">Working rules</h2>
+<ul>
+<li>One active item at a time for the product owner review.</li>
+<li>A decision belongs in the smallest relevant PRD; an enduring technical choice belongs in an ADR.</li>
+<li>Do not create a new ADR for a copy tweak, demo fixture, or reversible configuration.</li>
+<li>A demo fixture is not production evidence.</li>
+<li>Every item that blocks production must name its evidence in <code>prd/08-launch-gates.md</code>.</li>
+</ul></main><footer>Seraya Psikologi · generated from repository · <a href="./reference/index.html">Long-form reference</a></footer></div></body></html>

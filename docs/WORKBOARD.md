@@ -17,7 +17,9 @@ Last reviewed: 2026-09-02
 
 ## DOING — current focus
 
-- **W01 — Documentation refactor** — replace the long review document as the default reading path with this board and focused PRDs.
+- No active product-owner implementation item. Pick the next item from NEXT after reviewing PRD 01.
+
+The documentation refactor is complete: this board and the focused PRDs are now the default reading path.
 
 ## NEXT — ordered
 
@@ -35,6 +37,7 @@ Last reviewed: 2026-09-02
 - **B01 — Production launch** — blocked by real staff authentication, approved copy, real payment instructions, real availability, email delivery, backup/restore evidence, and UAT sign-off.
 - **B02 — Couple launch** — blocked by the explicit business decision: launch-ready or keep “coming soon”. The data model exists; the launch decision does not.
 - **B03 — Real Admin payment verification** — blocked until Admin auth and real bank/QRIS configuration are available.
+- **B04 — Legacy Admin read paths** — current Admin detail/refund helpers still contain queries for legacy `payment`/`refund_action` tables removed by the manual-payment migration; must be reconciled before those Admin actions are considered working.
 
 ## DEFERRED — intentional
 

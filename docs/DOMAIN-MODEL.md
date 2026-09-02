@@ -144,39 +144,27 @@ ClientAccess for couples is per-participant: each partner receives a `couple_acc
 
 # Payment and refund
 
-Launch gateway-of-record: Midtrans with Snap hosted checkout behind a provider-neutral PaymentGatewayAdapter. Browser redirect is informational; only signed, server-verified provider notification/webhook becomes PaymentEvent authority. Launch payment categories are QRIS and bank transfer/Virtual Account only. E-wallet, card, OTC, BNPL, direct debit, and other methods are deferred. Merchant onboarding, exact method codes, fees, limits, refund coverage, webhook payloads, and sandbox evidence remain pre-production verification items. Second gateway/failover is deferred.
+Launch payment path: manual bank transfer / Virtual Account / QRIS manual. The client receives a PDF and plain-text invoice, pays off-platform, and sends proof to Admin WhatsApp. Only an Admin verification action on `payment_proof` can confirm the Booking. Midtrans/Snap is deferred post-MVP and may be reactivated only through a new ADR. RefundAction remains separate from payment confirmation and cancellation effects.
 
-Create Booking + OfferSnapshot + 10-minute SlotHold → create Midtrans Snap intent from snapshot amount → client completes hosted checkout → verify signed provider notification/webhook idempotently → settle Payment. Single-session success confirms Appointment; package success creates PackagePurchase + ordered SessionEntitlement and confirms first Appointment. Browser redirect never settles Payment. RefundAction is separate from Payment settlement and cancellation effects.
-Late verified success after hold expiry becomes paid_late/reconciliation-required; reacquire only the original slot atomically if free. If unavailable, create no Appointment or alternate slot automatically; Admin resolves explicitly.
+Create Booking + OfferSnapshot + 10-minute SlotHold → generate invoice → client pays manually → client sends proof to Admin WhatsApp → Admin records/verifies `payment_proof` → confirm Booking and Appointment atomically. Browser navigation and WhatsApp conversation are not payment truth; the verified `payment_proof` record is.
 
 ## Settlement uniqueness (ADR 0093)
 
-For each `Booking.id` (and therefore each purchase intent), at most one `Payment` row is allowed to transition to `status = 'paid'` with `settled_at IS NOT NULL`. The invariant is enforced by a unique partial index `payment(booking_id) WHERE status = 'paid' AND settled_at IS NOT NULL` plus an application-level precheck inside the webhook handler transaction (defense-in-depth, following the same pattern as `ADR 0091` capacity overlap detection). Duplicate `PaymentEvent`s with distinct `provider_event_id` for the same `order_id` are absorbed by the idempotency record: the first event applies the state transition, subsequent events insert new `PaymentEvent` rows but perform a no-op transition and never insert a second `Payment`.
+For the current manual launch path, each Booking has at most one active `payment_proof` record. The proof records method, evidence metadata, Admin actor, verification time, and `submitted`/`verified`/`rejected` status. Verification is idempotent and atomically confirms the Booking; rejection does not confirm it. The legacy gateway settlement/idempotency model in ADR 0093 remains reference material for a future gateway adapter, not the current launch contract.
 
-Verified `PaymentEvent` requires value match, not just signature. `gross_amount`, `currency`, `order_id` (must equal `Booking.id`), and `merchant_id` (must equal configured Midtrans merchant) must match `OfferSnapshot` and `Booking.snapshotted_amount`. Mismatch is logged to `payment_event_mismatch_log` and the transaction is rolled back; no state transition occurs and Midtrans is contacted for investigation.
+## Payment package follow-up
 
-Idempotency keys (`payment_event_idempotency` keyed by `(provider_event_id, payment_intent_id)`) are lifetime-scoped — no TTL — with a `payload_hash = sha256(canonical_json(payload))` fingerprint. Same key + same hash returns the existing event result; same key + different hash raises `idempotency_key_collision` and rolls back (no silent overwrite); different key + same payload is treated as a separate duplicate event with a no-op transition.
+The current MVP does not implement gateway-driven `paid_late` settlement. If a future gateway is reactivated, the package late-payment behavior from ADR 0093 must be revalidated against the then-current payment adapter before implementation.
 
-Out-of-order and repeated-status mapping (full table in `ADR 0093 §4.1`): `capture`/`settlement` final → state transition; `pending` → no-op; `deny`/`cancel`/`expire`/`failure` → `Payment.status = 'failed'`; `refund`/`chargeback` → no-op on `Payment` (handled via `RefundAction`); `challenge` → admin review, no state change. `Payment.status` is a derived current projection and is never rewritten in place to represent historical changes.
+The original `Booking.snapshotted_slot_id` remains an audit concept for any future gateway migration. It is not part of the current manual-payment confirmation path. No automatic refund or silent slot substitution occurs (consistent with `ADR 0059` and `ADR 0076` no-auto-cutoff).
 
-Crash window is split into three layers (see `ADR 0093 §1.2` and `IMPLEMENTATION-GUIDE.md §7.3`): (a) between provider API call and persistence — optimistic `Payment` insert + idempotency record in one transaction; (b) between verified webhook and state transition — webhook handler transaction wraps idempotency, `PaymentEvent`, value match, state transition, and outbox; (c) between transition and outbox delivery — transactional outbox pattern (`application_outbox`) with best-effort retry and dead-letter routing. Verified event + state transition + outbox must commit atomically.
-
-## `paid_late` package creation (ADR 0093 §5)
-
-For late verified success (hold expired before webhook), `PackagePurchase` + ordered `SessionEntitlement` + `PackageValidity` are created at the moment the webhook is verified, not deferred. Two outcomes are possible:
-
-- **Slot reacquire succeeds** (atomic `CapacityReservation` claim per `ADR 0091`): `Payment.status = 'paid_late_slot_reacquired'`; `Booking.status = 'paid_late_slot_reacquired'`; `PackagePurchase.status = 'paid'`; `SessionEntitlement #1.state = 'scheduled'` linked to the reacquired Appointment; `SessionEntitlement #2..N.state = 'available'`; `PackageValidity.validity_start = now()`.
-- **Slot reacquire fails** (overlap or slot unavailable): `Payment.status = 'paid_late_first_session_pending'`; `Booking.status = 'paid_late_slot_unavailable'`; `PackagePurchase.status = 'paid_late'` with `requires_first_session_scheduling = true`; `SessionEntitlement #1.state = 'pending_schedule'`; `SessionEntitlement #2..N.state = 'available'`; `PackageValidity.validity_start = now()`. Admin resolves via the existing reconciliation flow (`ADR 0067`): schedule an alternative slot for entitlement #1, execute `full_refund` (which closes the package and cancels remaining entitlements), or hold for client decision via WhatsApp.
-
-The original `Booking.snapshotted_slot_id` is preserved for audit even when reacquire fails. `requires_first_session_scheduling` flags the package for Admin attention and is cleared once Admin resolves. No automatic refund or silent slot substitution occurs (consistent with `ADR 0059` and `ADR 0076` no-auto-cutoff).
-
-Payment is the append-only original transaction correlated with verified PaymentEvent records. Browser redirect never confirms it. States distinguish paid_late/reconciliation-required from failed. Refund financial status is summarized from append-only RefundAction records without overwriting Payment history. Launch RefundAction is full_refund for captured amount or no_refund as an audited non-disbursement outcome; partial monetary refund is deferred and never derived from entitlement count.
+For the current launch, `payment_proof` is the append-only payment evidence record. Browser navigation and WhatsApp conversation never confirm payment. Refund financial status is summarized from append-only RefundAction records without overwriting payment-proof history. Launch RefundAction is `full_refund` or `no_refund` as an audited off-platform action; partial monetary refund is deferred.
 
 Every refund outcome is an idempotent append-only RefundAction linked to original Payment and approved CancellationDecision or explicit Admin policy exception. Launch supports `full_refund` or `no_refund` only; partial monetary refunds are deferred. Record reason, policy/version, actor, approval, currency/amount where applicable, provider reference/status redacted, and reconciliation result. Full refund cannot exceed captured amount. One Admin may approve cancellation and execute the separate refund action; no second approval or threshold exists in MVP. Refund failure does not rewrite Payment or CancellationDecision and is handled through retry/reconciliation.
 
 # CMS and authorization
 
-Admin CMS launch surfaces: public program/content management; psychologist profile and protected credential verification status; ServiceOffering/Package revisions; future availability; Booking/Appointment; Payment/PaymentEvent/RefundAction; CancellationRequest/Decision; reschedule/outcome correction; PrivacyRequest; StaffMembership; audit.
+- Admin CMS launch surfaces: public program/content management; psychologist profile and protected credential verification status; ServiceOffering/Package revisions; future availability; Booking/Appointment; payment proof; CancellationRequest/Decision; reschedule/outcome correction; PrivacyRequest; StaffMembership; audit.
 Admin Cancellation & Refund Workspace: manual support context → request → pending → approve/deny → atomic cancellation/capacity/entitlement effect → separate full_refund/no_refund action. No separate Release Slot button, client self-service cancellation/refund, full chat transcript, or required WhatsApp task.
 
 Active staff launch roles:
@@ -255,8 +243,8 @@ Confirmed launch decisions:
 - Counseling is online/offline, 60 minutes.
 - Individual/couple catalog prices and package sequence are recorded; packages are paid upfront in IDR.
 - Fuja Rahayu Kinanti is the only confirmed psychologist, serves individual/couple; availability is PRD placeholder `anytime/anyplace` and non-blocking for design.
-- Midtrans Snap is the single launch gateway; QRIS + bank transfer/VA only; second gateway and other methods deferred.
-- Payment truth is verified webhook/PaymentEvent; late payment is paid_late reconciliation; no alternate auto-assignment.
+- Manual bank transfer/VA/QRIS is the launch payment path; Midtrans is deferred post-MVP.
+- Payment truth is an Admin-verified `payment_proof`; there is no launch webhook or gateway late-payment path.
 - Cancellation has no automatic cutoff and is Admin case-by-case; pending preserves reservation.
 - CancellationDecision is approve/deny; approval atomically cancels/releases/restores; no separate Release Slot action.
 - RefundAction is separate and launch-limited to full_refund/no_refund; partial refund deferred; one Admin may execute both separate actions.
@@ -271,5 +259,5 @@ Confirmed launch decisions:
 
 # ADR index
 
-Working ADR index: docs/adr/0001–0095. Closure decisions 0067–0095 cover Admin cancellation/refund workspace, Midtrans Snap launch gateway, QRIS+bank transfer/VA scope, program/bookable scope, counseling catalog, launch psychologist, cancellation/refund/approval, staff access/bootstrap, privacy/retention/anonymization, PRD handoff vs production gate, the couple package participant model (`ADR 0090`), capacity overlap + TransitionBuffer (`ADR 0091`), appointment outcome timing + late-arrival correction (`ADR 0092`), settlement uniqueness + paid-late package creation (`ADR 0093`), intake/minor/eligibility/cutoff (`ADR 0094`), and the package cancellation matrix + outcome race resolution (`ADR 0095`). ADR 0064 is historical/superseded for required WhatsApp timing/task semantics; ADR 0066 governs optional manual support; ADR 0089 ratifies the Cloudflare Worker + D1 architecture; ADR 0090 governs the couple package `BookingParticipant`/`AppointmentParticipant` model; ADR 0095 closes `TBC-PACKAGE-CANCEL-01` and `TBC-RESCHEDULE-01`.
+Working ADR index: docs/adr/0001–0097. ADR 0097 is the current launch payment decision: manual bank transfer/VA/QRIS + Admin WhatsApp verification; ADR 0068/0069 remain historical future-gateway references. ADR 0089 ratifies Cloudflare Worker + D1; ADR 0090–0096 record the domain and launch-gate decisions.
 

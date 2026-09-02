@@ -9,8 +9,8 @@ Source baseline:
 - Technical PRD canonical closure baseline: revision `168`
 - Non-technical PRD closure baseline: revision `46`
 - Domain model: `DOMAIN-MODEL.md`
-- Decision history: `docs/adr/0001–0095`
-- Live endpoint may advance beyond the baseline; the accepted ADRs and this guide remain the implementation authority until the live form is reconciled.
+- Decision history: `docs/adr/0001–0097`
+- Live endpoint may advance beyond the baseline; this guide describes implementation intent, while `docs/WORKBOARD.md` and `docs/prd/` describe the current project status and launch path.
 
 Dokumen ini sengaja tidak menunggu semua jawaban pada dua PRD form. Keputusan yang sudah confirmed menjadi aturan implementasi. Hal yang belum diputuskan ditulis sebagai `TBC` dan harus diisolasi di configuration/adapter/policy seam, bukan ditebak sebagai keputusan bisnis.
 
@@ -197,10 +197,8 @@ Implementasi boleh berupa satu Worker/modular monolith. Jangan membocorkan detai
 - `PackageModule`
   - purchase, ordered entitlements, consume/restore/expire.
 - `PaymentModule`
-  - Payment state, verified events, idempotency, late payment.
-- `PaymentGatewayAdapter`
-  - provider-neutral interface;
-  - `MidtransSnapAdapter` adalah adapter launch.
+  - manual payment proof, invoice generation, Admin verification, idempotency.
+  - Midtrans/payment gateway is deferred; do not add provider behavior to the MVP.
 - `CancellationModule`
   - request, approve/deny, atomic appointment/slot/entitlement effect.
 - `RefundModule`
@@ -1006,11 +1004,11 @@ Audit record minimal:
 
 ### 13.2 Integration tests
 
-- Midtrans adapter request/verification/refund mapping.
-- Signature/API verification failure.
-- Unknown/duplicate provider event.
-- Provider timeout/retry/dead-letter.
-- Payment and refund reconciliation.
+- Manual payment proof recording, amount match, verification, and rejection.
+- Duplicate/repeated Admin verification is idempotent.
+- Invoice PDF/text generation uses the immutable OfferSnapshot.
+- Refund remains a separate audited off-platform action.
+- Midtrans adapter tests are deferred until the payment decision is reopened.
 - Google SSO + membership enforcement.
 - Email delivery failure without domain rollback.
 
@@ -1019,7 +1017,7 @@ Audit record minimal:
 - Four program pillars public; only SERAYA PULANG has checkout.
 - Counseling online/offline catalog and package pricing.
 - Guest booking and hold expiry.
-- Payment success/failure/late webhook.
+- Manual payment invoice, WhatsApp handoff, proof review, acceptance, and rejection.
 - Package next-session scheduling.
 - Admin cancellation approve/deny and separate refund.
 - Staff role visibility.
@@ -1033,7 +1031,7 @@ Audit record minimal:
 | TBC-ACCESS-01 | ClientAccess rate limit/recovery/revocation | Isolate in AccessPolicy; use conservative configurable defaults | Technical; before production |
 | TBC-API-01 | Exact API routes/payloads | Define transport after command interfaces and UAT cases | Technical |
 | TBC-PACKAGE-01 | Exact validity calendar semantics/reminders | Store snapshot policy; do not read current catalog for old purchase | Business + technical |
-| TBC-PAY-01 | Midtrans onboarding/method codes/fees/limits/refund | Adapter/config; fake provider for development | Business/ops; production gate |
+| TBC-PAY-MANUAL-01 | Admin verification SLA, payment-proof retention, dispute handling, real account/QRIS configuration | Keep manual flow behind `WhatsAppManualPaymentModule`; demo configuration cannot pass production gate | Operations/finance; production gate |
 | TBC-PRIVACY-01 | Policy duration/trigger/exception/evidence | Implement RetentionPolicy, no destructive production action yet | Clinical/ethics + technical/data; production gate |
 | TBC-NOTIFY-01 | Email provider/copy/bounce/package offsets | Domain events first; provider behind NotificationAdapter | Business + technical |
 | TBC-ADMIN-01 | Admin forms/visibility/copy | Least privilege and command-driven UI | Technical + operations |

@@ -15,7 +15,7 @@ To deploy:
 2. `wrangler d1 migrations apply seraya-db --remote`.
 3. `wrangler deploy`.
 
-Migration is in `app/migrations/0001_init.sql` and references ADRs 0089–0095 (couple participant, capacity overlap, no-show timing, settlement uniqueness, intake schema, package cancellation).
+Migrations are in `app/migrations/0001_init.sql`, `0002_whatsapp_payment.sql`, and `0003_booking_state_whatsapp.sql`.
 
 ## 2. Authorization (placeholder, per user instruction)
 
@@ -39,7 +39,7 @@ The payment flow is **manual, Admin-verified** — no automated payment gateway 
 - The client pays via bank transfer or QRIS, then sends the screenshot/slip to Admin on WhatsApp.
 - Admin opens `/admin/payments`, reviews each `payment_proof`, and either:
   - **verify** (`/api/payment/manual/verify` with `status=verified`) → atomic flip of `payment_proof.status='verified'` AND `booking.state='confirmed'`.
-  - **reject** (`status=rejected`) → atomic flip of `payment_proof.status='rejected'` AND `booking.state='cancelled'`.
+  - **reject** (`status=rejected`) → records the rejection reason; the booking is not confirmed. Cancellation/expiry is handled by its own Admin command.
 
 Both transitions are **idempotent** (re-applying the same terminal status is a no-op) and **atomic** (single `db.batch`).
 
@@ -47,11 +47,12 @@ Key files:
 - `app/src/modules/payment.ts` — `WhatsAppManualPaymentModule` (generator, recordPayment, verifyPayment, listPendingPayments).
 - `app/src/modules/admin.ts` — `markAsPaid`, `rejectPayment`, `listPendingPayments`.
 - `app/src/modules/booking.ts` — `confirmPayment` for the booking-side state flip.
-- `app/migrations/0002_payment_proof.sql` — `payment_proof` table schema.
+- `app/migrations/0002_whatsapp_payment.sql` — `payment_proof` table schema.
+- `app/migrations/0003_booking_state_whatsapp.sql` — booking state constraint update.
 
 ### Pre-ADR 0097 (legacy Midtrans path, removed)
 
-The previous `app/src/adapters/midtrans-snap.ts` (placeholder Midtrans Snap adapter) and the `payment` table webhook flow (`/api/payment/notification`, `applyVerifiedPaymentEvent`, `executeRefundAction`) have been **removed entirely**. The `payment` table is retained for read-only audit of any pre-existing settled rows. New bookings go through `payment_proof` only.
+The previous `app/src/adapters/midtrans-snap.ts` (placeholder Midtrans Snap adapter) and the `payment` table webhook flow (`/api/payment/notification`, `applyVerifiedPaymentEvent`, `executeRefundAction`) have been **removed entirely**. The legacy gateway tables are removed by migration 0002. New bookings go through `payment_proof` only; Admin legacy refund/read paths are tracked on `docs/WORKBOARD.md` until reconciled.
 
 ## 4. Notification and email (placeholder)
 
@@ -138,7 +139,7 @@ seraya-psikologi-mvp/
 3. Start Worker: `pnpm dev`. Open `http://localhost:8787`.
 4. Admin (placeholder): set `ALLOW_PLACEHOLDER_ADMIN_AUTH=true` in `.dev.vars`, then visit `/admin`.
 
-Local DB is a fresh D1 binding. Seed data is **not** included; minimal seed script under `scripts/seed.mjs` is referenced in `package.json` but not implemented (TBC).
+Local DB is a fresh D1 binding. Demo seed data can be created with `../scripts/seed-d1.sh` (remote/local target). Demo values are not production evidence.
 
 ## 12. Verification artifacts (already produced)
 
