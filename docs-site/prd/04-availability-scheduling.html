@@ -1,31 +1,91 @@
 <!doctype html><html lang="id"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>PRD 04 — Availability &amp; Scheduling — Seraya Psikologi</title><link rel="stylesheet" href="../assets/main.css"></head><body><div class="shell"><header class="site-header"><div><a class="brand" href="../index.html">Seraya Psikologi</a><div class="subtitle">Project control center · MVP review</div></div><nav class="topnav"><a href="../index.html">Overview</a><a href="../workboard.html">Workboard</a><a href="../prd/index.html">Focused PRDs</a><a href="../reference/index.html">Reference</a></nav></header><div class="muted" style="font-size:.84rem;margin-bottom:18px"><a href="../index.html">Home</a> / Focused PRD</div><main><h1 id="prd-04-availability-scheduling">PRD 04 — Availability &amp; Scheduling</h1>
+<p>Status: <strong>Business review in progress</strong> (2026-09-02). Slot rules, schedule, and capacity are already locked in PRD 01; this PRD records the resulting availability surface and the remaining schedule/exception details.</p>
 <h2 id="goal">Goal</h2>
-<p>Expose only slots that are genuinely bookable for the selected offering and protect psychologist capacity.</p>
+<p>Expose only slots that are genuinely bookable for the selected offering and protect psychologist capacity. Make the schedule readable and the rules predictable for the client and for the Admin.</p>
 <h2 id="locked-rules">Locked rules</h2>
 <ul>
-<li>Canonical timezone: <code>Asia/Jakarta</code>.</li>
-<li>Session duration: 60 minutes.</li>
+<li>Canonical timezone: <code>Asia/Jakarta</code> (WIB).</li>
+<li>Session duration: <strong>60 minutes</strong>.</li>
 <li>Transition buffer: 15 minutes before and after a reservation.</li>
-<li>Slot grid: 30-minute granularity in the domain model; current demo fixtures use 60-minute starts.</li>
+<li><strong>Slot grid: 60 minutes.</strong> A slot starts on the hour (for example 09.00 or 16.00) and ends 60 minutes later.</li>
 <li>Booking horizon: 90 days.</li>
 <li>Booking cutoff: 2 hours before start.</li>
-<li>Individual offline counseling launch schedule: 09.00–12.00 and 16.00–20.00 WIB.</li>
-<li>Offline venue: Havana Park Blok H-3, Kepuharjo, Karangploso, Kab. Malang, 65152.</li>
-<li>Online launch services: Chat and Call.</li>
+<li>Booking days: <strong>Senin sampai Minggu</strong> (Monday through Sunday).</li>
+<li><strong>Closed on national holidays</strong> (hari libur tutup). The closed-day list is operational and managed by the Admin; the public site must reflect the same closed days in the slot list.</li>
+<li>Online launch services: <strong>Chat</strong> and <strong>Call</strong>.</li>
+<li>Individual offline counseling launch schedule: <strong>09.00–12.00 and 16.00–20.00 WIB</strong>.</li>
+<li>Offline venue: <strong>Havana Park Blok H-3, Kepuharjo, Karangploso, Kab. Malang, 65152</strong>.</li>
+<li>Online and offline offerings use the same <strong>60-minute slot grid</strong>.</li>
 <li>Overlapping active holds/reservations for the same psychologist are rejected.</li>
+<li>Booking changes between online and offline are not self-service. The client may ask Admin via WhatsApp; Admin confirms whether the change is allowed.</li>
 </ul>
-<h2 id="current-demo-fixture">Current demo fixture</h2>
-<p>The live D1 currently contains demo weekday slots for testing. These are not Fuja's production schedule and must not be treated as launch evidence.</p>
-<h2 id="next-work">Next work</h2>
+<h2 id="public-slot-list">Public slot list</h2>
 <ul>
-<li>Confirm recurring schedule and exceptions.</li>
-<li>Confirm offline venue and online-meeting mechanism.</li>
-<li>Add operational procedure for withdrawal, reschedule, and capacity release.</li>
+<li>The site shows the next 90 days of slots, scoped to the selected offering and the day’s open window.</li>
+<li>For online offerings, the day’s open window is 09.00–12.00 and 16.00–20.00 WIB.</li>
+<li>For offline individual counseling, the day’s open window is the same hours (09.00–12.00 and 16.00–20.00 WIB) at Havana Park.</li>
+<li>Slots that are at or within 2 hours of session start are not selectable. The client sees them only as informational or hidden, depending on design.</li>
+<li>A slot that is already held or booked is not selectable.</li>
+<li>A day that is on the closed-day list shows no bookable slot.</li>
+<li>All times in the public UI are explicitly labelled <code>WIB</code> (Asia/Jakarta).</li>
+</ul>
+<h2 id="schedule-exceptions">Schedule exceptions</h2>
+<ul>
+<li>Public holidays: the site shows them as closed. The list of public holidays is a calendar the Admin maintains, matching the Indonesian national-holiday calendar. Operational ownership of the list is in PRD 07.</li>
+<li>Recurring exceptions: the Admin can mark a specific weekday as a regular closed day, for example a recurring training day.</li>
+<li>One-off exceptions: the Admin can mark a specific date or a specific slot as withdrawn, with a short public reason such as “Cuti”, “Pelatihan”, or “Tidak tersedia”. The reason is internal and is not shown to the client.</li>
+<li>A withdrawn slot becomes unavailable immediately. A paid booking affected by a withdrawal is handled by the Admin and is recorded in the Admin’s notes for the booking.</li>
+</ul>
+<h2 id="capacity-and-overlap">Capacity and overlap</h2>
+<ul>
+<li>The capacity is one slot per psychologist per start time. Two clients cannot book the same psychologist at the same hour.</li>
+<li>The 15-minute transition buffer is added around each reservation. The next client-visible slot starts after that buffer.</li>
+<li>A pending <code>SlotHold</code> (10 minutes by default) holds the slot while the client completes intake. The hold expires automatically.</li>
+</ul>
+<h2 id="booking-changes-online-offline">Booking changes (online ↔ offline)</h2>
+<ul>
+<li>The client may ask to move from online to offline or from offline to online, with these rules:</li>
+<li>The request goes through <strong>Admin WhatsApp</strong>; there is no public self-service change button.</li>
+<li>Admin may approve the change only when the psychologist’s schedule can still accommodate the new mode, the new time window, and the venue.</li>
+<li>The price difference is recorded as a manual adjustment. If the new mode is more expensive, the client tops up before the change is confirmed; if the new mode is cheaper, the difference is recorded as a manual refund via the manual payment/refund flow.</li>
+<li>The change is recorded as a separate <code>RescheduleAction</code> in the audit trail. The original booking is not silently overwritten; the new mode becomes a new offer with a snapshot of its own.</li>
+</ul>
+<h2 id="operational-procedure-cancellation-because-the-psychologist-is-unavailable">Operational procedure: cancellation because the psychologist is unavailable</h2>
+<ul>
+<li>If the psychologist is unable to attend a confirmed booking (for example, sickness, family emergency, or administrative error), Admin contacts the client via WhatsApp as the first channel, and follows up with email if the contact is unsuccessful.</li>
+<li>Admin offers a free reschedule or a full refund, per the cancellation and refund PRD (PRD 05).</li>
+<li>A booking that is not rescheduled by mutual agreement is refunded, and the slot is released for other clients.</li>
 </ul>
 <h2 id="acceptance-checks">Acceptance checks</h2>
 <ul>
-<li>Slot list respects offering, horizon, cutoff, withdrawal, and active reservations.</li>
+<li>Slot list respects offering, schedule windows, holiday list, withdrawal, and active reservations.</li>
+<li>A slot at or within 2 hours of session start is not selectable.</li>
+<li>A day on the closed-day list shows no bookable slot.</li>
+<li>The 15-minute transition buffer is enforced between adjacent slots.</li>
 <li>Two overlapping booking attempts cannot both win.</li>
 <li>Expired holds release capacity.</li>
-<li>Displayed time is clearly Asia/Jakarta/WIB.</li>
+<li>Displayed time is explicitly <code>WIB</code> (Asia/Jakarta) on every visible time.</li>
+<li>Booking changes between online and offline are only done by Admin and are recorded as a <code>RescheduleAction</code>.</li>
+<li>Cancellation because the psychologist is unavailable starts with an Admin WhatsApp contact and is recorded with the action taken (reschedule or refund).</li>
+</ul>
+<h2 id="still-open-for-this-prd">Still open for this PRD</h2>
+<ul>
+<li>The Admin’s process for maintaining the public-holiday and recurring-exception calendar. The PRD records the outcome (the slot list must respect those dates); the operational procedure belongs to PRD 07.</li>
+<li>Operational SLA for reaching the client when a psychologist is unavailable, for example, “Admin contacts the client via WhatsApp within X hours.” The decision is operational and is not a launch blocker.</li>
+<li>The Admin workspace UI for marking days or slots as withdrawn and the audit trail for those changes. The PRD records the user-visible behavior; the implementation detail is in PRD 07.</li>
+<li>Final wording for the closed-day list on the public site. Placeholder text is acceptable during development; final copy is owned by PRD 03 and PRD 06.</li>
+<li>The minimum time between a confirmed booking and a change-of-mode request, if any. The default is to allow Admin to review on a case-by-case basis, and this is acceptable for the launch.</li>
+</ul>
+<h2 id="references">References</h2>
+<ul>
+<li><code>docs/prd/01-booking-flow.md</code></li>
+<li><code>docs/prd/05-cancellation-refund.md</code></li>
+<li><code>docs/prd/06-privacy-consent.md</code></li>
+<li><code>docs/prd/07-staff-admin-operations.md</code></li>
+<li><code>docs/adr/0091-capacity-overlap-buffer.md</code></li>
+</ul>
+<h2 id="change-log">Change log</h2>
+<ul>
+<li>2026-09-02: Initial locked rules based on the PRD 01 review (timezone, duration, transition buffer, horizon, cutoff, offline schedule, venue, online services).</li>
+<li>2026-09-02: Locked booking days to Senin–Minggu, closed on public holidays, 60-minute slot grid shared by online and offline, contact by Admin WhatsApp for psychologist unavailability, and online↔offline change by Admin request.</li>
 </ul></main><footer>Seraya Psikologi · generated from repository · <a href="../reference/index.html">Long-form reference</a></footer></div></body></html>
