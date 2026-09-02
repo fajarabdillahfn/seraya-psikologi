@@ -1,0 +1,34 @@
+<!doctype html><html lang="id"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>ADR 0039 — Seraya Psikologi</title><link rel="stylesheet" href="../../assets/main.css"></head><body><div class="shell"><header class="site-header"><div><a class="brand" href="../../index.html">Seraya Psikologi</a><div class="subtitle">Project control center · MVP review</div></div><nav class="topnav"><a href="../../index.html">Overview</a><a href="../../workboard.html">Workboard</a><a href="../../prd/index.html">Focused PRDs</a><a href="../../reference/index.html">Reference</a></nav></header><div class="muted" style="font-size:.84rem;margin-bottom:18px"><a href="../../index.html">Home</a> / ADR</div><main><h1 id="39-reschedule-with-a-replacement-appointment">39. Reschedule with a Replacement Appointment</h1>
+<h2 id="status">Status</h2>
+<p>Accepted for the MVP working model; replacement Appointment, same-payment, same-entitlement, and Admin-only operation are resolved by ADR 0039. Whether reschedule is allowed after each lifecycle state, policy cutoff, approval details, and client notification/recovery remain open.</p>
+<h2 id="context">Context</h2>
+<p>Editing an Appointment's time in place destroys the original commitment, complicates audit, and can accidentally consume or release a package entitlement twice. Requiring a new payment/Booking for a staff-approved schedule change misrepresents the existing purchase.</p>
+<h2 id="decision">Decision</h2>
+<p>An authorized admin performs a RescheduleAction:</p>
+<ol>
+<li>preserve the original Appointment record;</li>
+<li>mark it <code>rescheduled</code> with actor/time/reason and link to the replacement;</li>
+<li>hold/claim a new AvailabilitySlot;</li>
+<li>create a replacement Appointment for the same Booking;</li>
+<li>for a package, link the replacement to the same SessionEntitlement and PackagePurchase;</li>
+<li>carry forward the existing Payment/financial settlement; no new Payment or entitlement is created;</li>
+<li>release the old slot only as part of the atomic successful action.</li>
+</ol>
+<p>The replacement must pass the same overlap/concurrency constraints. If the new slot cannot be claimed, the original Appointment remains active.</p>
+<h2 id="consequences">Consequences</h2>
+<p>Positive:</p>
+<ul>
+<li>original and replacement schedule history are explicit;</li>
+<li>package balance is not double-consumed;</li>
+<li>financial reconciliation remains tied to the original purchase;</li>
+<li>failed reschedule does not destroy the working appointment.</li>
+</ul>
+<p>Costs and constraints:</p>
+<ul>
+<li>Appointment state and replacement links are needed;</li>
+<li>action must be idempotent and transactional across old/new slot;</li>
+<li>notifications must distinguish changed schedule from cancellation;</li>
+<li>cancellation/refund policy may impose restrictions that admin must see.</li>
+</ul>
+<h2 id="open-follow-up">Open follow-up</h2>
+<p>Define allowed reschedule lifecycle states, policy cutoff/approval interaction, and client notification/recovery behavior. Admin-only authority and replacement/same-entitlement semantics are resolved.</p></main><footer>Seraya Psikologi · Documentation generated from the repository · <a href="../../reference/index.html">Long-form reference</a></footer></div></body></html>

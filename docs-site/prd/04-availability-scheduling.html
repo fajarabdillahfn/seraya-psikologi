@@ -1,0 +1,28 @@
+<!doctype html><html lang="id"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>PRD 04 — Availability &amp; Scheduling — Seraya Psikologi</title><link rel="stylesheet" href="../assets/main.css"></head><body><div class="shell"><header class="site-header"><div><a class="brand" href="../index.html">Seraya Psikologi</a><div class="subtitle">Project control center · MVP review</div></div><nav class="topnav"><a href="../index.html">Overview</a><a href="../workboard.html">Workboard</a><a href="../prd/index.html">Focused PRDs</a><a href="../reference/index.html">Reference</a></nav></header><div class="muted" style="font-size:.84rem;margin-bottom:18px"><a href="../index.html">Home</a> / Focused PRD</div><main><h1 id="prd-04-availability-scheduling">PRD 04 — Availability &amp; Scheduling</h1>
+<h2 id="goal">Goal</h2>
+<p>Expose only slots that are genuinely bookable for the selected offering and protect psychologist capacity.</p>
+<h2 id="locked-rules">Locked rules</h2>
+<ul>
+<li>Canonical timezone: <code>Asia/Jakarta</code>.</li>
+<li>Session duration: 60 minutes.</li>
+<li>Transition buffer: 15 minutes before and after a reservation.</li>
+<li>Slot grid: 30-minute granularity in the domain model; current demo fixtures use 60-minute starts.</li>
+<li>Booking horizon: 90 days.</li>
+<li>Booking cutoff: 1 hour before start.</li>
+<li>Overlapping active holds/reservations for the same psychologist are rejected.</li>
+</ul>
+<h2 id="current-demo-fixture">Current demo fixture</h2>
+<p>The live D1 currently contains demo weekday slots for testing. These are not Fuja's production schedule and must not be treated as launch evidence.</p>
+<h2 id="next-work">Next work</h2>
+<ul>
+<li>Confirm recurring schedule and exceptions.</li>
+<li>Confirm offline venue and online-meeting mechanism.</li>
+<li>Add operational procedure for withdrawal, reschedule, and capacity release.</li>
+</ul>
+<h2 id="acceptance-checks">Acceptance checks</h2>
+<ul>
+<li>Slot list respects offering, horizon, cutoff, withdrawal, and active reservations.</li>
+<li>Two overlapping booking attempts cannot both win.</li>
+<li>Expired holds release capacity.</li>
+<li>Displayed time is clearly Asia/Jakarta/WIB.</li>
+</ul></main><footer>Seraya Psikologi · Documentation generated from the repository · <a href="../reference/index.html">Long-form reference</a></footer></div></body></html>

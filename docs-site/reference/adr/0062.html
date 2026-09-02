@@ -1,0 +1,25 @@
+<!doctype html><html lang="id"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>ADR 0062 — Seraya Psikologi</title><link rel="stylesheet" href="../../assets/main.css"></head><body><div class="shell"><header class="site-header"><div><a class="brand" href="../../index.html">Seraya Psikologi</a><div class="subtitle">Project control center · MVP review</div></div><nav class="topnav"><a href="../../index.html">Overview</a><a href="../../workboard.html">Workboard</a><a href="../../prd/index.html">Focused PRDs</a><a href="../../reference/index.html">Reference</a></nav></header><div class="muted" style="font-size:.84rem;margin-bottom:18px"><a href="../../index.html">Home</a> / ADR</div><main><h1 id="62-restore-entitlements-without-resetting-expiry">62. Restore Entitlements Without Resetting Expiry</h1>
+<h2 id="status">Status</h2>
+<p>Accepted for the MVP working model; exact Admin extension authority/SLA and client communication remain open.</p>
+<h2 id="context">Context</h2>
+<p>An approved cancellation or Admin outcome correction can return a SessionEntitlement to usable state. Resetting or extending validity automatically would create a new commercial benefit and could undermine the package's published expiry policy.</p>
+<h2 id="decision">Decision</h2>
+<p>A restored SessionEntitlement retains the original PackagePurchase expiry boundary. If that boundary has passed, the entitlement remains expired/closed and is not automatically schedulable. An authorized Admin may grant a separate, explicit extension exception with reason, new expiry, policy/approval context, and audit; the extension does not rewrite the original purchase validity.</p>
+<p>Sequence number and PackagePurchase binding remain unchanged. Refund/credit calculations use the original purchase snapshot plus the audited restoration/extension event.</p>
+<h2 id="consequences">Consequences</h2>
+<p>Positive:</p>
+<ul>
+<li>expiry remains predictable and fair across cancellation/correction;</li>
+<li>restoration does not silently create extra validity;</li>
+<li>exceptional goodwill is explicit and auditable;</li>
+<li>package history retains original sequence and terms.</li>
+</ul>
+<p>Costs and constraints:</p>
+<ul>
+<li>expired restoration needs a clear Admin workflow;</li>
+<li>entitlement state may need <code>closed</code> versus <code>expired</code> distinction;</li>
+<li>reminders and client access must reflect extension state;</li>
+<li>refund/credit calculations must consume the event history.</li>
+</ul>
+<h2 id="open-follow-up">Open follow-up</h2>
+<p>Define Admin extension authority/SLA, allowed extension triggers, client response/notification, and exact expired-versus-closed state vocabulary.</p></main><footer>Seraya Psikologi · Documentation generated from the repository · <a href="../../reference/index.html">Long-form reference</a></footer></div></body></html>

@@ -1,0 +1,659 @@
+<!doctype html><html lang="id"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>ADR 0095 — Seraya Psikologi</title><link rel="stylesheet" href="../../assets/main.css"></head><body><div class="shell"><header class="site-header"><div><a class="brand" href="../../index.html">Seraya Psikologi</a><div class="subtitle">Project control center · MVP review</div></div><nav class="topnav"><a href="../../index.html">Overview</a><a href="../../workboard.html">Workboard</a><a href="../../prd/index.html">Focused PRDs</a><a href="../../reference/index.html">Reference</a></nav></header><div class="muted" style="font-size:.84rem;margin-bottom:18px"><a href="../../index.html">Home</a> / ADR</div><main><h1 id="95-package-cancellation-matrix-and-outcome-race-resolution">95. Package Cancellation Matrix and Outcome Race Resolution</h1>
+<h2 id="status">Status</h2>
+<p>Accepted for the MVP working model. Closes <code>TBC-PACKAGE-CANCEL-01</code> from <code>PRD-GUIDELINE-REVIEW.md</code> Round 1 P1-13, and resolves the <code>ADR 0024</code> and <code>ADR 0051</code> open follow-ups on "package cancellation/entitlement accounting" and "repeat-request rules". Implements the complete transition matrix for <code>Booking</code>, <code>Appointment</code>, <code>PackagePurchase</code>, and <code>SessionEntitlement</code> under cancellation, including the pending-versus-outcome race, repeat/correction rules, atomic package-wide effects, partial-package (1-of-N) semantics, the missing <code>RescheduleAction</code> transition table, and couple-package cancellation tied to <code>BookingParticipant</code> (<code>ADR 0090</code>). Refund vocabulary is left untouched at <code>full_refund</code>/<code>no_refund</code> only per <code>ADR 0063</code>/<code>0077</code>; this ADR does not authorize any partial-monetary or per-entitlement refund. No-show terminal semantics (<code>completed</code>/<code>no_show</code> after 15-minute grace) are governed by <code>ADR 0027</code>/<code>0028</code>; this ADR adds the explicit race-resolution behavior that runs when an outcome lands before Admin decides.</p>
+<h2 id="context">Context</h2>
+<p><code>ADR 0024-admin-cancellation-review.md:33–35</code> and <code>ADR 0051-cancellation-decision-record.md:33–35</code> leave four open questions that the implementation cannot answer:</p>
+<ol>
+<li><strong>One open CancellationRequest per target.</strong> <code>ADR 0051</code> says "repeat requests need a defined rule". <code>ADR 0025</code> says pending preserves reservation. The current text does not say whether a second request against the same target is allowed while the first is pending, what to do when two requests race, or how a new request behaves after a terminal <code>CancellationDecision</code>.</li>
+<li><strong>Pending-versus-outcome race.</strong> A <code>CancellationRequest</code> is pending while the <code>Appointment</code> is still <code>confirmed</code> (<code>ADR 0025</code>). The psychologist can still mark the appointment <code>completed</code> or <code>no_show</code> (per <code>ADR 0027</code>, <code>ADR 0028</code>) before Admin decides. No rule currently says what happens to the open request — does it auto-resolve, stay open forever, or block outcome marking?</li>
+<li><strong>Atomic effects of a package-wide cancellation.</strong> <code>ADR 0063</code> says refund is purchase-level <code>full_refund</code>/<code>no_refund</code>. <code>ADR 0076</code> says Admin is case-by-case. The implementation guide says "approval atomically cancels/releases/restores" (<code>IMPLEMENTATION-GUIDE.md:300–304</code>). The matrix is not enumerated: which Appointments are closed, which <code>SessionEntitlement</code> rows are restored vs closed, whether <code>PackagePurchase</code> is closed, and what happens to <code>PackageValidity</code> (reset? extended? frozen at last value?).</li>
+<li><strong>Partial-package (1-of-N) cancellation.</strong> If a client cancels session 2 of a 3-session package, does this trigger the package-wide path (close everything, restore all unused) or only the per-Appointment path (cancel one, restore one)? The business decision — finalised by Round 3 in <code>ADR 0077</code> (<code>full_refund</code>/<code>no_refund</code> only) — implies that partial-package semantics must be <strong>operational</strong> (per-Appointment state and entitlement) without creating per-entitlement refund allocation. The matrix must reflect this.</li>
+</ol>
+<p>Additional open follow-ups inherited from earlier ADRs:</p>
+<ul>
+<li><code>RescheduleAction</code> is referenced from <code>IMPLEMENTATION-GUIDE.md:159</code>, <code>CONTEXT.md:241–243</code>, and <code>ADR 0090</code> but has no transition table of its own. The ticket (<code>Ticket 10</code>, line 28–29) explicitly says the reschedule matrix is a Slice 6 deliverable.</li>
+<li>Couple-package cancellation must use <code>BookingParticipant</code> and <code>AppointmentParticipant</code> (<code>ADR 0090</code>). Today, <code>ADR 0090</code> defines withdrawal/no-show/reschedule semantics but defers the explicit CancellationDecision transition table to this ADR.</li>
+</ul>
+<p>Ticket 04 (<code>vault/Projects/Seraya Psikologi/Tickets/Ticket 04 — No-show timing &amp; late-arrival correction.md</code>) is still open; no-show may shift from a 15-minute early-grace checkpoint to a post-session terminal outcome in a future ADR (referenced as <code>ADR 0092</code> once accepted; this ADR does not depend on that decision and uses the current <code>ADR 0027</code>/<code>0028</code> semantics as a stable baseline).</p>
+<h2 id="decision">Decision</h2>
+<p>The decision is structured as a single canonical transition matrix per target plus race-resolution rules, repeat/correction rules, and couple-package overrides. Every matrix cell is exhaustive — there is no "TBD" cell.</p>
+<h3 id="1-cancellationrequest-at-most-one-open-invariant">1. CancellationRequest — at-most-one-open invariant</h3>
+<h4 id="11-targets">1.1 Targets</h4>
+<p>A <code>CancellationRequest</code> may target one of:</p>
+<table>
+<thead>
+<tr>
+<th>Target type</th>
+<th>Meaning</th>
+<th>Single-session or package?</th>
+<th>Atomic effect scope</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>appointment</code></td>
+<td>One <code>Appointment.id</code></td>
+<td>Single-session (one Booking)</td>
+<td>That Appointment + linked entitlement (if any) + CapacityReservation</td>
+</tr>
+<tr>
+<td><code>booking</code></td>
+<td>One <code>Booking.id</code></td>
+<td>Single-session with no future linked Appointment (rare; one-appointment single-session Booking)</td>
+<td>Same as <code>appointment</code> for that Booking's only Appointment</td>
+</tr>
+<tr>
+<td><code>package_purchase</code></td>
+<td>One <code>PackagePurchase.id</code></td>
+<td>Package (n sessions)</td>
+<td>All future non-terminal Appointments + all unused SessionEntitlements + PackagePurchase state</td>
+</tr>
+</tbody>
+</table>
+<p><code>CancellationRequest</code> does <strong>not</strong> target <code>SessionEntitlement</code> directly. Entitlements are mutated as side effects of decisions on <code>appointment</code>/<code>booking</code>/<code>package_purchase</code> targets. The entitlement has no independent cancellation surface.</p>
+<h4 id="12-open-request-uniqueness">1.2 Open-request uniqueness</h4>
+<p>Invariant: <strong>at most one CancellationRequest with <code>state = open</code> per target</strong>. Enforced by unique partial index on <code>(target_type, target_id)</code> where <code>state = 'open'</code>.</p>
+<table>
+<thead>
+<tr>
+<th>Incoming event</th>
+<th>Existing target state</th>
+<th>Behaviour</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>RequestCancellation</code></td>
+<td>no existing open request</td>
+<td>Create <code>CancellationRequest</code> with <code>state = open</code>, return new record</td>
+</tr>
+<tr>
+<td><code>RequestCancellation</code></td>
+<td>one open request already</td>
+<td>Return the existing open request with <code>idempotent_replay = true</code>; do <strong>not</strong> create a second row; the second intake may append a note via <code>AppendCancellationNote</code> (audit only, no state mutation)</td>
+</tr>
+<tr>
+<td><code>RequestCancellation</code></td>
+<td>one <code>decided</code> (approved/denied) request already</td>
+<td>Allowed: create new <code>CancellationRequest</code> with <code>state = open</code>, <code>correction_of = previous_cancellation_request_id</code>. This is the repeat/correction path (§4).</td>
+</tr>
+<tr>
+<td><code>RequestCancellation</code></td>
+<td>one <code>auto_resolved</code> request already</td>
+<td>Allowed: create new <code>CancellationRequest</code> with <code>state = open</code>, <code>prior_auto_resolve_reason</code> snapshotted for Admin context.</td>
+</tr>
+</tbody>
+</table>
+<p>The intake channel is Admin WhatsApp → Admin Cancellation &amp; Refund Workspace (<code>ADR 0024</code>/<code>0067</code>). Client cannot directly create a <code>CancellationRequest</code>.</p>
+<h4 id="13-cancellationrequest-state-machine">1.3 CancellationRequest state machine</h4>
+<pre><code>                RequestCancellation (idempotent; see §1.2)
+                          │
+                          ▼
+                       ┌──────┐
+                       │ open │ ◀──────────────────────────┐
+                       └──┬───┘                            │
+                          │                                │
+        ┌─────────────────┼──────────────────┐             │
+        │                 │                  │             │
+        ▼                 ▼                  ▼             │
+  ┌──────────┐      ┌──────────┐     ┌──────────────┐     │
+  │ approved │      │  denied  │     │ auto_resolved│     │
+  └────┬─────┘      └────┬─────┘     └──────┬───────┘     │
+       │                 │                  │             │
+       │ DecideCancellation │                │             │
+       │ (approve/deny)    │                │ outcome race│
+       │                   │                │ (§2)        │
+       └──────┬────────────┘                │             │
+              │                             │             │
+              │ superseded_by_correction    │             │
+              ▼                             ▼             │
+        ┌────────────────┐             (terminal)         │
+        │  superseded    │                                │
+        └────────────────┘                                │
+                                                          │
+                       RequestCancellation (correction)──┘
+</code></pre>
+<table>
+<thead>
+<tr>
+<th>State</th>
+<th>Terminal?</th>
+<th>Set by</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>open</code></td>
+<td>no</td>
+<td><code>RequestCancellation</code> (first time) or correction intake</td>
+<td>visible in Admin workspace; emits no capacity effect</td>
+</tr>
+<tr>
+<td><code>approved</code></td>
+<td>yes (operational)</td>
+<td><code>DecideCancellation</code> approve</td>
+<td>atomic effect per target type (§3); triggers optional separate <code>RefundAction</code> per <code>ADR 0063</code>/<code>0077</code></td>
+</tr>
+<tr>
+<td><code>denied</code></td>
+<td>yes</td>
+<td><code>DecideCancellation</code> deny</td>
+<td>no mutation to Booking/Appointment/PackagePurchase/SessionEntitlement/Payment</td>
+</tr>
+<tr>
+<td><code>auto_resolved</code></td>
+<td>yes</td>
+<td>system on outcome race (§2)</td>
+<td>no capacity/entitlement effect; reason code recorded</td>
+</tr>
+<tr>
+<td><code>superseded</code></td>
+<td>yes</td>
+<td>system when a new <code>CancellationRequest</code> on the same target reaches <code>approved</code>/<code>denied</code> while this one is in <code>approved</code>/<code>denied</code></td>
+<td>original record remains immutable history per <code>ADR 0051</code>; new decision is the operational truth</td>
+</tr>
+</tbody>
+</table>
+<p>All terminal transitions write an <code>AuditRecord</code> with <code>target_type = cancellation_request</code>, <code>actor = admin | system</code>, <code>before_state</code>, <code>after_state</code>, <code>reason_code</code>, and <code>correlation_id</code>.</p>
+<h3 id="2-pending-versus-outcome-race-resolution">2. Pending-versus-outcome race resolution</h3>
+<p>Rule: <strong><code>Appointment</code> outcome (<code>completed</code>/<code>no_show</code>) is terminal and wins.</strong> The open <code>CancellationRequest</code> does not block outcome marking, and the outcome does not retroactively cancel an already-approved decision. The four race cells:</p>
+<h4 id="21-race-matrix">2.1 Race matrix</h4>
+<table>
+<thead>
+<tr>
+<th>Order</th>
+<th>Event A</th>
+<th>Event B</th>
+<th>Result for CancellationRequest</th>
+<th>Result for Appointment</th>
+<th>Result for SessionEntitlement</th>
+<th>Reason code</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>R1</strong></td>
+<td>Outcome <code>completed</code> (psychologist mark) lands</td>
+<td><code>CancellationRequest</code> is still <code>open</code></td>
+<td><code>CancellationRequest</code> transitions <code>open → auto_resolved</code>; review skipped</td>
+<td><code>completed</code> (unchanged)</td>
+<td>consumed (per <code>ADR 0027</code>)</td>
+<td><code>outcome_already_recorded_completed</code></td>
+</tr>
+<tr>
+<td><strong>R2</strong></td>
+<td>Outcome <code>no_show</code> (after 15-minute grace per <code>ADR 0028</code>) lands</td>
+<td><code>CancellationRequest</code> is still <code>open</code></td>
+<td><code>CancellationRequest</code> transitions <code>open → auto_resolved</code></td>
+<td><code>no_show</code> (unchanged)</td>
+<td>consumed (per <code>ADR 0027</code>)</td>
+<td><code>outcome_already_recorded_no_show</code></td>
+</tr>
+<tr>
+<td><strong>R3</strong></td>
+<td><code>CancellationDecision</code> <code>approved</code> lands first</td>
+<td>Outcome marking would follow</td>
+<td>Cancellation effective per §3 (target=appointment → that Appointment → <code>cancelled</code>; target=package → all future non-terminal Appointments → <code>cancelled</code>)</td>
+<td>For target=appointment: <code>cancelled</code> (outcome marking now impossible — state is terminal-cancelled, not <code>completed</code>/<code>no_show</code>). For target=package: only future non-terminal Appointments are cancelled. Terminal-outcome Appointments keep their outcome.</td>
+<td>per §3</td>
+<td><code>cancellation_approved_before_outcome</code></td>
+</tr>
+<tr>
+<td><strong>R4</strong></td>
+<td><code>RescheduleAction</code> lands</td>
+<td><code>CancellationRequest</code> is still <code>open</code> against the original Appointment</td>
+<td><code>CancellationRequest</code> does <strong>not</strong> auto-resolve. Reason: reschedule is not a terminal outcome (<code>ADR 0039</code>); the original Appointment transitions to <code>rescheduled</code> and a replacement is created. The open request is <strong>rebound</strong> to the replacement Appointment (see §5 for matrix).</td>
+<td><code>rescheduled</code> (original) + replacement <code>scheduled</code>/<code>confirmed</code></td>
+<td>not consumed; rebound to replacement</td>
+<td><code>request_rebound_to_replacement</code></td>
+</tr>
+</tbody>
+</table>
+<p><code>R1</code> and <code>R2</code> are auto-resolution: the system writes the transition with <code>actor = system</code>, <code>reason_code</code> as above, and an <code>AuditRecord</code>. Admin sees the auto-resolved request in the workspace with a clear "skipped because outcome already recorded" note; manual re-intake is possible if the client reopens the case.</p>
+<p><code>R3</code> is the atomic-operation guarantee from <code>ADR 0025</code>/<code>0051</code>/<code>IMPLEMENTATION-GUIDE.md:300–304</code>. Outcome marking that arrives <strong>after</strong> <code>approved</code> must be rejected at the command boundary with typed failure <code>E-APPOINTMENT-ALREADY-CANCELLED</code>; the psychologist cannot mark <code>completed</code>/<code>no_show</code> on a cancelled Appointment. This is enforced both at app-level (<code>MarkAppointmentOutcome</code> precondition) and at DB level (trigger or CHECK constraint restricting outcome transitions to non-cancelled/non-rescheduled states).</p>
+<p><code>R4</code> is a bound, not a termination. The cancellation now targets the replacement Appointment; if the replacement is also <code>rescheduled</code>, the binding walks the chain until the current Appointment, then stops. If the chain ends in a terminal-cancelled Appointment, the request auto-resolves with reason <code>target_chain_terminal_cancelled</code>.</p>
+<h4 id="22-notification-effect">2.2 Notification effect</h4>
+<ul>
+<li><code>R1</code>/<code>R2</code> auto-resolve: client receives an email "Permintaan pembatalan tidak dapat diproses karena sesi telah ditandai selesai/tidak hadir oleh psikolog". Admin workspace shows the auto-resolved row with the reason code.</li>
+<li><code>R3</code>: client receives the standard cancellation email per <code>IMPLEMENTATION-GUIDE.md §10.1</code>; no outcome email.</li>
+<li><code>R4</code>: client receives the reschedule email per <code>IMPLEMENTATION-GUIDE.md §10.1</code> plus a note "Pembatalan yang Anda ajukan akan dievaluasi terhadap jadwal pengganti".</li>
+</ul>
+<h3 id="3-atomic-effects-per-target-full-matrix">3. Atomic effects per target — full matrix</h3>
+<h4 id="31-target-appointment-single-session-single-booking">3.1 Target = <code>appointment</code> (single-session, single Booking)</h4>
+<p>Precondition: <code>target.state ∈ {scheduled, confirmed, rescheduled-replacement-active}</code> AND <code>target.outcome_state IS NULL</code>. The check is on the Appointment row at decision time.</p>
+<table>
+<thead>
+<tr>
+<th><code>DecideCancellation</code> outcome</th>
+<th>Appointment transition</th>
+<th>CapacityReservation</th>
+<th>SessionEntitlement (if linked)</th>
+<th>Payment</th>
+<th>Slot reuse</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>approve</code>, target is <code>scheduled</code>/<code>confirmed</code></td>
+<td><code>scheduled</code>/<code>confirmed</code> → <code>cancelled</code></td>
+<td><code>confirmed</code>/<code>hold_active</code> → <code>cancelled</code> (<code>release_reason = appointment_cancelled</code>) per <code>ADR 0091</code> §9</td>
+<td>restore if <code>state = scheduled</code> AND <code>PackageValidity.valid_until &gt;= now</code> AND session not yet started → <code>available</code>; else <code>closed_unrecoverable</code></td>
+<td>no mutation (refund is separate <code>RefundAction</code>)</td>
+<td>if <code>target.starts_at &gt; now</code> AND not held by another → <code>available</code> for rescheduling/booking; else retained as history</td>
+</tr>
+<tr>
+<td><code>approve</code>, target is <code>rescheduled</code> and chain-bound replacement is current (per §2 R4)</td>
+<td>replacement transitions to <code>cancelled</code>; original <code>rescheduled</code> unchanged</td>
+<td>replacement reservation transitions to <code>cancelled</code></td>
+<td>same restore rule applied to entitlement bound to the replacement</td>
+<td>no mutation</td>
+<td>replacement slot released per same rule</td>
+</tr>
+<tr>
+<td><code>approve</code>, but target's outcome is already <code>completed</code>/<code>no_show</code> (<code>R3</code> boundary violation)</td>
+<td>rejected with typed failure <code>E-APPOINTMENT-OUTCOME-ALREADY-RECORDED</code></td>
+<td>no change</td>
+<td>no change</td>
+<td>no change</td>
+<td>no change</td>
+</tr>
+<tr>
+<td><code>deny</code></td>
+<td>no mutation</td>
+<td>no change</td>
+<td>no change</td>
+<td>no change</td>
+<td>no change</td>
+</tr>
+</tbody>
+</table>
+<p>Atomicity: the three writes (Appointment.state, CapacityReservation.state, SessionEntitlement.state) happen in one DB transaction per <code>ADR 0089</code> D1 batch semantics; any failure rolls back all three.</p>
+<h4 id="32-target-package_purchase">3.2 Target = <code>package_purchase</code></h4>
+<p>Precondition: <code>PackagePurchase.state ∈ {active, partially_consumed}</code> AND at least one future, non-terminal Appointment or unused SessionEntitlement exists. The decision applies to the entire package; partial-package atomic effects are derived (not partial-application of a smaller scope).</p>
+<p><code>DecideCancellation</code> <code>approve</code> on <code>package_purchase</code> triggers the following <strong>single-transaction</strong> effects:</p>
+<ol>
+<li><strong>Appointment sweep.</strong> Iterate all <code>Appointment</code> rows where <code>package_purchase_id = target.id</code> AND <code>state ∈ {scheduled, confirmed}</code> AND <code>starts_at &gt; now</code> AND <code>outcome_state IS NULL</code>. Transition each to <code>cancelled</code>. Original <code>rescheduled</code> Appointments are kept as history (terminal); only their <strong>current</strong> replacement is cancelled.</li>
+<li><strong>CapacityReservation sweep.</strong> For each cancelled Appointment, transition its <code>CapacityReservation</code> (<code>reservation_kind = confirmed</code>) to <code>cancelled</code> (<code>release_reason = appointment_cancelled</code>) per <code>ADR 0091</code> §9.</li>
+<li><strong>SessionEntitlement sweep.</strong> For each <code>SessionEntitlement</code> where <code>package_purchase_id = target.id</code> AND <code>state ∈ {available, scheduled}</code> AND <code>valid_until &gt;= now</code>:
+   - If the entitlement has never been bound to a started/cancelled Appointment AND <code>PackageValidity.valid_until &gt;= now</code>: transition to <code>closed_restored_by_cancellation</code> (restored into the validity window; can be rescheduled by Admin within the same package if package re-opens — see step 6).
+   - Else: transition to <code>closed_cancelled_with_package</code> (no longer usable; reported as "closed by package cancellation" in Admin workspace).
+   - Entitlements with <code>state = consumed</code> (already terminal-outcome Appointments) keep their state and are NOT refunded here (refund is separate <code>RefundAction</code> per <code>ADR 0063</code>).
+   - Entitlements with <code>state = expired</code> (past <code>valid_until</code>) keep their state and are not touched.</li>
+<li><strong>PackagePurchase transition.</strong> <code>PackagePurchase.state</code> transitions <code>active | partially_consumed → closed_by_cancellation</code>. This is terminal for the package.</li>
+<li><strong>PackageValidity.</strong> <code>PackageValidity.valid_until</code> is <strong>not</strong> modified (no extension, no reset) per <code>ADR 0062</code> (restored-entitlement expiry). The validity calendar value at the time of cancellation is the final value. Restored entitlements in step 3 use the original <code>valid_until</code> snapshot; the calendar does not slide forward.</li>
+<li><strong>No re-open.</strong> A <code>closed_by_cancellation</code> <code>PackagePurchase</code> cannot be re-opened by a subsequent <code>DecideCancellation deny</code> or any other command. If Admin later determines the cancellation was wrong, the path is: create a <strong>new</strong> <code>PackagePurchase</code> (new PaymentIntent required) — the closed one remains immutable history. This matches <code>ADR 0051</code> "corrections create a new audited decision rather than rewriting the old one".</li>
+<li><strong>Refund.</strong> Out of scope of this transaction. Admin creates a separate <code>RefundAction</code> (<code>full_refund</code> or <code>no_refund</code> per <code>ADR 0063</code>/<code>0077</code>) linked by <code>cancellation_decision_id</code>. <code>RefundAction</code> carries its own audit and provider-retry semantics.</li>
+</ol>
+<p><code>DecideCancellation</code> <code>deny</code> on <code>package_purchase</code>:</p>
+<ul>
+<li>No mutation to any <code>Appointment</code>, <code>CapacityReservation</code>, <code>SessionEntitlement</code>, <code>PackagePurchase</code>, <code>PackageValidity</code>, or <code>Payment</code>.</li>
+<li>Record <code>CancellationDecision</code> with <code>outcome = deny</code>, <code>reason_code</code>, <code>actor = admin</code>.</li>
+<li>Audit only.</li>
+</ul>
+<h4 id="33-target-booking-single-session-booking-with-one-appointment">3.3 Target = <code>booking</code> (single-session Booking with one Appointment)</h4>
+<p>Same as <code>target = appointment</code> (§3.1); the Booking is the single parent and the only Appointment row is the operational target. Booking.state transitions to <code>cancelled</code> only when its sole Appointment transitions to <code>cancelled</code> (no separate Booking-level cancellation mutation for single-session — <code>Booking</code> is just the parent reference). Booking aggregate is preserved as immutable history.</p>
+<h3 id="4-repeat-correction-rule-for-cancellationdecision">4. Repeat / correction rule for CancellationDecision</h3>
+<p><code>CancellationDecision</code> is append-only and immutable per <code>ADR 0051</code>/<code>0065</code>. Corrections are modelled as a <strong>new</strong> decision on the same target with <code>correction_of</code> linkage.</p>
+<table>
+<thead>
+<tr>
+<th>Situation</th>
+<th>Behaviour</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Admin reconsiders an <code>approved</code> decision before any downstream effect has been relied on (e.g., <code>RefundAction</code> not yet executed)</td>
+<td>Admin records a new <code>CancellationRequest</code> (target=appointment/package_purchase), gets a new <code>CancellationRequest</code> row. The new <code>DecideCancellation</code> <code>deny</code> transitions the new request to <code>denied</code> and writes <code>supersedes_decision_id = &lt;original_decision_id&gt;</code>. The original <code>CancellationDecision</code> remains <code>approved</code> historically but is marked <code>superseded_by = &lt;new_decision_id&gt;</code> and the system publishes a <code>CancellationCorrectionApplied</code> notification. <strong>No retroactive rollback of the operational effects already applied</strong> (Appointment is already <code>cancelled</code>; CapacityReservation already <code>cancelled</code>; entitlement already <code>closed_*</code>). Recovery requires explicit re-booking.</td>
+</tr>
+<tr>
+<td>Admin reconsiders a <code>denied</code> decision (decides the cancellation should have been approved)</td>
+<td>Admin records a new <code>CancellationRequest</code>, gets a new decision row. New <code>DecideCancellation</code> <code>approve</code> applies the §3 atomic effects afresh (idempotently — already-cancelled entities are skipped). Original <code>denied</code> decision is marked <code>superseded_by</code>. Client is notified that the cancellation is now approved and which Appointments/entitlements are affected.</td>
+</tr>
+<tr>
+<td>Outcome race lands after the decision (§2 R1/R2)</td>
+<td>The decision is <code>approved</code> historically, but the Appointment is <code>completed</code>/<code>no_show</code>. Capacity was not released (the Appointment never went <code>cancelled</code>), entitlement was consumed. Admin sees the conflict in the workspace and decides whether to issue a <code>RefundAction</code> (<code>full_refund</code> for the unused portion only at purchase level per <code>ADR 0063</code>); no further cancellation atomic effects are re-applied.</td>
+</tr>
+</tbody>
+</table>
+<p>Idempotency: every <code>DecideCancellation</code> carries <code>idempotency_key</code>. A retry with the same key returns the existing decision without side effects. A retry with a different key against a request already in <code>approved</code>/<code>denied</code>/<code>auto_resolved</code> returns typed failure <code>E-DECISION-ALREADY-RECORDED</code> and instructs the caller to open a correction.</p>
+<h3 id="5-rescheduleaction-transition-matrix">5. RescheduleAction transition matrix</h3>
+<p><code>RescheduleAction</code> is an audited administrative operation (<code>CONTEXT.md:241–243</code>, <code>ADR 0039</code>) that preserves the original Appointment as <code>rescheduled</code> and creates a replacement. The matrix below is the canonical one for MVP; it previously lived only as prose and was missing from <code>IMPLEMENTATION-GUIDE.md §6</code>.</p>
+<h4 id="51-preconditions-and-forbidden-transitions">5.1 Preconditions and forbidden transitions</h4>
+<table>
+<thead>
+<tr>
+<th>Source Appointment state</th>
+<th>Reschedule allowed?</th>
+<th>Reason</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>scheduled</code></td>
+<td>yes</td>
+<td>normal path</td>
+</tr>
+<tr>
+<td><code>confirmed</code></td>
+<td>yes</td>
+<td>normal path; replacement inherits confirmation once verified PaymentEvent covers it (single-session only — package replacement references the same Payment and PackagePurchase per <code>ADR 0039</code>)</td>
+</tr>
+<tr>
+<td><code>rescheduled</code> (original)</td>
+<td>no — already terminal-rescheduled</td>
+<td>typed failure <code>E-RESCHEDULE-ALREADY-RESCHEDULED</code></td>
+</tr>
+<tr>
+<td><code>cancelled</code></td>
+<td>no</td>
+<td>typed failure <code>E-RESCHEDULE-CANCELLED</code></td>
+</tr>
+<tr>
+<td><code>completed</code></td>
+<td>no (post-session outcome is terminal)</td>
+<td>typed failure <code>E-RESCHEDULE-OUTCOME-COMPLETED</code></td>
+</tr>
+<tr>
+<td><code>no_show</code></td>
+<td>no</td>
+<td>typed failure <code>E-RESCHEDULE-OUTCOME-NO-SHOW</code></td>
+</tr>
+<tr>
+<td><code>pending_payment</code> (PackagePurchase first session not yet confirmed)</td>
+<td>no</td>
+<td>reschedule applies to scheduled/confirmed only; pending_payment means no Appointment yet to reschedule</td>
+</tr>
+</tbody>
+</table>
+<h4 id="52-atomic-effects">5.2 Atomic effects</h4>
+<table>
+<thead>
+<tr>
+<th>Source state</th>
+<th>RescheduleAction outcome</th>
+<th>Original Appointment</th>
+<th>Replacement Appointment</th>
+<th>CapacityReservation</th>
+<th>SessionEntitlement</th>
+<th>PackagePurchase</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>scheduled</code>/<code>confirmed</code></td>
+<td>success</td>
+<td><code>state → rescheduled</code> (terminal); <code>outcome_state</code> stays NULL; replacement chain pointer set</td>
+<td>new Appointment with <code>state = scheduled</code>; on verified payment for single-session: <code>state = confirmed</code>; for package: <code>state = confirmed</code> after first-session payment per <code>ADR 0039</code></td>
+<td>original reservation <code>confirmed → cancelled</code> (<code>release_reason = appointment_cancelled</code>); new reservation inserted for replacement (<code>hold_active → confirmed</code> on payment, or <code>confirmed</code> directly for package)</td>
+<td>for package: entitlement bound to source rebinds to replacement (no new consumption); for single-session: no entitlement</td>
+<td>no mutation</td>
+</tr>
+<tr>
+<td><code>scheduled</code>/<code>confirmed</code></td>
+<td>failure (capacity overlap on replacement slot)</td>
+<td>no mutation</td>
+<td>not created</td>
+<td>not created</td>
+<td>not touched</td>
+<td>no mutation</td>
+</tr>
+</tbody>
+</table>
+<h4 id="53-reschedule-for-couple-package">5.3 Reschedule for couple package</h4>
+<p>Per <code>ADR 0090</code> §6: Admin and Psychologist may reschedule A/B/joint Appointments; Client/guest (including partner via ClientAccess) may not. The replacement must remain within <code>PackageValidity.valid_until</code> and respect both <code>BookingParticipant</code> records (joint replacement cannot be proposed if either partner has withdrawn — the request is rejected with <code>E-RESCHEDULE-JOINT-PARTNER-WITHDRAWN</code>).</p>
+<h4 id="54-reschedule-while-cancellationrequest-is-open">5.4 Reschedule while CancellationRequest is open</h4>
+<p>This is the §2 R4 rebound. The original Appointment transitions to <code>rescheduled</code>; the open <code>CancellationRequest.target_appointment_id</code> is updated to the replacement <code>Appointment.id</code> in the same transaction that performs the reschedule (or rebinds via <code>AppendCancellationNote</code> + workspace view update). The replacement inherits the request; Admin continues to review against the replacement's slot.</p>
+<h3 id="6-couple-package-cancellation-rules">6. Couple-package cancellation rules</h3>
+<p>Couple package binds exactly two <code>BookingParticipant</code> rows (<code>ADR 0090</code> §1). Cancellation rules layered on top of §1–§5:</p>
+<h4 id="61-target-resolution">6.1 Target resolution</h4>
+<table>
+<thead>
+<tr>
+<th>Withdrawal pattern</th>
+<th>Effective target</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>One partner withdraws from individual Appointment A or B before start</td>
+<td><code>target = appointment</code> (the individual Appointment)</td>
+<td>per §3.1; entitlement #1 or #2 in scope</td>
+</tr>
+<tr>
+<td>One partner withdraws from joint Appointment before start</td>
+<td><code>target = appointment</code> (the joint Appointment)</td>
+<td>joint cancellation restores entitlement #3 per <code>ADR 0090</code> §5; the matrix in §3.1 applies (restore if valid)</td>
+</tr>
+<tr>
+<td>Both partners withdraw / cancel the entire couple booking</td>
+<td><code>target = package_purchase</code></td>
+<td>per §3.2; atomic sweep of A, B, joint Appointments + all unused entitlements</td>
+</tr>
+<tr>
+<td>One partner initiates, the other does not</td>
+<td><code>target = appointment</code> (the requesting partner's individual Appointment only)</td>
+<td>per <code>ADR 0090</code> §4 visibility, the non-requesting partner is not shown the request in their ClientAccess; Admin sees both <code>BookingParticipant</code> rows and may decide; decision applies only to the targeted Appointment</td>
+</tr>
+</tbody>
+</table>
+<h4 id="62-consent-and-visibility-on-cancellation">6.2 Consent and visibility on cancellation</h4>
+<ul>
+<li><code>CancellationRequest</code> on joint Appointment: <code>joint_session_consent</code> for both partners must already be <code>verified</code> for the cancellation path to allow <code>approve</code> (precondition check). If either partner withdrew <code>joint_session_consent</code>, Admin sees the request with a "consent withdrawn by <party_role>" flag and may only <code>deny</code> (joint session cannot be cancelled by an absent partner as a workaround for outcome marking).</li>
+<li><code>CancellationRequest</code> on individual A or B: per-participant consent must be <code>verified</code> (or <code>pending</code> only if the request is for an Appointment that has not started and the partner never verified — Admin's discretion per <code>ADR 0090</code> §3).</li>
+<li><code>BookingParticipant</code> rows are read by Admin from the workspace; partner-identifying data is captured in audit per <code>ADR 0090</code> §10.</li>
+</ul>
+<h4 id="63-mid-session-withdrawal-not-a-cancellation-kept-distinct">6.3 Mid-session withdrawal (not a cancellation, kept distinct)</h4>
+<p>Per <code>ADR 0090</code> §5: a partner who withdraws mid-session does <strong>not</strong> trigger a CancellationRequest. The psychologist marks <code>completed</code> with <code>withdrawn_mid_session</code> on the withdrawing partner's <code>AppointmentParticipant.presence_status</code>. Entitlement #3 is consumed (session was held). This is <strong>not</strong> covered by the cancellation matrix; it lives in <code>OutcomeCorrection</code> / <code>AppointmentOutcome</code> semantics per <code>ADR 0054</code> and is referenced here only to disambiguate.</p>
+<h4 id="64-couple-package-wide-cancellation-atomic-effects">6.4 Couple-package-wide cancellation atomic effects</h4>
+<p>Same as §3.2 with the couple-specific note that the Appointment sweep includes A, B, and joint rows. Joint Appointment is cancelled in the same transaction as A and B; restored entitlements are #1/#2/#3 per individual validity window.</p>
+<h3 id="7-acceptance-criteria-test-scenarios">7. Acceptance criteria (test scenarios)</h3>
+<p>The integration test from <code>Ticket 10</code> acceptance criteria is fully specified:</p>
+<ol>
+<li>
+<p><strong>Single-session cancellation happy path.</strong> Booking with one confirmed Appointment. Admin approves. Appointment → <code>cancelled</code>; CapacityReservation → <code>cancelled</code>; no entitlement to restore (single-session). Slot <code>available</code> for re-booking. Idempotent retry of <code>DecideCancellation</code> with same key returns the existing decision without re-running effects.</p>
+</li>
+<li>
+<p><strong>Single-session pending-vs-completed race (R1).</strong> Booking with confirmed Appointment, CancellationRequest open. Psychologist marks <code>completed</code>. CancellationRequest auto-resolves with <code>outcome_already_recorded_completed</code>; client notification "permintaan tidak diproses"; no capacity release; entitlement consumed.</p>
+</li>
+<li>
+<p><strong>Single-session pending-vs-no-show race (R2).</strong> Same as R1 with <code>no_show</code> after 15-minute grace. Auto-resolve with <code>outcome_already_recorded_no_show</code>.</p>
+</li>
+<li>
+<p><strong>Single-session reschedule-vs-pending (R4).</strong> Open request, Admin reschedules the Appointment. Request rebinds to replacement; Admin workspace shows the rebound target; original Appointment transitions to <code>rescheduled</code> per §5.2.</p>
+</li>
+<li>
+<p><strong>Package-wide cancellation.</strong> PackagePurchase with 3 future Appointments (A, B, joint for couple; or sessions 1/2/3 for individual package), 3 unused SessionEntitlements, no consumed. Admin approves on <code>target = package_purchase</code>. Atomic transaction:
+   - 3 Appointments → <code>cancelled</code>.
+   - 3 CapacityReservations → <code>cancelled</code>.
+   - 3 SessionEntitlements → <code>closed_restored_by_cancellation</code>.
+   - PackagePurchase → <code>closed_by_cancellation</code>.
+   - PackageValidity.valid_until unchanged.
+   - No re-open possible.
+   - RefundAction (<code>full_refund</code> or <code>no_refund</code>) is a separate command/record.</p>
+</li>
+<li>
+<p><strong>Partial-package (1-of-N) cancellation.</strong> 3-session package, session 1 already completed (consumed), sessions 2 and 3 scheduled. Admin approves on <code>target = appointment</code> for session 2 only. Session 2 Appointment → <code>cancelled</code>; session 2 entitlement → <code>closed_restored_by_cancellation</code>; session 3 untouched; PackagePurchase stays <code>partially_consumed</code> (not closed). This is the per-Appointment path — the package-wide path is reserved for full-cancellation decisions on <code>target = package_purchase</code>.</p>
+</li>
+<li>
+<p><strong>Repeat request while one is open.</strong> Client messages twice about the same Appointment. Second intake returns the existing open request (<code>idempotent_replay = true</code>); no second row created. Admin sees both intake notes under one open request.</p>
+</li>
+<li>
+<p><strong>Repeat request after terminal decision.</strong> First CancellationDecision <code>denied</code>. Client messages again. New <code>CancellationRequest</code> opens with <code>correction_of = &lt;previous_decision_id&gt;</code>. Admin re-reviews; second decision <code>approve</code> applies §3.1 effects afresh (idempotent on already-cancelled entities). Original <code>denied</code> decision marked <code>superseded_by</code>.</p>
+</li>
+<li>
+<p><strong>Outcome race after approval (R3 violation).</strong> CancellationDecision <code>approved</code> lands; then psychologist tries to mark <code>completed</code>. Command rejected with <code>E-APPOINTMENT-ALREADY-CANCELLED</code>. No state change.</p>
+</li>
+<li>
+<p><strong>Reschedule forbidden on completed.</strong> Try to reschedule an Appointment in <code>completed</code>. Command rejected with <code>E-RESCHEDULE-OUTCOME-COMPLETED</code>.</p>
+</li>
+<li>
+<p><strong>Reschedule capacity overlap.</strong> Original Appointment confirmed; replacement slot overlaps an existing <code>confirmed</code> reservation for the same psychologist. Reschedule rejected; original Appointment unchanged.</p>
+</li>
+<li>
+<p><strong>Couple individual-A cancellation.</strong> Couple booking, partner A withdraws from individual A. Admin approves on <code>target = appointment</code> for A only. Appointment A → <code>cancelled</code>; entitlement #1 → <code>closed_restored_by_cancellation</code>; B and joint untouched; PackagePurchase stays <code>partially_consumed</code>. Partner B sees no change in their ClientAccess; partner A sees "sesi A Anda dibatalkan" email.</p>
+</li>
+<li>
+<p><strong>Couple joint pre-start cancellation.</strong> Couple booking, partner A withdraws from joint before start. Admin approves on <code>target = appointment</code> for joint. Joint Appointment → <code>cancelled</code>; entitlement #3 → <code>closed_restored_by_cancellation</code> (joint cancellation before start is the explicit restore case per <code>ADR 0090</code> §5); A and B individual sessions untouched.</p>
+</li>
+<li>
+<p><strong>Couple package-wide cancellation.</strong> Couple booking, both partners withdraw from the entire package. Admin approves on <code>target = package_purchase</code>. A, B, joint all → <code>cancelled</code>; all three entitlements → <code>closed_restored_by_cancellation</code>; PackagePurchase → <code>closed_by_cancellation</code>; no re-open.</p>
+</li>
+<li>
+<p><strong>Idempotency and retry safety.</strong> All <code>RequestCancellation</code> and <code>DecideCancellation</code> retries with the same <code>idempotency_key</code> return the existing record/decision without side effects. All retries with different keys against a decided request return <code>E-DECISION-ALREADY-RECORDED</code>.</p>
+</li>
+</ol>
+<h3 id="8-migration-schema-canonical">8. Migration schema (canonical)</h3>
+<p>No new tables are introduced. The matrix is enforced by:</p>
+<ul>
+<li>Unique partial index on <code>cancellation_request (target_type, target_id)</code> where <code>state = 'open'</code> — enforces §1.2.</li>
+<li>Trigger / CHECK constraint on <code>appointment.state</code> blocking transitions <code>cancelled → completed|no_show</code> and <code>rescheduled → *</code> — enforces §2 R3 and §5.1.</li>
+<li>Trigger on <code>appointment</code> outcome write checking <code>cancellation_request</code> open/approved state and auto-resolving on completion (<code>actor = system</code>) — enforces §2 R1/R2.</li>
+<li><code>package_purchase</code> state CHECK constraint preventing <code>closed_by_cancellation → active|partially_consumed</code> — enforces §3.2 step 6.</li>
+<li><code>session_entitlement</code> state enum extension adding <code>closed_restored_by_cancellation</code> and <code>closed_cancelled_with_package</code> — enforces §3.2 step 3.</li>
+</ul>
+<pre><code class="language-sql">-- 0095_cancellation_matrix.sql (D1/SQLite canonical; Postgres equivalent in §9)
+
+-- §1.2: at most one open request per target
+CREATE UNIQUE INDEX cancellation_request_open_unique
+  ON cancellation_request (target_type, target_id)
+  WHERE state = 'open';
+
+-- §2 R3: cancellation is terminal; outcome marking is forbidden afterwards
+CREATE TRIGGER appointment_no_outcome_after_cancel
+BEFORE UPDATE OF state ON appointment
+WHEN NEW.state IN ('cancelled', 'rescheduled') AND OLD.outcome_state IS NULL
+BEGIN
+  -- allow transition to cancelled/rescheduled; outcome_state stays NULL
+  -- (no-op trigger; explicit guard below)
+END;
+
+CREATE TRIGGER appointment_block_outcome_after_cancel
+BEFORE UPDATE OF outcome_state ON appointment
+WHEN OLD.state IN ('cancelled', 'rescheduled')
+BEGIN
+  SELECT RAISE(ABORT, 'E-APPOINTMENT-ALREADY-CANCELLED')
+  WHERE NEW.outcome_state IS NOT NULL AND NEW.outcome_state != OLD.outcome_state;
+END;
+
+-- §3.2 step 6: closed_by_cancellation is terminal
+CREATE TRIGGER package_purchase_no_reopen
+BEFORE UPDATE OF state ON package_purchase
+WHEN OLD.state = 'closed_by_cancellation'
+BEGIN
+  SELECT RAISE(ABORT, 'E-PACKAGE-CLOSED-BY-CANCELLATION')
+  WHERE NEW.state IN ('active', 'partially_consumed');
+END;
+</code></pre>
+<p>The <code>session_entitlement</code> enum extension is a D1 schema migration; existing rows are unaffected because new values are only set on forward transitions from <code>available</code>/<code>scheduled</code>.</p>
+<h3 id="9-postgres-equivalent-per-adr-0089">9. Postgres equivalent (per <code>ADR 0089</code>)</h3>
+<pre><code class="language-sql">-- 0095_cancellation_matrix.sql (Postgres)
+
+CREATE UNIQUE INDEX cancellation_request_open_unique
+  ON cancellation_request (target_type, target_id)
+  WHERE state = 'open';
+
+CREATE OR REPLACE FUNCTION appointment_block_outcome_after_cancel()
+RETURNS trigger AS $$
+BEGIN
+  IF OLD.state IN ('cancelled', 'rescheduled') AND NEW.outcome_state IS DISTINCT FROM OLD.outcome_state THEN
+    RAISE EXCEPTION 'E-APPOINTMENT-ALREADY-CANCELLED';
+  END IF;
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER appointment_block_outcome_after_cancel
+BEFORE UPDATE OF outcome_state ON appointment
+FOR EACH ROW EXECUTE FUNCTION appointment_block_outcome_after_cancel();
+
+CREATE OR REPLACE FUNCTION package_purchase_no_reopen()
+RETURNS trigger AS $$
+BEGIN
+  IF OLD.state = 'closed_by_cancellation' AND NEW.state IN ('active', 'partially_consumed') THEN
+    RAISE EXCEPTION 'E-PACKAGE-CLOSED-BY-CANCELLATION';
+  END IF;
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER package_purchase_no_reopen
+BEFORE UPDATE OF state ON package_purchase
+FOR EACH ROW EXECUTE FUNCTION package_purchase_no_reopen();
+</code></pre>
+<p>The Postgres variant is selected when <code>TBC-STACK-01</code> resolves to a Postgres runtime; the trigger logic is identical. The D1 variant is the launch canonical.</p>
+<h3 id="10-audit-and-notifications">10. Audit and notifications</h3>
+<p>Every state transition in §1–§6 writes an <code>AuditRecord</code> row:</p>
+<ul>
+<li><code>target_type ∈ {cancellation_request, appointment, capacity_reservation, session_entitlement, package_purchase, booking}</code></li>
+<li><code>action ∈ {request_intake, request_rebound_to_replacement, decide_approve, decide_deny, auto_resolve, supersede, restore_entitlement, close_entitlement, cancel_appointment, close_package}</code></li>
+<li><code>actor ∈ {admin, psychologist, system}</code></li>
+<li><code>correlation_id</code> shared across atomic-effect rows for one decision</li>
+<li><code>before_state</code>, <code>after_state</code> (enum string only, no PII)</li>
+<li><code>reason_code</code> (typed enum: <code>outcome_already_recorded_completed</code>, <code>outcome_already_recorded_no_show</code>, <code>cancellation_approved_before_outcome</code>, <code>request_rebound_to_replacement</code>, <code>target_chain_terminal_cancelled</code>, <code>correction_of_&lt;id&gt;</code>, etc.)</li>
+<li><code>idempotency_key</code> of the originating command</li>
+</ul>
+<p>Email notifications per <code>IMPLEMENTATION-GUIDE.md §10.1</code>:</p>
+<ul>
+<li><code>R1</code>/<code>R2</code> auto-resolve: client email "Permintaan pembatalan tidak diproses" + reason summary.</li>
+<li><code>R3</code>/<code>R4</code> and standard approve/deny: existing templates.</li>
+<li>Package-wide approval: client email enumerates each cancelled Appointment and each restored/closed entitlement by ordinal (sesi 1/2/3).</li>
+<li>Couple individual Appointment cancellation: client email addressed to the affected partner's ClientAccess scope per <code>ADR 0090</code> §7.</li>
+</ul>
+<h2 id="consequences">Consequences</h2>
+<p>Positive:</p>
+<ul>
+<li>Single canonical matrix covers Booking, Appointment, PackagePurchase, and SessionEntitlement for every cancellation target; no cell is <code>TBD</code>.</li>
+<li>Pending-versus-outcome race is resolved deterministically (R1–R4); admin never faces an open request against a terminal outcome.</li>
+<li>Repeat/correction rule preserves <code>ADR 0051</code> immutability while allowing Admin to recover from wrong decisions without rewriting history.</li>
+<li>Package-wide cancellation atomicity is enforced at DB level (trigger + CHECK) in addition to app-level transaction per <code>ADR 0089</code> D1 batch semantics.</li>
+<li>Partial-package (1-of-N) is clearly distinguished from package-wide via the target field; the per-Appointment path keeps the package open with one less session.</li>
+<li>RescheduleAction transition matrix closes the open gap flagged by <code>Ticket 10</code> and <code>CONTEXT.md:241–243</code>.</li>
+<li>Couple-package cancellation is consistent with <code>ADR 0090</code> and uses the same atomic-effect primitives; no separate matrix.</li>
+<li>Refund remains purchase-level <code>full_refund</code>/<code>no_refund</code> per <code>ADR 0063</code>/<code>0077</code>; this ADR adds no refund semantics.</li>
+</ul>
+<p>Costs and constraints:</p>
+<ul>
+<li>New <code>closed_restored_by_cancellation</code> and <code>closed_cancelled_with_package</code> enum values on <code>session_entitlement</code> are additive but require migration in any environment that already has <code>session_entitlement</code> rows.</li>
+<li>Auto-resolution (<code>R1</code>/<code>R2</code>) means the Admin workspace shows requests that resolved without admin action; the UI must explain the reason clearly so Admin does not attempt a manual decision.</li>
+<li>The "no re-open" rule for <code>closed_by_cancellation</code> means recovery from an incorrect package-wide approval is administratively expensive (new PackagePurchase + new payment). This is intentional and aligned with <code>ADR 0063</code>/<code>0077</code>; the cost is the cost of audit integrity.</li>
+<li>Race resolution depends on trigger-level enforcement; teams must maintain the trigger alongside the application code (no divergence).</li>
+<li><code>RescheduleAction</code> was previously prose-only; this ADR formalises it and creates new typed failures (<code>E-RESCHEDULE-OUTCOME-COMPLETED</code>, etc.) that the Admin workspace must surface.</li>
+</ul>
+<h2 id="open-follow-up">Open follow-up</h2>
+<ul>
+<li>Closed by this ADR: <code>TBC-PACKAGE-CANCEL-01</code> (Round 1 P1-13), <code>ADR 0024</code> open follow-up on package cancellation/entitlement accounting, <code>ADR 0051</code> open follow-up on repeat-request rules and <code>RescheduleAction</code> transition table.</li>
+<li>Carry-forward:</li>
+<li><code>ADR 0092-appointment-outcome-timing.md</code> (Ticket 04) — when no-show terminal semantics shift from 15-minute early-grace to post-session terminal, this ADR's <code>R1</code>/<code>R2</code> outcome-race resolution continues to apply without change (terminal outcome is terminal outcome), but the grace window logic moves.</li>
+<li><code>TBC-STAFF-SESSION-01</code> — Admin workspace UI for surfacing auto-resolved requests, rebound requests, and supersede linkage is <code>TBC-ADMIN-01</code> dependent; this ADR provides the data, not the UI.</li>
+<li><code>TBC-NO-SHOW-01</code> — explicit "early checkpoint vs terminal outcome" decision (Round 1 P1-12) is independent of this matrix but is referenced by <code>R1</code>/<code>R2</code>.</li>
+<li><code>TBC-PACKAGE-01</code> — exact package validity calendar semantics; <code>closed_restored_by_cancellation</code> uses the snapshotted <code>valid_until</code> from <code>OfferSnapshot</code>/<code>PackageValidity</code> per <code>ADR 0055</code>, which already freezes the policy.</li>
+<li>Couple package minor (<code>ADR 0090</code> follow-up) — DEFERRED post-MVP; if a minor-in-couple cancellation ever ships, the consent precondition in §6.2 must extend to guardian consent; out of scope here.</li>
+</ul>
+<h2 id="reference">Reference</h2>
+<ul>
+<li><code>ADR 0024-admin-cancellation-review.md</code> — Admin review intake</li>
+<li><code>ADR 0025-cancellation-pending-reservation.md</code> — pending preserves reservation</li>
+<li><code>ADR 0027-no-show-consumption.md</code> — no_show consumes entitlement by default</li>
+<li><code>ADR 0028-no-show-grace-period.md</code> — 15-minute no-show grace</li>
+<li><code>ADR 0051-cancellation-decision-record.md</code> — append-only CancellationDecision</li>
+<li><code>ADR 0054-outcome-correction-events.md</code> — correction events for outcomes</li>
+<li><code>ADR 0062-restored-entitlement-expiry.md</code> — restored-entitlement expiry policy</li>
+<li><code>ADR 0063-package-refund-at-purchase-level.md</code> — purchase-level refund, no per-entitlement split</li>
+<li><code>ADR 0066-flexible-admin-whatsapp-support.md</code> — WhatsApp optional manual support</li>
+<li><code>ADR 0067-admin-cancellation-refund-workspace.md</code> — Admin workspace</li>
+<li><code>ADR 0076-case-by-case-cancellation.md</code> — no automatic cutoff, Admin case-by-case</li>
+<li><code>ADR 0077-launch-full-or-no-refund.md</code> — <code>full_refund</code>/<code>no_refund</code> only</li>
+<li><code>ADR 0078-one-admin-separate-refund-action.md</code> — one Admin separate actions</li>
+<li><code>ADR 0089-architecture-worker-d1.md</code> — D1 batch transaction model</li>
+<li><code>ADR 0090-couple-participant-model.md</code> — couple package model, withdrawal/no-show/reschedule authority</li>
+<li><code>ADR 0091-capacity-overlap-buffer.md</code> — CapacityReservation transition on cancellation</li>
+<li><code>ADR 0094-intake-eligibility-cutoff.md</code> — booking cutoff (independent of this matrix)</li>
+<li><code>IMPLEMENTATION-GUIDE.md</code> §6.2, §6.3, §6.5, §8.2, §10.1, §11 — patched alongside this ADR</li>
+<li><code>DOMAIN-MODEL.md</code> Lifecycle § — patched alongside this ADR</li>
+<li><code>PRD-GUIDELINE-REVIEW.md</code> Round 1 P1-13, TBC register <code>TBC-PACKAGE-CANCEL-01</code> — closed by this ADR</li>
+<li><code>vault/Projects/Seraya Psikologi/Tickets/Ticket 10 — Package cancellation matrix &amp; outcome race.md</code> — source ticket</li>
+<li><code>vault/Projects/Seraya Psikologi/Tickets/Ticket 04 — No-show timing &amp; late-arrival correction.md</code> — open; not blocking this ADR</li>
+</ul></main><footer>Seraya Psikologi · Documentation generated from the repository · <a href="../../reference/index.html">Long-form reference</a></footer></div></body></html>

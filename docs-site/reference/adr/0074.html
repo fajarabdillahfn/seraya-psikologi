@@ -1,0 +1,49 @@
+<!doctype html><html lang="id"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>ADR 0074 — Seraya Psikologi</title><link rel="stylesheet" href="../../assets/main.css"></head><body><div class="shell"><header class="site-header"><div><a class="brand" href="../../index.html">Seraya Psikologi</a><div class="subtitle">Project control center · MVP review</div></div><nav class="topnav"><a href="../../index.html">Overview</a><a href="../../workboard.html">Workboard</a><a href="../../prd/index.html">Focused PRDs</a><a href="../../reference/index.html">Reference</a></nav></header><div class="muted" style="font-size:.84rem;margin-bottom:18px"><a href="../../index.html">Home</a> / ADR</div><main><h1 id="74-launch-counseling-catalog-and-prices">74. Launch Counseling Catalog and Prices</h1>
+<h2 id="status">Status</h2>
+<p>Accepted for launch planning; prices and package structures are recorded from the business catalog brief. Psychologist assignment, exact availability, venue, validity, and operational policy remain open.</p>
+<h2 id="context">Context</h2>
+<p>SERAYA PULANG launches psychological counseling online and offline, with individual and couple formats. The domain supports concrete ServiceOffering/ServiceOfferingRevision snapshots, single-session Booking, and full-upfront ServicePackage purchases with ordered SessionEntitlement units.</p>
+<h2 id="decision">Decision</h2>
+<p>Use the following initial IDR catalog for launch planning:</p>
+<h3 id="individual-counseling">Individual counseling</h3>
+<ul>
+<li>Online, 60 minutes: <strong>Rp125.000</strong> per session.</li>
+<li>Offline, 60 minutes: <strong>Rp200.000</strong> per session.</li>
+</ul>
+<h3 id="individual-counseling-packages">Individual counseling packages</h3>
+<ul>
+<li>Online, 2 sessions: <strong>Rp235.000</strong>; reference saving Rp15.000.</li>
+<li>Online, 3 sessions: <strong>Rp345.000</strong>; reference saving Rp30.000.</li>
+<li>Offline, 2 sessions: <strong>Rp380.000</strong>; reference saving Rp20.000.</li>
+<li>Offline, 3 sessions: <strong>Rp555.000</strong>; reference saving Rp45.000.</li>
+</ul>
+<h3 id="couple-counseling-package">Couple counseling package</h3>
+<ul>
+<li>Three meetings, online: <strong>Rp350.000</strong>; reference saving Rp25.000.</li>
+<li>Three meetings, offline: <strong>Rp550.000</strong>; reference saving Rp50.000.</li>
+</ul>
+<p>The couple package's planned sequence is:</p>
+<ol>
+<li>individual session for partner A;</li>
+<li>individual session for partner B;</li>
+<li>joint couple session.</li>
+</ol>
+<p>All package purchases are paid in full upfront. The listed price, mode, duration, package count, sequence, and offering revision are snapshotted at purchase. The stated “format and number of sessions may be adjusted based on need and psychologist consideration” is not an authorization to silently mutate a paid package; any change requires an explicit Admin-supported package/appointment resolution, consent where relevant, and an audited record.</p>
+<p>The savings figures are reference catalog copy, not an entitlement-level financial allocation. Refunds remain purchase-level Admin decisions under the existing RefundAction model.</p>
+<h2 id="consequences">Consequences</h2>
+<p>Positive:</p>
+<ul>
+<li>the launch catalog has concrete prices and purchasable variants;</li>
+<li>individual packages map cleanly to sequential entitlements;</li>
+<li>the couple package has an explicit default sequence instead of an ambiguous “three sessions” label;</li>
+<li>historical OfferSnapshot/PackagePurchase values remain stable when catalog prices change.</li>
+</ul>
+<p>Costs and constraints:</p>
+<ul>
+<li>psychologist assignment, price ownership, and availability must be defined before production slots are published;</li>
+<li>couple booking needs participant identity/consent and communication handling without introducing clinical records;</li>
+<li>package validity and cancellation/refund policy still affect the final product behavior;</li>
+<li>offline venue and mode-specific instructions are launch prerequisites.</li>
+</ul>
+<h2 id="open-follow-up">Open follow-up</h2>
+<p>Confirm which psychologist(s) can deliver each variant, mode-specific availability and venue, package validity, couple participant/consent model, booking cutoff, and cancellation/refund policy. Confirm whether “adjusted format/number” is handled only as Admin-created replacement offerings or as a documented package exception flow.</p></main><footer>Seraya Psikologi · Documentation generated from the repository · <a href="../../reference/index.html">Long-form reference</a></footer></div></body></html>

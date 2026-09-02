@@ -1,0 +1,32 @@
+<!doctype html><html lang="id"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>ADR 0052 — Seraya Psikologi</title><link rel="stylesheet" href="../../assets/main.css"></head><body><div class="shell"><header class="site-header"><div><a class="brand" href="../../index.html">Seraya Psikologi</a><div class="subtitle">Project control center · MVP review</div></div><nav class="topnav"><a href="../../index.html">Overview</a><a href="../../workboard.html">Workboard</a><a href="../../prd/index.html">Focused PRDs</a><a href="../../reference/index.html">Reference</a></nav></header><div class="muted" style="font-size:.84rem;margin-bottom:18px"><a href="../../index.html">Home</a> / ADR</div><main><h1 id="52-include-transactional-appointment-reminders">52. Include Transactional Appointment Reminders</h1>
+<h2 id="status">Status</h2>
+<p>Accepted for the MVP working model; Appointment reminder offsets are resolved by ADR 0053 as 24 hours + 2 hours, with Asia/Jakarta rendering and reschedule/cancellation recomputation. Package-expiry offsets, opt-out/mandatory semantics, provider/retry policy, and failure/manual support remain open.</p>
+<h2 id="context">Context</h2>
+<p>Booking confirmation alone is insufficient for an appointment scheduled days/weeks later or for later package sessions. Reminder delivery reduces missed operational commitments without requiring clinical data.</p>
+<h2 id="decision">Decision</h2>
+<p>Include transactional reminders in MVP for:</p>
+<ul>
+<li>upcoming Appointment;</li>
+<li>payment/Booking state where action is needed;</li>
+<li>schedule change/cancellation decision;</li>
+<li>package validity/remaining-session expiry where useful.</li>
+</ul>
+<p>ReminderSchedule/Notification is derived from Appointment/PackagePurchase state and delivered through the email-primary channel. Reschedule, cancellation approval, expiry, or terminal outcome must cancel/recompute pending reminders. Content contains minimum non-clinical details: Seraya identity, service/psychologist as appropriate, local date/time/mode, scoped access link, and support path.</p>
+<p>No marketing campaign or clinical advice notification is included.</p>
+<h2 id="consequences">Consequences</h2>
+<p>Positive:</p>
+<ul>
+<li>fewer missed sessions and clearer guest experience;</li>
+<li>reminder state is explainable/auditable;</li>
+<li>reschedule/cancellation can update notifications safely;</li>
+<li>package clients get help using remaining entitlements.</li>
+</ul>
+<p>Costs and constraints:</p>
+<ul>
+<li>scheduler/outbox and idempotent delivery are needed;</li>
+<li>time-zone and daylight boundary tests are required;</li>
+<li>stale reminder cancellation must be reliable;</li>
+<li>email content must avoid sensitive clinical details.</li>
+</ul>
+<h2 id="open-follow-up">Open follow-up</h2>
+<p>Choose package-expiry reminder offsets, opt-out/mandatory semantics, provider quotas/failure behavior, and manual support fallback. Appointment offsets and timezone source are resolved.</p></main><footer>Seraya Psikologi · Documentation generated from the repository · <a href="../../reference/index.html">Long-form reference</a></footer></div></body></html>

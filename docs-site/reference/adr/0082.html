@@ -1,0 +1,28 @@
+<!doctype html><html lang="id"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>ADR 0082 — Seraya Psikologi</title><link rel="stylesheet" href="../../assets/main.css"></head><body><div class="shell"><header class="site-header"><div><a class="brand" href="../../index.html">Seraya Psikologi</a><div class="subtitle">Project control center · MVP review</div></div><nav class="topnav"><a href="../../index.html">Overview</a><a href="../../workboard.html">Workboard</a><a href="../../prd/index.html">Focused PRDs</a><a href="../../reference/index.html">Reference</a></nav></header><div class="muted" style="font-size:.84rem;margin-bottom:18px"><a href="../../index.html">Home</a> / ADR</div><main><h1 id="82-joint-privacy-and-consent-sign-off">82. Joint Privacy and Consent Sign-off</h1>
+<h2 id="status">Status</h2>
+<p>Accepted for launch planning.</p>
+<h2 id="context">Context</h2>
+<p>Seraya's MVP handles sensitive transactional and contact data around psychological services while intentionally excluding clinical records. Privacy, consent, retention, public clinical wording, and technical controls cross both clinical/ethical and engineering responsibilities.</p>
+<h2 id="decision">Decision</h2>
+<p>Use joint sign-off with distinct ownership:</p>
+<ul>
+<li><strong>Clinical/ethical owner (istri/clinical lead):</strong> consent purpose/wording, public clinical and crisis-boundary wording, professional profile/service claims, client-facing privacy expectations related to psychological services, and ethical suitability of data collection.</li>
+<li><strong>Technical/data owner (user):</strong> data inventory, access control, retention implementation, deletion/redaction/anonymization mechanics, security logging, provider configuration, and technical verification.</li>
+<li><strong>Joint sign-off:</strong> cross-cutting consent/retention policy, launch privacy wording, and any change that alters both clinical meaning and data behavior.</li>
+</ul>
+<p>The PRD records decisions and implementation boundaries; it does not claim external legal approval. External review may be added if the owners decide it is needed, but it is not introduced as an automatic MVP blocker by this ADR.</p>
+<h2 id="consequences">Consequences</h2>
+<p>Positive:</p>
+<ul>
+<li>clinical meaning is not decided by engineering alone;</li>
+<li>technical retention/access behavior is not left implicit in clinical copy;</li>
+<li>sign-off responsibility is visible for future policy changes.</li>
+</ul>
+<p>Costs and constraints:</p>
+<ul>
+<li>some changes require both owners to review;</li>
+<li>unresolved retention/consent choices remain explicit rather than silently defaulted;</li>
+<li>implementation cannot publish clinical/professional claims without the clinical owner sign-off.</li>
+</ul>
+<h2 id="open-follow-up">Open follow-up</h2>
+<p>Set category-specific retention durations/triggers, consent versions/purpose text, PrivacyRequest handling, public privacy copy, and the evidence/checklist used by both owners for launch sign-off.</p></main><footer>Seraya Psikologi · Documentation generated from the repository · <a href="../../reference/index.html">Long-form reference</a></footer></div></body></html>

@@ -1,0 +1,32 @@
+<!doctype html><html lang="id"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>ADR 0005 — Seraya Psikologi</title><link rel="stylesheet" href="../../assets/main.css"></head><body><div class="shell"><header class="site-header"><div><a class="brand" href="../../index.html">Seraya Psikologi</a><div class="subtitle">Project control center · MVP review</div></div><nav class="topnav"><a href="../../index.html">Overview</a><a href="../../workboard.html">Workboard</a><a href="../../prd/index.html">Focused PRDs</a><a href="../../reference/index.html">Reference</a></nav></header><div class="muted" style="font-size:.84rem;margin-bottom:18px"><a href="../../index.html">Home</a> / ADR</div><main><h1 id="5-payment-success-gates-appointment-confirmation">5. Payment Success Gates Appointment Confirmation</h1>
+<h2 id="status">Status</h2>
+<p>Accepted; hold TTL is resolved by ADR 0014, payment truth by ADR 0023, late-success reconciliation by ADR 0059, cancellation review by ADR 0024/0025, and flexible manual WhatsApp support by ADR 0066. Exact Admin resolution/SLA/refund timing remains open.</p>
+<h2 id="context">Context</h2>
+<p>A selected slot must not become a confirmed appointment merely because a browser reached a payment page or redirect URL. Payment gateways can retry, send late webhooks, or disagree temporarily with client-side state. At the same time, an unbounded hold would block availability.</p>
+<h2 id="decision">Decision</h2>
+<p>For self-serve online booking:</p>
+<ol>
+<li>The client selects an AvailabilitySlot.</li>
+<li>The system creates a pending Booking and a time-limited SlotHold.</li>
+<li>The system initiates Payment.</li>
+<li>Only verified, idempotently processed payment success may create/confirm the Appointment.</li>
+<li>Payment failure or hold expiry releases the SlotHold and marks the active checkout/hold attempt expired or non-confirmed. It does not by itself settle Payment, decide the final Booking/Appointment outcome, or classify a later verified PaymentEvent; late success enters an explicit reconciliation/exception flow.</li>
+</ol>
+<p>Frontend redirect success is not sufficient authority. SlotHold TTL is 10 minutes and configurable (ADR 0014); payment truth is a signed, server-verified webhook/PaymentEvent (ADR 0023). Midtrans + Snap is the launch provider/surface under ADR 0068 with QRIS + bank transfer/VA under ADR 0069; method activation, late verified success after expiry, and staff manual-payment exceptions remain open.</p>
+<h2 id="consequences">Consequences</h2>
+<p>Positive:</p>
+<ul>
+<li>the confirmed Appointment has a clear business trigger;</li>
+<li>double booking and false-positive payment states are easier to prevent;</li>
+<li>retries and late webhooks can be handled without creating duplicate appointments;</li>
+<li>payment and appointment histories remain auditable.</li>
+</ul>
+<p>Costs and constraints:</p>
+<ul>
+<li>the system needs an idempotency key and a reconciliation path;</li>
+<li>a payment page may expire while the client still believes they are booking;</li>
+<li>UX must explain hold expiry and offer a safe restart;</li>
+<li>manual/WhatsApp bookings need an explicit state transition rather than an operator-side shortcut.</li>
+</ul>
+<h2 id="open-follow-up">Open follow-up</h2>
+<p>Choose activated payment methods, late-success behavior after expiry, and whether staff can manually confirm an appointment with a recorded payment exception. Midtrans + Snap provider selection is resolved by ADR 0068; provider-specific signature/API verification, refund, and reconciliation details remain separate follow-up.</p></main><footer>Seraya Psikologi · Documentation generated from the repository · <a href="../../reference/index.html">Long-form reference</a></footer></div></body></html>

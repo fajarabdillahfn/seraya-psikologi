@@ -1,0 +1,25 @@
+<!doctype html><html lang="id"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>ADR 0041 — Seraya Psikologi</title><link rel="stylesheet" href="../../assets/main.css"></head><body><div class="shell"><header class="site-header"><div><a class="brand" href="../../index.html">Seraya Psikologi</a><div class="subtitle">Project control center · MVP review</div></div><nav class="topnav"><a href="../../index.html">Overview</a><a href="../../workboard.html">Workboard</a><a href="../../prd/index.html">Focused PRDs</a><a href="../../reference/index.html">Reference</a></nav></header><div class="muted" style="font-size:.84rem;margin-bottom:18px"><a href="../../index.html">Home</a> / ADR</div><main><h1 id="41-apply-a-fifteen-minute-configurable-transition-buffer">41. Apply a Fifteen-minute Configurable Transition Buffer</h1>
+<h2 id="status">Status</h2>
+<p>Accepted for the MVP working model; default 15-minute value, per-offering configuration, overlap/concurrency application, and historical snapshot requirement are resolved by ADR 0041–0043. Exact before/after placement, storage mapping, and future-slot effects remain open.</p>
+<h2 id="context">Context</h2>
+<p>A psychologist's availability window should not be treated as back-to-back appointment capacity without a transition interval. The buffer affects both generated candidate slots and the actual overlap/concurrency invariant; applying it only in UI would permit conflicting bookings.</p>
+<h2 id="decision">Decision</h2>
+<p>Use a default 15-minute TransitionBuffer for ServiceOffering scheduling. Admin may configure the effective buffer per offering. Generation, SlotHold, Appointment overlap checks, and reschedule slot claims must apply the effective buffer. The effective duration and buffer are snapshotted on the relevant Booking/PackagePurchase/Appointment so later offering edits do not rewrite historical schedule semantics.</p>
+<p>The buffer is operational scheduling metadata and does not imply clinical notes.</p>
+<h2 id="consequences">Consequences</h2>
+<p>Positive:</p>
+<ul>
+<li>slot display and booking enforcement agree;</li>
+<li>different offerings can use different operational assumptions;</li>
+<li>reschedule and package later-session flows reuse one invariant;</li>
+<li>historical records remain interpretable after configuration changes.</li>
+</ul>
+<p>Costs and constraints:</p>
+<ul>
+<li>effective-value precedence (Service default vs offering override) is required;</li>
+<li>available capacity may be lower than raw window arithmetic;</li>
+<li>tests must cover boundary-touching intervals and different buffers;</li>
+<li>admin UI must make the effective buffer visible.</li>
+</ul>
+<h2 id="open-follow-up">Open follow-up</h2>
+<p>Define whether the buffer applies before, after, or both sides of an Appointment, exact persistence mapping, and how active/future slots react to changed effective values.</p></main><footer>Seraya Psikologi · Documentation generated from the repository · <a href="../../reference/index.html">Long-form reference</a></footer></div></body></html>

@@ -1,0 +1,25 @@
+<!doctype html><html lang="id"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>ADR 0029 — Seraya Psikologi</title><link rel="stylesheet" href="../../assets/main.css"></head><body><div class="shell"><header class="site-header"><div><a class="brand" href="../../index.html">Seraya Psikologi</a><div class="subtitle">Project control center · MVP review</div></div><nav class="topnav"><a href="../../index.html">Overview</a><a href="../../workboard.html">Workboard</a><a href="../../prd/index.html">Focused PRDs</a><a href="../../reference/index.html">Reference</a></nav></header><div class="muted" style="font-size:.84rem;margin-bottom:18px"><a href="../../index.html">Home</a> / ADR</div><main><h1 id="29-handle-privacy-requests-through-a-manual-workflow">29. Handle Privacy Requests Through a Manual Workflow</h1>
+<h2 id="status">Status</h2>
+<p>Accepted for the MVP working model; retention schedule, verification standard, and policy/legal wording remain open.</p>
+<h2 id="context">Context</h2>
+<p>The MVP stores limited transactional personal data and operational/audit records but does not store clinical records. A client still needs a traceable way to request access, correction, deletion, or restriction. A self-service delete button could erase payment/audit evidence, break package/appointment history, or be abused without identity verification.</p>
+<h2 id="decision">Decision</h2>
+<p>Support PrivacyRequest through manual support/admin workflow. The request must be identity-verified, scoped to the relevant client/contact/booking data, and recorded with request type, decision, applicable retention/legal exception, and the result (access export, correction, redaction, anonymization, or justified retention). Payment reconciliation and required audit evidence are not blindly deleted; the policy determines what can be redacted or minimized.</p>
+<p>The workflow must not collect or retain clinical notes as part of the request.</p>
+<h2 id="consequences">Consequences</h2>
+<p>Positive:</p>
+<ul>
+<li>privacy operations are auditable from the first release;</li>
+<li>destructive actions are deliberate and identity-verified;</li>
+<li>payment/audit integrity is preserved while minimization remains possible;</li>
+<li>no full clinical-record feature is implied.</li>
+</ul>
+<p>Costs and constraints:</p>
+<ul>
+<li>admin workload and response SLA are required;</li>
+<li>retention categories and legal review cannot be skipped;</li>
+<li>export/redaction tools need careful access control;</li>
+<li>support must avoid revealing data before verification.</li>
+</ul>
+<h2 id="open-follow-up">Open follow-up</h2>
+<p>Define request categories, verification steps, retention periods by data class, export format, redaction/anonymization semantics, and escalation/approval authority.</p></main><footer>Seraya Psikologi · Documentation generated from the repository · <a href="../../reference/index.html">Long-form reference</a></footer></div></body></html>

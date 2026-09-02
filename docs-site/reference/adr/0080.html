@@ -1,0 +1,30 @@
+<!doctype html><html lang="id"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>ADR 0080 — Seraya Psikologi</title><link rel="stylesheet" href="../../assets/main.css"></head><body><div class="shell"><header class="site-header"><div><a class="brand" href="../../index.html">Seraya Psikologi</a><div class="subtitle">Project control center · MVP review</div></div><nav class="topnav"><a href="../../index.html">Overview</a><a href="../../workboard.html">Workboard</a><a href="../../prd/index.html">Focused PRDs</a><a href="../../reference/index.html">Reference</a></nav></header><div class="muted" style="font-size:.84rem;margin-bottom:18px"><a href="../../index.html">Home</a> / ADR</div><main><h1 id="80-staff-access-via-google-sso-and-explicit-membership">80. Staff Access via Google SSO and Explicit Membership</h1>
+<h2 id="status">Status</h2>
+<p>Accepted for launch planning.</p>
+<h2 id="context">Context</h2>
+<p>Seraya needs privileged access for Admin and Psychologist roles. A staff identity must not receive permissions merely because it uses a certain email address or logs in through an SSO provider.</p>
+<h2 id="decision">Decision</h2>
+<p>Use <strong>Google SSO</strong> for staff authentication at launch. Access requires all of:</p>
+<ol>
+<li>an Admin-created invite/allowlist entry for the intended identity;</li>
+<li>successful Google authentication;</li>
+<li>an explicit active <code>StaffMembership</code>/<code>RoleAssignment</code> mapping the identity to <code>admin</code> or <code>psychologist</code>.</li>
+</ol>
+<p>Google SSO authentication alone grants no role. Email domain matching, self-signup, self-selected role, or client login does not grant staff access. Editor is not enabled at launch under ADR 0079.</p>
+<p>Role assignment, invite/allowlist changes, activation/deactivation, and privileged actions are audited. Staff authentication/session secrets and provider configuration are not stored in PRD artifacts.</p>
+<h2 id="consequences">Consequences</h2>
+<p>Positive:</p>
+<ul>
+<li>familiar staff sign-in path without a separate password store;</li>
+<li>explicit membership prevents accidental privilege from SSO identity alone;</li>
+<li>role changes are auditable and reversible.</li>
+</ul>
+<p>Costs and constraints:</p>
+<ul>
+<li>launch depends on Google identity availability and account ownership;</li>
+<li>Admin needs an invite/allowlist management path;</li>
+<li>account recovery and break-glass access still require an explicit operational rule;</li>
+<li>client optional Google linking remains separate from staff SSO.</li>
+</ul>
+<h2 id="open-follow-up">Open follow-up</h2>
+<p>Define Admin invite/revocation UI, session lifetime/re-authentication, recovery/break-glass policy, and the minimum initial Admin bootstrap procedure without putting credentials in PRD artifacts.</p></main><footer>Seraya Psikologi · Documentation generated from the repository · <a href="../../reference/index.html">Long-form reference</a></footer></div></body></html>

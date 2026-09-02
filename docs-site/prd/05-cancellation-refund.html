@@ -1,0 +1,26 @@
+<!doctype html><html lang="id"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>PRD 05 — Cancellation &amp; Refund — Seraya Psikologi</title><link rel="stylesheet" href="../assets/main.css"></head><body><div class="shell"><header class="site-header"><div><a class="brand" href="../index.html">Seraya Psikologi</a><div class="subtitle">Project control center · MVP review</div></div><nav class="topnav"><a href="../index.html">Overview</a><a href="../workboard.html">Workboard</a><a href="../prd/index.html">Focused PRDs</a><a href="../reference/index.html">Reference</a></nav></header><div class="muted" style="font-size:.84rem;margin-bottom:18px"><a href="../index.html">Home</a> / Focused PRD</div><main><h1 id="prd-05-cancellation-refund">PRD 05 — Cancellation &amp; Refund</h1>
+<h2 id="locked-business-rule">Locked business rule</h2>
+<ul>
+<li>Client requests cancellation/refund through Admin WhatsApp.</li>
+<li>Website has no public cancellation/refund UI.</li>
+<li>Admin reviews case by case.</li>
+<li>Public refund outcomes are <code>full_refund</code> or <code>no_refund</code> only.</li>
+<li>Refund execution is separate from cancellation approval.</li>
+</ul>
+<h2 id="system-behavior">System behavior</h2>
+<ul>
+<li>CancellationDecision is append-only.</li>
+<li>Pending cancellation preserves the current appointment/reservation.</li>
+<li>Approval and eligible capacity release are one atomic command.</li>
+<li>Refund is a separate audited action.</li>
+<li>Pending-vs-outcome races follow the accepted cancellation matrix.</li>
+</ul>
+<h2 id="acceptance-checks">Acceptance checks</h2>
+<ul>
+<li>No public endpoint lets a client directly mutate cancellation/refund state.</li>
+<li>Admin actions have actor, timestamp, reason, and audit record.</li>
+<li>A repeated command is idempotent.</li>
+<li>Package and appointment targets follow the matrix in ADR 0095.</li>
+</ul>
+<h2 id="next-work">Next work</h2>
+<p>Write the Admin operating procedure and evidence template; do not change the business rule without a new decision.</p></main><footer>Seraya Psikologi · Documentation generated from the repository · <a href="../reference/index.html">Long-form reference</a></footer></div></body></html>

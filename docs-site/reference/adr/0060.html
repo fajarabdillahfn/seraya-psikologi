@@ -1,0 +1,30 @@
+<!doctype html><html lang="id"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>ADR 0060 — Seraya Psikologi</title><link rel="stylesheet" href="../../assets/main.css"></head><body><div class="shell"><header class="site-header"><div><a class="brand" href="../../index.html">Seraya Psikologi</a><div class="subtitle">Project control center · MVP review</div></div><nav class="topnav"><a href="../../index.html">Overview</a><a href="../../workboard.html">Workboard</a><a href="../../prd/index.html">Focused PRDs</a><a href="../../reference/index.html">Reference</a></nav></header><div class="muted" style="font-size:.84rem;margin-bottom:18px"><a href="../../index.html">Home</a> / ADR</div><main><h1 id="60-resolve-package-unavailability-explicitly">60. Resolve Package Unavailability Explicitly</h1>
+<h2 id="status">Status</h2>
+<p>Accepted for the MVP working model; exact SLA, client communication, launch full/no-refund/credit calculation, and transfer eligibility remain open. Partial monetary refunds are deferred beyond launch by ADR 0077.</p>
+<h2 id="context">Context</h2>
+<p>A PackagePurchase is bound to one psychologist and one ServiceOffering. That binding is part of what the client bought; silently moving a package to another psychologist/offering can change fit, consent, price, mode, and expectations. At the same time, illness, leave, departure, or offering archival can make future sessions unavailable.</p>
+<h2 id="decision">Decision</h2>
+<p>Keep the PackagePurchase bound to its original psychologist/ServiceOffering by default. Admin first attempts a replacement schedule within the same offering. If that is not feasible, Admin creates an audited PackageAvailabilityResolution and presents an explicit client-approved option such as:</p>
+<ul>
+<li>full refund or no refund at launch; partial monetary refunds require a future explicit policy;</li>
+<li>credit/extension under policy;</li>
+<li>transfer to another psychologist/offering only as an explicit exception with client approval and updated terms/consent.</li>
+</ul>
+<p>The system must not auto-transfer, auto-assign a different psychologist, or silently rewrite the PackagePurchase binding. Existing completed/consumed history remains tied to the original purchase and entitlement sequence.</p>
+<h2 id="consequences">Consequences</h2>
+<p>Positive:</p>
+<ul>
+<li>package promise and professional choice remain explicit;</li>
+<li>client consent is preserved for cross-psychologist transfer;</li>
+<li>operational unavailability has a first-class path;</li>
+<li>financial and entitlement effects are auditable.</li>
+</ul>
+<p>Costs and constraints:</p>
+<ul>
+<li>Admin support work is required;</li>
+<li>resolution may involve RefundAction, validity extension, or replacement Appointment;</li>
+<li>transfer needs a new OfferSnapshot/terms/consent comparison;</li>
+<li>client communication and SLA become important.</li>
+</ul>
+<h2 id="open-follow-up">Open follow-up</h2>
+<p>Define resolution SLA, eligible events, client response timeout, launch full/no-refund/credit formula, extension semantics, and transfer data/consent workflow. Partial monetary refunds remain deferred.</p></main><footer>Seraya Psikologi · Documentation generated from the repository · <a href="../../reference/index.html">Long-form reference</a></footer></div></body></html>

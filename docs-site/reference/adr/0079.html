@@ -1,0 +1,28 @@
+<!doctype html><html lang="id"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>ADR 0079 — Seraya Psikologi</title><link rel="stylesheet" href="../../assets/main.css"></head><body><div class="shell"><header class="site-header"><div><a class="brand" href="../../index.html">Seraya Psikologi</a><div class="subtitle">Project control center · MVP review</div></div><nav class="topnav"><a href="../../index.html">Overview</a><a href="../../workboard.html">Workboard</a><a href="../../prd/index.html">Focused PRDs</a><a href="../../reference/index.html">Reference</a></nav></header><div class="muted" style="font-size:.84rem;margin-bottom:18px"><a href="../../index.html">Home</a> / ADR</div><main><h1 id="79-launch-with-admin-and-psychologist-staff-roles">79. Launch with Admin and Psychologist Staff Roles</h1>
+<h2 id="status">Status</h2>
+<p>Accepted for launch planning.</p>
+<h2 id="context">Context</h2>
+<p>The technical model includes Admin, Psychologist, and Editor staff capabilities. The launch team currently has one confirmed psychologist and does not need a separate editorial operator to manage public content.</p>
+<h2 id="decision">Decision</h2>
+<p>Active staff roles at launch:</p>
+<ul>
+<li><strong>Admin</strong> — operational owner for catalog, availability, Booking/Appointment, payment/refund, cancellation/reschedule, privacy, staff membership, and protected content;</li>
+<li><strong>Psychologist</strong> — own profile/availability inputs and assigned operational appointment/outcome actions within the existing minimum-data boundary.</li>
+</ul>
+<p><strong>Editor</strong> remains a future-capable role but is not active/assigned at launch. Admin handles narrative content publication and protected catalog/professional changes until an Editor is explicitly invited and enabled.</p>
+<p>Visitor and guest ClientAccess remain public/client capabilities, not staff roles. No staff member self-claims a role through SSO or email domain.</p>
+<h2 id="consequences">Consequences</h2>
+<p>Positive:</p>
+<ul>
+<li>smaller permission surface for launch;</li>
+<li>clear separation between operational Admin and own-work Psychologist access;</li>
+<li>no unused editorial privilege is granted before needed.</li>
+</ul>
+<p>Costs and constraints:</p>
+<ul>
+<li>Admin carries content-publishing workload;</li>
+<li>adding an Editor later requires explicit StaffMembership/RoleAssignment and permission review;</li>
+<li>role assignment and removal must be audited.</li>
+</ul>
+<h2 id="open-follow-up">Open follow-up</h2>
+<p>Choose staff identity provider/invite flow, Admin recovery/break-glass policy, exact Psychologist visibility/actions, and the explicit conditions for enabling Editor later.</p></main><footer>Seraya Psikologi · Documentation generated from the repository · <a href="../../reference/index.html">Long-form reference</a></footer></div></body></html>

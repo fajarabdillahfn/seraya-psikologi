@@ -1,0 +1,25 @@
+<!doctype html><html lang="id"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>ADR 0010 — Seraya Psikologi</title><link rel="stylesheet" href="../../assets/main.css"></head><body><div class="shell"><header class="site-header"><div><a class="brand" href="../../index.html">Seraya Psikologi</a><div class="subtitle">Project control center · MVP review</div></div><nav class="topnav"><a href="../../index.html">Overview</a><a href="../../workboard.html">Workboard</a><a href="../../prd/index.html">Focused PRDs</a><a href="../../reference/index.html">Reference</a></nav></header><div class="muted" style="font-size:.84rem;margin-bottom:18px"><a href="../../index.html">Home</a> / ADR</div><main><h1 id="10-start-with-one-versioned-global-cancellation-policy">10. Start with One Versioned Global Cancellation Policy</h1>
+<h2 id="status">Status</h2>
+<p>Accepted for the MVP working model; launch uses no automatic cutoff and Admin case-by-case review with full/no-refund outcomes. Partial refunds and percentages are deferred; exact provider capabilities remain implementation verification.</p>
+<h2 id="context">Context</h2>
+<p>Cancellation and refund behavior affects Booking, Appointment, Payment, notifications, and staff operations. Allowing every service or psychologist to define separate rules before the business has proven the need would multiply edge cases and make the public policy difficult to explain.</p>
+<h2 id="decision">Decision</h2>
+<p>Use one configurable global CancellationPolicy for MVP. Version the policy; when a Booking/Appointment is created or confirmed, record the policy version that applies. Staff may have an explicitly audited override path for exceptional cases.</p>
+<p>The policy uses no automatic cutoff for launch. Admin reviews requests case-by-case, records a versioned policy reference, and may approve/deny cancellation. RefundAction is separate and launch-limited to full_refund/no_refund; partial outcomes require a future policy.</p>
+<h2 id="consequences">Consequences</h2>
+<p>Positive:</p>
+<ul>
+<li>one public policy to explain and test;</li>
+<li>consistent automation across services and psychologists;</li>
+<li>historical transactions retain the rule version used;</li>
+<li>exceptions are visible as overrides instead of hidden manual edits.</li>
+</ul>
+<p>Costs and constraints:</p>
+<ul>
+<li>a policy change requires versioning and effective-date semantics;</li>
+<li>admin override permissions and audit entries are required;</li>
+<li>future per-service rules may require a migration from global policy references;</li>
+<li>refund gateway support and reconciliation remain necessary.</li>
+</ul>
+<h2 id="open-follow-up">Open follow-up</h2>
+<p>Define policy version/effective-date semantics, Admin exception authority, and package credit/extension handling. Launch full/no-refund behavior is resolved; partial monetary refunds require a future explicit policy.</p></main><footer>Seraya Psikologi · Documentation generated from the repository · <a href="../../reference/index.html">Long-form reference</a></footer></div></body></html>

@@ -1,0 +1,35 @@
+<!doctype html><html lang="id"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>ADR 0008 — Seraya Psikologi</title><link rel="stylesheet" href="../../assets/main.css"></head><body><div class="shell"><header class="site-header"><div><a class="brand" href="../../index.html">Seraya Psikologi</a><div class="subtitle">Project control center · MVP review</div></div><nav class="topnav"><a href="../../index.html">Overview</a><a href="../../workboard.html">Workboard</a><a href="../../prd/index.html">Focused PRDs</a><a href="../../reference/index.html">Reference</a></nav></header><div class="muted" style="font-size:.84rem;margin-bottom:18px"><a href="../../index.html">Home</a> / ADR</div><main><h1 id="8-store-versioned-consent-records-per-purpose">8. Store Versioned Consent Records per Purpose</h1>
+<h2 id="status">Status</h2>
+<p>Accepted for the MVP working model; exact purposes, legal wording, retention, and withdrawal semantics require policy/legal review.</p>
+<h2 id="context">Context</h2>
+<p>The website handles personal/contact data, booking/payment, and potentially sensitive mental-health context even though clinical records are out of scope. A single mutable <code>consent=true</code> field cannot prove which notice was accepted, for what purpose, or under which version.</p>
+<p>Marketing consent also has a different purpose from the consent needed to process a booking and should not be bundled into one checkbox.</p>
+<h2 id="decision">Decision</h2>
+<p>Model ConsentRecord as a separate, append-oriented record containing at least:</p>
+<ul>
+<li>purpose;</li>
+<li>policy or notice version/reference;</li>
+<li>accepted/withdrawn action as applicable;</li>
+<li>timestamp;</li>
+<li>actor or ClientAccess context;</li>
+<li>source/channel;</li>
+<li>relation to the relevant client/booking flow.</li>
+</ul>
+<p>Required transactional/privacy consent and optional marketing consent are separate purposes. A Booking may require the relevant ConsentRecords before proceeding, but consent history is not flattened into one mutable Booking boolean.</p>
+<h2 id="consequences">Consequences</h2>
+<p>Positive:</p>
+<ul>
+<li>consent evidence is auditable and version-aware;</li>
+<li>policy updates do not rewrite historical acceptance;</li>
+<li>marketing opt-in can be managed independently;</li>
+<li>privacy review has an explicit data object and lifecycle.</li>
+</ul>
+<p>Costs and constraints:</p>
+<ul>
+<li>purpose taxonomy and withdrawal behavior need policy decisions;</li>
+<li>records may be append-only or require a carefully defined correction path;</li>
+<li>UX must make purposes understandable rather than hiding them in one checkbox;</li>
+<li>deletion/export rules must account for consent evidence.</li>
+</ul>
+<h2 id="open-follow-up">Open follow-up</h2>
+<p>Define the initial consent purposes, whether withdrawal affects future bookings only, which version/reference is stored, and who may view consent records.</p></main><footer>Seraya Psikologi · Documentation generated from the repository · <a href="../../reference/index.html">Long-form reference</a></footer></div></body></html>

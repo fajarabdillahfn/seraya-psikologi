@@ -1,0 +1,25 @@
+<!doctype html><html lang="id"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>ADR 0049 — Seraya Psikologi</title><link rel="stylesheet" href="../../assets/main.css"></head><body><div class="shell"><header class="site-header"><div><a class="brand" href="../../index.html">Seraya Psikologi</a><div class="subtitle">Project control center · MVP review</div></div><nav class="topnav"><a href="../../index.html">Overview</a><a href="../../workboard.html">Workboard</a><a href="../../prd/index.html">Focused PRDs</a><a href="../../reference/index.html">Reference</a></nav></header><div class="muted" style="font-size:.84rem;margin-bottom:18px"><a href="../../index.html">Home</a> / ADR</div><main><h1 id="49-keep-crisis-handling-outside-the-booking-domain">49. Keep Crisis Handling Outside the Booking Domain</h1>
+<h2 id="status">Status</h2>
+<p>Accepted for the MVP working model; exact notice copy, referral resources, localization, and content ownership require policy/professional review.</p>
+<h2 id="context">Context</h2>
+<p>A booking/payment system is not a crisis response or clinical triage system. Collecting crisis disclosures or automated screening would create a different clinical/safety boundary than the transactional MVP and could mislead a person about response guarantees.</p>
+<h2 id="decision">Decision</h2>
+<p>Provide a static, versioned CrisisNotice/referral content path in public UX and relevant booking context. It clearly states that Seraya booking is not emergency/crisis response and points to appropriate local emergency/support resources. Do not collect crisis narratives, implement automated triage, score risk, or create crisis escalation records in the booking MVP.</p>
+<p>If a person contacts support manually, staff use an out-of-band operational procedure; that interaction is not silently stored as a clinical record in this MVP.</p>
+<h2 id="consequences">Consequences</h2>
+<p>Positive:</p>
+<ul>
+<li>domain boundary stays transactional rather than clinical;</li>
+<li>copy can set realistic expectations;</li>
+<li>no automated safety claims are implied;</li>
+<li>clinical record scope remains explicit.</li>
+</ul>
+<p>Costs and constraints:</p>
+<ul>
+<li>notice/referral content needs professional/policy ownership;</li>
+<li>public and booking flows must not hide the notice;</li>
+<li>manual support needs a separate operating procedure;</li>
+<li>future clinical expansion would require a new scope decision, not an ad hoc field.</li>
+</ul>
+<h2 id="open-follow-up">Open follow-up</h2>
+<p>Define notice placement/versioning, local resources, after-hours wording, and content owner/reviewer.</p></main><footer>Seraya Psikologi · Documentation generated from the repository · <a href="../../reference/index.html">Long-form reference</a></footer></div></body></html>

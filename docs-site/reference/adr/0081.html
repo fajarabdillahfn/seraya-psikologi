@@ -1,0 +1,30 @@
+<!doctype html><html lang="id"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>ADR 0081 — Seraya Psikologi</title><link rel="stylesheet" href="../../assets/main.css"></head><body><div class="shell"><header class="site-header"><div><a class="brand" href="../../index.html">Seraya Psikologi</a><div class="subtitle">Project control center · MVP review</div></div><nav class="topnav"><a href="../../index.html">Overview</a><a href="../../workboard.html">Workboard</a><a href="../../prd/index.html">Focused PRDs</a><a href="../../reference/index.html">Reference</a></nav></header><div class="muted" style="font-size:.84rem;margin-bottom:18px"><a href="../../index.html">Home</a> / ADR</div><main><h1 id="81-bootstrap-two-admins-for-recovery">81. Bootstrap Two Admins for Recovery</h1>
+<h2 id="status">Status</h2>
+<p>Accepted for launch planning.</p>
+<h2 id="context">Context</h2>
+<p>Staff access uses Google SSO plus explicit StaffMembership. A single Admin would create an avoidable operational dependency for invite/revoke and recovery, while a full break-glass system is unnecessary for the MVP.</p>
+<h2 id="decision">Decision</h2>
+<p>Bootstrap <strong>two active Admin StaffMemberships</strong> at launch. Either Admin may:</p>
+<ul>
+<li>invite/allowlist a staff identity;</li>
+<li>assign or revoke an active <code>StaffMembership</code>/RoleAssignment;</li>
+<li>deactivate the other Admin's staff access when there is a documented security/ownership reason;</li>
+<li>perform the existing Admin operational actions subject to audit.</li>
+</ul>
+<p>No password fallback, shared account, credential copy, or undocumented bypass is introduced. Google account recovery remains the identity provider's responsibility; application-level staff recovery uses the other active Admin to restore/revoke membership. If both Admins lose access, the owner follows a separately maintained operational recovery runbook; its secrets are never stored in PRD artifacts.</p>
+<h2 id="consequences">Consequences</h2>
+<p>Positive:</p>
+<ul>
+<li>avoids a single Admin access dependency;</li>
+<li>invite/revoke and staff recovery remain possible without a privileged backdoor;</li>
+<li>role changes remain explicit and audited.</li>
+</ul>
+<p>Costs and constraints:</p>
+<ul>
+<li>two trusted Admin identities must be selected and maintained;</li>
+<li>each Admin has broad operational authority;</li>
+<li>deactivating the other Admin needs a reason/audit record;</li>
+<li>recovery runbook ownership remains an operational task outside the PRD.</li>
+</ul>
+<h2 id="open-follow-up">Open follow-up</h2>
+<p>Record the two Admin StaffMemberships during implementation/bootstrap, define re-authentication/session expiry, and maintain the owner recovery runbook outside source/PRD artifacts.</p></main><footer>Seraya Psikologi · Documentation generated from the repository · <a href="../../reference/index.html">Long-form reference</a></footer></div></body></html>

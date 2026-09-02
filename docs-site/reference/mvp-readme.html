@@ -1,0 +1,183 @@
+<!doctype html><html lang="id"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>MVP README — Seraya Psikologi</title><link rel="stylesheet" href="../assets/main.css"></head><body><div class="shell"><header class="site-header"><div><a class="brand" href="../index.html">Seraya Psikologi</a><div class="subtitle">Project control center · MVP review</div></div><nav class="topnav"><a href="../index.html">Overview</a><a href="../workboard.html">Workboard</a><a href="../prd/index.html">Focused PRDs</a><a href="../reference/index.html">Reference</a></nav></header><div class="muted" style="font-size:.84rem;margin-bottom:18px"><a href="../index.html">Home</a> / MVP README</div><main><h1 id="mvp-limitations-and-production-gate">MVP Limitations and Production Gate</h1>
+<blockquote>
+<p>Status: <strong>MVP skeleton code</strong> — <strong>not production ready</strong>. This document lists every limitation the user must address before flipping the production switch.</p>
+<p>Per user instruction (2026-08-31): authorization, payment integration, and any other live-service dependency are placeholder. They are not blockers for the MVP skeleton because the business scope and architecture are locked; they are blockers for <strong>production traffic</strong>.</p>
+</blockquote>
+<h2 id="1-architecture-and-persistence-locked-by-adr-0089">1. Architecture and persistence (locked by ADR 0089)</h2>
+<ul>
+<li><strong>Runtime</strong>: Cloudflare Worker (TypeScript, <code>nodejs_compat</code>).</li>
+<li><strong>Database</strong>: Cloudflare D1 (single regional primary + global read replicas).</li>
+<li><strong>PersistenceAdapter</strong>: single seam in <code>app/src/persistence/adapter.ts</code>; D1 implementation in <code>d1-adapter.ts</code>. Future Postgres rewrite touches only the adapter.</li>
+</ul>
+<p>To deploy:
+1. <code>wrangler d1 create seraya-db</code> → copy <code>database_id</code> into <code>wrangler.toml</code>.
+2. <code>wrangler d1 migrations apply seraya-db --remote</code>.
+3. <code>wrangler deploy</code>.</p>
+<p>Migration is in <code>app/migrations/0001_init.sql</code> and references ADRs 0089–0095 (couple participant, capacity overlap, no-show timing, settlement uniqueness, intake schema, package cancellation).</p>
+<h2 id="2-authorization-placeholder-per-user-instruction">2. Authorization (placeholder, per user instruction)</h2>
+<ul>
+<li><strong>Public routes</strong>: <code>/</code>, <code>/pulang</code>, <code>/about</code>, <code>/fuja</code>, <code>/faq</code>, <code>/safety/crisis</code>, <code>/privacy</code>, <code>/consent</code>, <code>/cancellation</code>, <code>/book/*</code> — open to all.</li>
+<li><strong>Admin routes</strong>: <code>/admin/*</code> are gated behind <code>ALLOW_PLACEHOLDER_ADMIN_AUTH=true</code> env flag. <strong>Production must remove this flag</strong> and integrate:</li>
+<li>Google SSO verification per ADR 0080 (<code>google_subject</code> claim → StaffMembership lookup).</li>
+<li>StaffMembership bootstrap with two Admin per ADR 0081.</li>
+<li>Role check per ADR 0079 (<code>admin</code> / <code>psychologist</code>).</li>
+<li>Two-Admin invariant for staff invite/revoke (TBC-STAFF-SESSION-01).</li>
+</ul>
+<h2 id="3-payment-integration-whatsapp-manual-adr-0097">3. Payment integration (WhatsApp manual, ADR 0097)</h2>
+<p>The payment flow is <strong>manual, Admin-verified</strong> — no automated payment gateway is in scope for the MVP.</p>
+<ul>
+<li>After booking intake, <code>booking.state = 'pending_manual_payment'</code>.</li>
+<li>The Worker renders a confirmation page with:</li>
+<li>Downloadable <strong>invoice PDF</strong> (<code>/api/booking/:id/invoice.pdf</code>)</li>
+<li>Plain-text invoice (<code>/api/booking/:id/invoice.txt</code>)</li>
+<li>A WhatsApp deep-link (<code>https://wa.me/&lt;ADMIN_NUMBER&gt;?text=...</code>) the client taps to send the proof.</li>
+<li>The Admin's WhatsApp number (set via <code>ADMIN_WHATSAPP_NUMBER</code> var).</li>
+<li>The client pays via bank transfer or QRIS, then sends the screenshot/slip to Admin on WhatsApp.</li>
+<li>Admin opens <code>/admin/payments</code>, reviews each <code>payment_proof</code>, and either:</li>
+<li><strong>verify</strong> (<code>/api/payment/manual/verify</code> with <code>status=verified</code>) → atomic flip of <code>payment_proof.status='verified'</code> AND <code>booking.state='confirmed'</code>.</li>
+<li><strong>reject</strong> (<code>status=rejected</code>) → atomic flip of <code>payment_proof.status='rejected'</code> AND <code>booking.state='cancelled'</code>.</li>
+</ul>
+<p>Both transitions are <strong>idempotent</strong> (re-applying the same terminal status is a no-op) and <strong>atomic</strong> (single <code>db.batch</code>).</p>
+<p>Key files:
+- <code>app/src/modules/payment.ts</code> — <code>WhatsAppManualPaymentModule</code> (generator, recordPayment, verifyPayment, listPendingPayments).
+- <code>app/src/modules/admin.ts</code> — <code>markAsPaid</code>, <code>rejectPayment</code>, <code>listPendingPayments</code>.
+- <code>app/src/modules/booking.ts</code> — <code>confirmPayment</code> for the booking-side state flip.
+- <code>app/migrations/0002_payment_proof.sql</code> — <code>payment_proof</code> table schema.</p>
+<h3 id="pre-adr-0097-legacy-midtrans-path-removed">Pre-ADR 0097 (legacy Midtrans path, removed)</h3>
+<p>The previous <code>app/src/adapters/midtrans-snap.ts</code> (placeholder Midtrans Snap adapter) and the <code>payment</code> table webhook flow (<code>/api/payment/notification</code>, <code>applyVerifiedPaymentEvent</code>, <code>executeRefundAction</code>) have been <strong>removed entirely</strong>. The <code>payment</code> table is retained for read-only audit of any pre-existing settled rows. New bookings go through <code>payment_proof</code> only.</p>
+<h2 id="4-notification-and-email-placeholder">4. Notification and email (placeholder)</h2>
+<ul>
+<li>The Worker does not call any email provider in this skeleton.</li>
+<li><code>Notification</code> and <code>DeliveryAttempt</code> tables exist in the migration; the Worker just inserts rows. TBC-NOTIFY-01 covers provider integration.</li>
+</ul>
+<h2 id="5-contentcms-placeholder">5. Content/CMS (placeholder)</h2>
+<ul>
+<li><code>ContentEntry</code> and <code>ContentRevision</code> tables exist; Admin CMS is not implemented.</li>
+<li>Public pages render from inline views in <code>app/src/views/index.ts</code>. Move content to <code>content_entry</code> rows before launch.</li>
+</ul>
+<h2 id="6-crisis-privacy-consent-cancellation-copy-placeholder-wording">6. Crisis, privacy, consent, cancellation copy (placeholder wording)</h2>
+<ul>
+<li>All public-facing copy for <code>/safety/crisis</code>, <code>/privacy</code>, <code>/consent</code>, <code>/cancellation</code> is a <strong>placeholder</strong> intended to match the locked business scope. Final wording requires:</li>
+<li>Clinical/ethics sign-off (TBC-CONSENT-01).</li>
+<li>Privacy review (TBC-PRIVACY-01).</li>
+<li>Legal review for terms of service and refund policy.</li>
+</ul>
+<h2 id="7-couple-booking-launch-deferred-pending-adr-0090">7. Couple booking (launch-deferred pending ADR 0090)</h2>
+<ul>
+<li>The couple package is <strong>modeled</strong> end-to-end (<code>BookingParticipant</code>, <code>AppointmentParticipant</code>, <code>joint_attendees</code>), but the public page surfaces a "coming soon" badge.</li>
+<li>To launch couple booking: complete TBC-COUPLE-LAUNCH-01 (additional clinical/ethics sign-off on joint-session consent wording, and Admin workspace support for couple-package cancellation).</li>
+</ul>
+<h2 id="8-what-is-locked-do-not-re-open-without-a-new-adr">8. What is locked (do not re-open without a new ADR)</h2>
+<table>
+<thead>
+<tr>
+<th>Decision</th>
+<th>ADR</th>
+<th>Authority</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Stack: Cloudflare Worker + D1</td>
+<td>ADR 0089</td>
+<td>Locked</td>
+</tr>
+<tr>
+<td>Cancellation/refund handled by Admin WhatsApp only</td>
+<td>Round 3 + ADR 0076/0077</td>
+<td>Locked</td>
+</tr>
+<tr>
+<td>Refund outcomes only <code>full_refund</code> / <code>no_refund</code></td>
+<td>ADR 0077/0093</td>
+<td>Locked</td>
+</tr>
+<tr>
+<td>Capacity grid 30 min, symmetric TransitionBuffer</td>
+<td>ADR 0091</td>
+<td>Locked</td>
+</tr>
+<tr>
+<td>No-show early checkpoint T+15m, correction window 7×24h</td>
+<td>ADR 0092</td>
+<td>Locked</td>
+</tr>
+<tr>
+<td>At-most-one settled Payment per Booking</td>
+<td>ADR 0093</td>
+<td>Locked</td>
+</tr>
+<tr>
+<td>Intake: Nama + Email + optional Phone + Consent</td>
+<td>ADR 0094</td>
+<td>Locked</td>
+</tr>
+<tr>
+<td>Couple BookingParticipant/AppointmentParticipant</td>
+<td>ADR 0090</td>
+<td>Locked</td>
+</tr>
+<tr>
+<td>Package cancellation matrix R1–R4</td>
+<td>ADR 0095</td>
+<td>Locked</td>
+</tr>
+<tr>
+<td>Launch gate G-1..G-14 with owners</td>
+<td>ADR 0096</td>
+<td>Locked</td>
+</tr>
+</tbody>
+</table>
+<h2 id="9-what-is-operational-must-be-done-before-production-but-not-architecture-changes">9. What is <strong>operational</strong> (must be done before production, but not architecture changes)</h2>
+<ol>
+<li><strong>Staff bootstrap</strong>: record two Admin StaffMemberships per ADR 0081.</li>
+<li><strong>Profile evidence</strong>: verify Fuja's STR/SILP and obtain publication consent.</li>
+<li><strong>Real availability</strong>: replace <code>anytime/anyplace</code> placeholder with Fuja's recurring schedule and offline venue (TBC-SCHEDULE-01).</li>
+<li><strong>Approved consent/privacy copy</strong>: clinical/ethics sign-off on the placeholder text in <code>app/src/views/index.ts</code>.</li>
+<li><strong>WhatsApp payment onboarding</strong>: confirm Admin WhatsApp number, bank account details, and QRIS image URL are set in <code>wrangler.toml</code> <code>[vars]</code> (TBC-PAY-01 replaced by ADR 0097 manual flow).</li>
+<li><strong>Email provider</strong>: choose provider, set sender domain, and write template copy (TBC-NOTIFY-01).</li>
+<li><strong>Backup/restore drill</strong>: pre-launch snapshot export via <code>wrangler d1 export</code>; restore drill.</li>
+<li><strong>Runbook</strong>: cancellation handling, WhatsApp payment verification turnaround, refund failure recovery.</li>
+</ol>
+<p>Each gate G-1..G-14 in ADR 0096 maps to one of the above.</p>
+<h2 id="10-folder-layout">10. Folder layout</h2>
+<pre><code>seraya-psikologi-mvp/
+├── package.json                # Worker + Hono + Vitest + wrangler
+├── wrangler.toml               # CF Worker + D1 binding (PLACEHOLDER db_id)
+├── tsconfig.json
+├── README.md                   # (this file)
+├── app/
+│   ├── migrations/
+│   │   └── 0001_init.sql       # D1 schema baseline (post ADR 0089–0095)
+│   ├── public/
+│   │   └── (placeholder, Worker serves inline CSS)
+│   └── src/
+│       ├── worker/index.ts     # Hono router; public + booking + admin + webhook
+│   │   ├── modules/            # catalog, availability, booking, payment, admin
+│   │   ├── adapters/           # (legacy Midtrans adapter removed per ADR 0097)
+│   │   ├── persistence/        # PersistenceAdapter + D1 driver
+│   │   ├── domain/types.ts     # shared vocabulary
+│   │   └── views/index.ts      # SSR HTML helpers
+│   └── migrations/
+│       ├── 0001_init.sql       # D1 schema baseline (post ADR 0089–0095)
+│       └── 0002_payment_proof.sql # payment_proof table (ADR 0097)
+└── tests/
+    ├── unit/                   # (empty; place pure-policy tests here)
+    └── integration/            # (empty; place D1/Miniflare tests here)
+</code></pre>
+<h2 id="11-how-to-run-locally">11. How to run locally</h2>
+<ol>
+<li>Install deps: <code>pnpm install</code> (or <code>npm install</code>).</li>
+<li>Apply migrations: <code>pnpm migrate:local</code>.</li>
+<li>Start Worker: <code>pnpm dev</code>. Open <code>http://localhost:8787</code>.</li>
+<li>Admin (placeholder): set <code>ALLOW_PLACEHOLDER_ADMIN_AUTH=true</code> in <code>.dev.vars</code>, then visit <code>/admin</code>.</li>
+</ol>
+<p>Local DB is a fresh D1 binding. Seed data is <strong>not</strong> included; minimal seed script under <code>scripts/seed.mjs</code> is referenced in <code>package.json</code> but not implemented (TBC).</p>
+<h2 id="12-verification-artifacts-already-produced">12. Verification artifacts (already produced)</h2>
+<ul>
+<li><code>docs/adr/0089–0096</code> — eight ADRs covering all top-priority ticket closures.</li>
+<li><code>docs/IMPLEMENTATION-GUIDE.md</code>, <code>docs/DOMAIN-MODEL.md</code>, <code>docs/CONTEXT.md</code> — patched and consistent with the ADRs.</li>
+<li><code>docs/PRD-GUIDELINE-REVIEW.md</code> — 1,075 lines, Round 1–6 closure summary.</li>
+<li><code>output/seraya-psikologi-prd-review-001.zip</code> — review bundle (125 members, 96 ADR, MVP skeleton files).</li>
+</ul></main><footer>Seraya Psikologi · Documentation generated from the repository · <a href="../reference/index.html">Long-form reference</a></footer></div></body></html>

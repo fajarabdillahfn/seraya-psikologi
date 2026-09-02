@@ -1,0 +1,25 @@
+<!doctype html><html lang="id"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>ADR 0045 — Seraya Psikologi</title><link rel="stylesheet" href="../../assets/main.css"></head><body><div class="shell"><header class="site-header"><div><a class="brand" href="../../index.html">Seraya Psikologi</a><div class="subtitle">Project control center · MVP review</div></div><nav class="topnav"><a href="../../index.html">Overview</a><a href="../../workboard.html">Workboard</a><a href="../../prd/index.html">Focused PRDs</a><a href="../../reference/index.html">Reference</a></nav></header><div class="muted" style="font-size:.84rem;margin-bottom:18px"><a href="../../index.html">Home</a> / ADR</div><main><h1 id="45-version-published-serviceoffering-changes">45. Version Published ServiceOffering Changes</h1>
+<h2 id="status">Status</h2>
+<p>Accepted for the MVP working model; immutable revisions and preservation of held/booked historical source are resolved by ADR 0045/0061. Exact revision activation time, rollback validation, and CMS-content relationship remain open.</p>
+<h2 id="context">Context</h2>
+<p>A published ServiceOffering can change price, duration, mode, or TransitionBuffer. In-place mutation risks applying new values to future slots or admin screens without preserving which configuration created a historical Appointment. OfferSnapshot protects transactions, but availability and public audit also need a stable configuration revision.</p>
+<h2 id="decision">Decision</h2>
+<p>Treat each published configuration as an immutable ServiceOfferingRevision under the stable ServiceOffering identity. A revision contains effective approved booking values and relevant policy references. New revisions are used for future slot generation and new OfferSnapshots after activation. Existing held/Appointment-linked AvailabilitySlot records retain their revision/snapshot; unheld future slots may be retained, regenerated, or withdrawn under ADR 0061, but are not silently migrated into a different historical transaction.</p>
+<p>Draft edits may be changed before publication. Publishing creates/activates a new revision; rollback means activating an existing compatible revision through an audited admin action, not mutating the old revision.</p>
+<h2 id="consequences">Consequences</h2>
+<p>Positive:</p>
+<ul>
+<li>public identity can remain stable while configuration history is preserved;</li>
+<li>future availability has a clear source revision;</li>
+<li>transactions and historical appointments remain interpretable;</li>
+<li>rollback is explicit and auditable.</li>
+</ul>
+<p>Costs and constraints:</p>
+<ul>
+<li>revision activation and future-slot generation need idempotency;</li>
+<li>changes to duration/buffer can create incompatible future slots;</li>
+<li>admin UI must show active/future revision impact;</li>
+<li>archival and offering lifecycle need clear revision semantics.</li>
+</ul>
+<h2 id="open-follow-up">Open follow-up</h2>
+<p>Define revision activation time, rollback validation, client/admin messaging for withdrawn future slots, and whether copy/content changes share this revision or use CMS ContentRevision. Future unheld/held/booked handling is resolved by ADR 0061.</p></main><footer>Seraya Psikologi · Documentation generated from the repository · <a href="../../reference/index.html">Long-form reference</a></footer></div></body></html>

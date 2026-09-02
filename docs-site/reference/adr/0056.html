@@ -1,0 +1,25 @@
+<!doctype html><html lang="id"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>ADR 0056 — Seraya Psikologi</title><link rel="stylesheet" href="../../assets/main.css"></head><body><div class="shell"><header class="site-header"><div><a class="brand" href="../../index.html">Seraya Psikologi</a><div class="subtitle">Project control center · MVP review</div></div><nav class="topnav"><a href="../../index.html">Overview</a><a href="../../workboard.html">Workboard</a><a href="../../prd/index.html">Focused PRDs</a><a href="../../reference/index.html">Reference</a></nav></header><div class="muted" style="font-size:.84rem;margin-bottom:18px"><a href="../../index.html">Home</a> / ADR</div><main><h1 id="56-model-retention-by-transactional-data-category">56. Model Retention by Transactional Data Category</h1>
+<h2 id="status">Status</h2>
+<p>Accepted for the MVP working model; exact durations, legal basis, anonymization strategy, and policy owner remain open.</p>
+<h2 id="context">Context</h2>
+<p>Transactional data categories have different purposes and constraints. Payment/refund reconciliation, Booking/Appointment operations, Client contact, ConsentRecord, Notification delivery, and Audit metadata should not be forced into one retention number or deletion behavior.</p>
+<h2 id="decision">Decision</h2>
+<p>Represent retention as versioned RetentionPolicy per data category. A policy defines category, purpose, retention duration/trigger, deletion/anonymization action, legal/operational exception, owner, and effective version. PrivacyRequest records which policy/exception was applied. Payment/audit integrity must not be destroyed by a generic client deletion action; where deletion is approved, the system applies the category-specific redaction/anonymization behavior and retains only what the active policy permits.</p>
+<p>No clinical category is introduced by this decision; clinical records remain out of MVP scope.</p>
+<h2 id="consequences">Consequences</h2>
+<p>Positive:</p>
+<ul>
+<li>retention behavior is explicit and reviewable;</li>
+<li>privacy requests can explain why data is retained/redacted;</li>
+<li>financial/audit needs are separated from contact/notification data;</li>
+<li>policy changes can be versioned without rewriting history.</li>
+</ul>
+<p>Costs and constraints:</p>
+<ul>
+<li>a policy owner and enforcement job/process are needed;</li>
+<li>references between redacted records must remain safe;</li>
+<li>legal review is required for actual durations/grounds;</li>
+<li>test fixtures must cover expiry/anonymization without exposing secrets or clinical data.</li>
+</ul>
+<h2 id="open-follow-up">Open follow-up</h2>
+<p>Define data categories, actual durations/triggers, legal owner, anonymization fields, execution cadence, and reporting after redaction.</p></main><footer>Seraya Psikologi · Documentation generated from the repository · <a href="../../reference/index.html">Long-form reference</a></footer></div></body></html>

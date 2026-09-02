@@ -1,0 +1,30 @@
+<!doctype html><html lang="id"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>ADR 0003 — Seraya Psikologi</title><link rel="stylesheet" href="../../assets/main.css"></head><body><div class="shell"><header class="site-header"><div><a class="brand" href="../../index.html">Seraya Psikologi</a><div class="subtitle">Project control center · MVP review</div></div><nav class="topnav"><a href="../../index.html">Overview</a><a href="../../workboard.html">Workboard</a><a href="../../prd/index.html">Focused PRDs</a><a href="../../reference/index.html">Reference</a></nav></header><div class="muted" style="font-size:.84rem;margin-bottom:18px"><a href="../../index.html">Home</a> / ADR</div><main><h1 id="3-use-shared-services-with-psychologist-level-offerings">3. Use Shared Services with Psychologist-level Offerings</h1>
+<h2 id="status">Status</h2>
+<p>Accepted for the MVP working model; psychologist-specific offering cardinality is resolved by ADR 0018. Approved override fields and snapshot timing are resolved by ADR 0042/0043; publication lifecycle and immutable revisions by ADR 0044/0045. Actual catalog values remain owned by the non-technical PRD; shared offerings across psychologists are deferred.</p>
+<h2 id="context">Context</h2>
+<p>The team has a small fixed set of psychologists, but price, duration, mode, or eligibility may eventually differ by psychologist. A single global service row would make those differences awkward; five independent catalogs would make the public experience and administration inconsistent.</p>
+<p>The technical model needs to distinguish the public category a visitor understands from the concrete thing that can be booked.</p>
+<h2 id="decision">Decision</h2>
+<p>Model two levels:</p>
+<ul>
+<li><strong>Service</strong> is the canonical public category with shared defaults.</li>
+<li><strong>ServiceOffering</strong> is the psychologist-specific bookable variant and carries the effective values used for booking.</li>
+</ul>
+<p>A ServiceOffering may inherit a default from Service or explicitly override it. A Booking targets exactly one ServiceOffering. The non-technical PRD remains the authority for the actual catalog, prices, durations, and policy rules.</p>
+<h2 id="consequences">Consequences</h2>
+<p>Positive:</p>
+<ul>
+<li>public taxonomy stays consistent;</li>
+<li>psychologist-specific differences are representable without duplicating the catalog;</li>
+<li>future pricing/duration changes can be scoped deliberately;</li>
+<li>booking always points to an unambiguous bookable configuration.</li>
+</ul>
+<p>Costs and constraints:</p>
+<ul>
+<li>effective-value precedence must be defined;</li>
+<li>admin UI must make inherited versus overridden values visible;</li>
+<li>changes to offering price/duration must not silently rewrite historical bookings;</li>
+<li>service and offering publication/archival states need lifecycle rules.</li>
+</ul>
+<h2 id="open-follow-up">Open follow-up</h2>
+<p>Define the implementation mapping for approved overrides, OfferSnapshot fields, and revision activation/rollback/future-slot handling. Actual service prices, durations, and policy values belong to the non-technical PRD. A shared offering across multiple psychologists is deferred beyond the MVP.</p></main><footer>Seraya Psikologi · Documentation generated from the repository · <a href="../../reference/index.html">Long-form reference</a></footer></div></body></html>

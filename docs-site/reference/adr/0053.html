@@ -1,0 +1,29 @@
+<!doctype html><html lang="id"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>ADR 0053 — Seraya Psikologi</title><link rel="stylesheet" href="../../assets/main.css"></head><body><div class="shell"><header class="site-header"><div><a class="brand" href="../../index.html">Seraya Psikologi</a><div class="subtitle">Project control center · MVP review</div></div><nav class="topnav"><a href="../../index.html">Overview</a><a href="../../workboard.html">Workboard</a><a href="../../prd/index.html">Focused PRDs</a><a href="../../reference/index.html">Reference</a></nav></header><div class="muted" style="font-size:.84rem;margin-bottom:18px"><a href="../../index.html">Home</a> / ADR</div><main><h1 id="53-use-24-hour-and-2-hour-appointment-reminders">53. Use 24-hour and 2-hour Appointment Reminders</h1>
+<h2 id="status">Status</h2>
+<p>Accepted for the MVP working model; exact opt-out, quiet hours, and provider failure behavior remain open.</p>
+<h2 id="context">Context</h2>
+<p>A single reminder may be missed; too many reminders add noise. The practice uses Asia/Jakarta operational time and needs predictable behavior when an Appointment is rescheduled or cancelled.</p>
+<h2 id="decision">Decision</h2>
+<p>Schedule two transactional email reminders by default:</p>
+<ul>
+<li>24 hours before Appointment start;</li>
+<li>2 hours before Appointment start.</li>
+</ul>
+<p>Offsets are configurable by Admin within the notification policy. ReminderSchedule computes them from the Appointment's canonical instant and renders Asia/Jakarta local date/time. Reschedule/cancellation/terminal outcome cancels stale reminders and creates new ones where applicable. Each send has an idempotency key so retries cannot duplicate a reminder.</p>
+<h2 id="consequences">Consequences</h2>
+<p>Positive:</p>
+<ul>
+<li>predictable minimal reminder cadence;</li>
+<li>local-time copy matches operational schedule;</li>
+<li>reschedule behavior is explicit;</li>
+<li>duplicate delivery is preventable.</li>
+</ul>
+<p>Costs and constraints:</p>
+<ul>
+<li>appointments created inside an offset may skip one reminder;</li>
+<li>scheduler clock/timezone tests are required;</li>
+<li>email failure/manual support path remains necessary;</li>
+<li>quiet hours and client preferences need policy.</li>
+</ul>
+<h2 id="open-follow-up">Open follow-up</h2>
+<p>Define package-expiry offsets, notification opt-out/mandatory rules, quiet hours, and late-created appointment behavior.</p></main><footer>Seraya Psikologi · Documentation generated from the repository · <a href="../../reference/index.html">Long-form reference</a></footer></div></body></html>

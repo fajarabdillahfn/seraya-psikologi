@@ -1,0 +1,25 @@
+<!doctype html><html lang="id"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>ADR 0036 — Seraya Psikologi</title><link rel="stylesheet" href="../../assets/main.css"></head><body><div class="shell"><header class="site-header"><div><a class="brand" href="../../index.html">Seraya Psikologi</a><div class="subtitle">Project control center · MVP review</div></div><nav class="topnav"><a href="../../index.html">Overview</a><a href="../../workboard.html">Workboard</a><a href="../../prd/index.html">Focused PRDs</a><a href="../../reference/index.html">Reference</a></nav></header><div class="muted" style="font-size:.84rem;margin-bottom:18px"><a href="../../index.html">Home</a> / ADR</div><main><h1 id="36-start-package-validity-at-verified-payment-success">36. Start Package Validity at Verified Payment Success</h1>
+<h2 id="status">Status</h2>
+<p>Accepted for the MVP working model; validity starts at verified payment success with Asia/Jakarta semantics and a snapshotted boundary. Calendar-period arithmetic is resolved at the model level by ADR 0055. Exact duration values, end-of-month/local-boundary policy, extension, and restored-entitlement expiry are governed by ADR 0062 and remain open only for explicit Admin extension rules.</p>
+<h2 id="context">Context</h2>
+<p>PackagePurchase and its SessionEntitlement units are created/activated after verified payment success. Starting validity at first Appointment would leave a purchased package without a deterministic expiry while the client delays scheduling; starting at catalog selection would expire a package that was never paid.</p>
+<h2 id="decision">Decision</h2>
+<p>PackageValidity starts at the authoritative verified PackagePayment success event. PackagePurchase snapshots the start instant, operational timezone semantics (<code>Asia/Jakarta</code>), validity configuration/version, and explicit expiry boundary. Unused SessionEntitlement units expire at that boundary unless an audited admin exception applies.</p>
+<p>The expiry boundary must be visible before payment and in the guest package view.</p>
+<h2 id="consequences">Consequences</h2>
+<p>Positive:</p>
+<ul>
+<li>purchased obligations have a deterministic lifetime;</li>
+<li>payment, entitlement, and expiry timelines align;</li>
+<li>catalog/policy changes cannot rewrite historical package expiry;</li>
+<li>package reminders can be scheduled from a stable anchor.</li>
+</ul>
+<p>Costs and constraints:</p>
+<ul>
+<li>clients may lose time if they postpone scheduling;</li>
+<li>reminders and public copy must explain the anchor;</li>
+<li>date arithmetic and daylight/timezone semantics need tests;</li>
+<li>extension/restoration requires explicit policy and audit.</li>
+</ul>
+<h2 id="open-follow-up">Open follow-up</h2>
+<p>Choose exact duration values, end-of-month/local expiry boundary, extension approval, reminder offsets, and whether a restored entitlement retains or receives a new expiry.</p></main><footer>Seraya Psikologi · Documentation generated from the repository · <a href="../../reference/index.html">Long-form reference</a></footer></div></body></html>

@@ -1,0 +1,31 @@
+<!doctype html><html lang="id"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>ADR 0015 — Seraya Psikologi</title><link rel="stylesheet" href="../../assets/main.css"></head><body><div class="shell"><header class="site-header"><div><a class="brand" href="../../index.html">Seraya Psikologi</a><div class="subtitle">Project control center · MVP review</div></div><nav class="topnav"><a href="../../index.html">Overview</a><a href="../../workboard.html">Workboard</a><a href="../../prd/index.html">Focused PRDs</a><a href="../../reference/index.html">Reference</a></nav></header><div class="muted" style="font-size:.84rem;margin-bottom:18px"><a href="../../index.html">Home</a> / ADR</div><main><h1 id="15-track-operational-appointment-outcomes">15. Track Operational Appointment Outcomes</h1>
+<h2 id="status">Status</h2>
+<p>Accepted for the MVP working model; initial marking/correction authority is resolved by ADR 0028/0054, and no-show timing/consumption by ADR 0027/0028. Client-facing outcome history remains open.</p>
+<h2 id="context">Context</h2>
+<p>A booking system needs to distinguish a confirmed appointment that happened from one that was cancelled or not attended. Keeping every past appointment in <code>confirmed</code> makes reporting, notification cleanup, and cancellation/refund policy ambiguous. The system must not use this as a place for clinical content.</p>
+<h2 id="decision">Decision</h2>
+<p>Appointment lifecycle includes these operational outcomes:</p>
+<ul>
+<li><code>confirmed</code> — payment-gated scheduled commitment;</li>
+<li><code>cancelled</code> — ended before the session under policy or admin action;</li>
+<li><code>completed</code> — marked as operationally completed;</li>
+<li><code>no_show</code> — marked as not attended according to policy.</li>
+</ul>
+<p>Only authorized psychologist/admin actors may mark post-session outcomes. The outcome stores actor/time and allowed operational metadata, never clinical notes, diagnosis, assessment results, or treatment details.</p>
+<h2 id="consequences">Consequences</h2>
+<p>Positive:</p>
+<ul>
+<li>reports and policy evaluation have meaningful terminal states;</li>
+<li>notifications can stop or change after an outcome;</li>
+<li>no-show handling can be explicit without a clinical system;</li>
+<li>operational and clinical boundaries stay separate.</li>
+</ul>
+<p>Costs and constraints:</p>
+<ul>
+<li>permissions and correction rules are required;</li>
+<li>no-show consumption and timing are defined by ADR 0027/0028; remaining policy questions concern correction/exception behavior;</li>
+<li>outcome changes must be audited;</li>
+<li>UI copy must avoid implying clinical judgment.</li>
+</ul>
+<h2 id="open-follow-up">Open follow-up</h2>
+<p>Define the correction window/allowed transition matrix and whether client-facing history shows the outcome.</p></main><footer>Seraya Psikologi · Documentation generated from the repository · <a href="../../reference/index.html">Long-form reference</a></footer></div></body></html>

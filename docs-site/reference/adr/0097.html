@@ -1,0 +1,558 @@
+<!doctype html><html lang="id"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>ADR 0097 — Seraya Psikologi</title><link rel="stylesheet" href="../../assets/main.css"></head><body><div class="shell"><header class="site-header"><div><a class="brand" href="../../index.html">Seraya Psikologi</a><div class="subtitle">Project control center · MVP review</div></div><nav class="topnav"><a href="../../index.html">Overview</a><a href="../../workboard.html">Workboard</a><a href="../../prd/index.html">Focused PRDs</a><a href="../../reference/index.html">Reference</a></nav></header><div class="muted" style="font-size:.84rem;margin-bottom:18px"><a href="../../index.html">Home</a> / ADR</div><main><h1 id="97-whatsapp-manual-payment-flow-for-mvp-launch">97. WhatsApp Manual Payment Flow for MVP Launch</h1>
+<h2 id="status">Status</h2>
+<p>Accepted for MVP launch. <strong>Supersedes</strong> <code>ADR 0068-midtrans-snap-launch-gateway.md</code> and <code>ADR 0069-launch-payment-methods.md</code> for the launch path. Midtrans (Snap or Core API) and any other Indonesian payment gateway are <strong>deferred</strong> to post-MVP. The launch payment surface is: <strong>manual bank transfer / Virtual Account / QRIS manual</strong>, with the client receiving a PDF + plain-text invoice via WhatsApp, paying manually off-platform, and an Admin marking the Booking as paid after reviewing evidence in the Admin workspace.</p>
+<p>This ADR closes the launch-path scope of <code>TBC-PAY-01</code> (the original Midtrans-specific evidence gap) and <code>TBC-PAY-EXPIRY-01</code> (provider-expiry invariant) by removing the provider entirely from the launch path. Both rows in the TBC register are replaced by a single new operational TBC <code>TBC-PAY-MANUAL-01</code> for Admin verification SLA, evidence retention, and dispute handling.</p>
+<h2 id="ringkasan-eksekutif-bahasa-indonesia">Ringkasan eksekutif (Bahasa Indonesia)</h2>
+<ul>
+<li><strong>Tidak ada payment gateway di launch.</strong> Klien membayar manual lewat transfer bank, Virtual Account, atau QRIS manual ke rekening/akun Seraya. Invoice diberikan via WhatsApp dalam dua format: PDF (downloadable, untuk arsip) dan plain text (untuk forward / share). Tidak ada redirect, tidak ada webhook, tidak ada Snap, tidak ada Midtrans.</li>
+<li><strong>Booking state machine baru.</strong> Empat status utama terkait pembayaran: <code>pending_manual_payment</code> → <code>awaiting_confirmation</code> → <code>confirmed</code> (Admin mark-as-paid) → <code>cancelled</code>. Tidak ada lagi <code>pending</code> (provider-intent waiting webhook) atau <code>paid_late_*</code> (provider late event) untuk path launch ini.</li>
+<li><strong>Admin workspace: tombol "Mark as paid".</strong> Admin menerima bukti pembayaran dari klien (foto screenshot transfer, nomor referensi, atau teks sederhana) lewat WhatsApp. Admin membuka Booking di Admin workspace, memilih <code>payment_method</code> (<code>bank_transfer</code> / <code>va</code> / <code>qris_manual</code>), meng-upload atau menulis evidence, lalu menekan tombol "Mark as paid". Sistem membuat <code>payment_proof</code> record dan menggerakkan <code>Booking.status</code> ke <code>confirmed</code> atomically dalam satu transaction.</li>
+<li><strong><code>payment_proof</code> table.</strong> Append-only record per verifikasi. Fields: <code>id</code>, <code>booking_id</code>, <code>payment_method</code> (enum: <code>bank_transfer</code> | <code>va</code> | <code>qris_manual</code>), <code>amount_idr</code> (integer minor unit), <code>evidence_url</code> (nullable: URL ke uploaded image/screenshot), <code>evidence_note</code> (nullable: free-text Admin note, mis. nama pengirim, waktu transfer), <code>verified_by_membership_id</code> (FK ke StaffMembership admin yang memverifikasi), <code>verified_at</code> (ISO timestamp Asia/Jakarta), <code>status</code> (enum: <code>verified</code> | <code>rejected</code>). Idempotent dan re-verifiable: Admin boleh <code>reject</code> lalu re-<code>verify</code> (mis. jika klien kirim bukti kedua) — setiap perubahan adalah <code>payment_proof</code> row baru, original immutable.</li>
+<li><strong>Audit trail.</strong> Setiap state change Booking (<code>pending_manual_payment</code> → <code>awaiting_confirmation</code> → <code>confirmed</code> / <code>cancelled</code>) dicatat di <code>audit_record</code> dengan <code>actor_membership_id</code>, <code>before_state</code>, <code>after_state</code>, <code>reason_code</code>, <code>timestamp</code>. Tidak ada rewrite in-place.</li>
+<li><strong>Refund tetap berlaku sama.</strong> <code>RefundAction</code> <code>full_refund</code> / <code>no_refund</code> per <code>ADR 0077</code>; tidak ada perubahan. Refund dijalankan off-platform (transfer balik manual ke rekening klien), direkam dengan <code>provider_reference = "manual_bank_transfer"</code> dan <code>status = completed</code> setelah Admin konfirmasi transfer selesai.</li>
+</ul>
+<h2 id="context">Context</h2>
+<p><code>ADR 0068</code> memilih Midtrans Snap sebagai launch payment gateway, dengan <code>ADR 0069</code> mempersempit ke QRIS + bank transfer/VA. Sejak keputusan itu, beberapa blocker operasional teridentifikasi:</p>
+<ol>
+<li><strong>Midtrans merchant onboarding</strong> belum selesai; estimasi waktu aktivasi production account belum tersedia.</li>
+<li><strong>Sandbox evidence</strong> untuk verifikasi signature, value match, idempotency, retry/dead-letter, dan reconciliation cadence belum terkumpul (<code>TBC-PAY-01</code>).</li>
+<li><strong>Provider expiry ↔ SlotHold TTL</strong> masih open (<code>TBC-PAY-EXPIRY-01</code>); keputusan <code>1 jam</code> JSON vs <code>10 menit</code> hold guide belum reconcile.</li>
+<li><strong>Operational footprint</strong> Midtrans (webhook receiver, secret rotation, retry policy, dead-letter, reconciliation report) memerlukan engineering time yang dapat dialokasikan ke fitur lain yang lebih dekat dengan value launch.</li>
+<li><strong>Volume launch rendah.</strong> MVP untuk psikolog tunggal (Fuja) dengan satu layanan (SERAYA PULANG); volume transaksi rendah sehingga throughput gateway bukan bottleneck, sementara Admin tetap harus handle konfirmasi/refund secara manual karena cancellation/refund sudah case-by-case via WhatsApp (<code>ADR 0066</code>, <code>ADR 0076</code>).</li>
+</ol>
+<p>Tim memilih <strong>menghilangkan payment gateway dari launch path</strong> dan menggantinya dengan <strong>WhatsApp manual payment</strong>: klien menerima invoice via WhatsApp, membayar manual, Admin memverifikasi bukti bayar di workspace, Booking confirmed. Midtrans tetap deferred dan dapat diaktifkan di iterasi berikutnya tanpa menyentuh domain model Booking/PackagePurchase/Payment — boundary <code>PaymentGatewayAdapter</code> tetap dipakai (dengan implementasi <code>null</code> / <code>noop</code>), dan field <code>Payment.provider</code> ditambah nilai baru <code>manual_whatsapp</code> untuk mengidentifikasi jalur ini.</p>
+<h2 id="diskusi-multi-perspektif">Diskusi multi-perspektif</h2>
+<h3 id="privacy-klinisetis">Privacy (klinis/etis)</h3>
+<ul>
+<li>Bukti pembayaran (screenshot mutasi bank, foto struk) berisi nama pengirim dan nomor rekening — ini data <strong>non-clinical</strong> yang boleh disimpan dalam retention category Payment/Refund per <code>IMPLEMENTATION-GUIDE.md §9.1</code>. <code>payment_proof.evidence_url</code> menunjuk ke object storage (Cloudflare R2 atau equivalent) yang tunduk pada retention policy <code>Payment/PaymentEvent/RefundAction</code> (audit/legal policy).</li>
+<li>Tidak ada nama akun, nomor rekening pengirim, atau message body WhatsApp yang boleh tersimpan sebagai clinical record. <code>evidence_note</code> Admin terbatas pada field operasional (nama pengirim jika berbeda dari nama kontak, waktu transfer jika relevan untuk dispute, kode referensi bank). Field ini tunduk pada data minimization.</li>
+<li>Consent tidak berubah: <code>ConsentRecord</code> yang sudah diverifikasi saat checkout tetap berlaku; WhatsApp manual payment adalah perubahan metode settlement, bukan perubahan consent.</li>
+</ul>
+<h3 id="operations-adminfinance">Operations (admin/finance)</h3>
+<ul>
+<li><strong>Admin verifikasi SLA</strong>: perlu didefinisikan. Default aman: Admin verifikasi dalam jam kerja normal, target <code>≤ 24 jam</code> sejak bukti diterima. <code>TBC-PAY-MANUAL-01</code> mengangkat ini.</li>
+<li><strong>Dispute / re-verify</strong>: jika bukti pembayaran tidak jelas atau nominal tidak sesuai, Admin <code>reject</code> <code>payment_proof</code> row dan menghubungi klien via WhatsApp untuk klarifikasi. Klien mengirim bukti kedua; Admin <code>verify</code> row baru. Original <code>payment_proof</code> (status <code>rejected</code>) immutable; row baru memiliki <code>correction_of</code> linkage.</li>
+<li><strong>Nominal tidak sesuai</strong>: jika Admin menerima bukti dengan nominal lebih kecil dari <code>OfferSnapshot.amount_cents</code>, Admin boleh (a) reject dan minta klien transfer sisa, (b) reject dan <code>cancelled</code> Booking per cancellation flow. Tidak ada partial payment / partial confirm di launch.</li>
+<li><strong>Refund manual</strong>: setelah Admin <code>DecideCancellation approve</code>, <code>RefundAction full_refund</code> di-execute off-platform (transfer balik ke rekening klien). Admin menandai <code>RefundAction.status = 'completed'</code> setelah transfer selesai; <code>provider_reference</code> adalah <code>"manual_bank_transfer"</code> + tanggal + referensi internal.</li>
+<li><strong>Reporting</strong>: financial reporting membaca <code>Payment.settled_at</code> (canonical), dengan <code>Payment.provider = 'manual_whatsapp'</code> memisahkan jalur settlement manual dari gateway. <code>payment_proof</code> table menyediakan audit trail per verifikasi (siapa, kapan, bukti apa).</li>
+<li><strong>Reconciliation</strong>: tidak ada provider dashboard; source of truth adalah <code>payment_proof</code> + Admin WhatsApp conversation log (off-system, retention terpisah). Tidak ada automatic reconciliation script; Admin adalah operator.</li>
+</ul>
+<h3 id="engineering-aggregate-schema">Engineering (aggregate &amp; schema)</h3>
+<ul>
+<li><strong>No provider integration</strong>: tidak ada <code>createCheckout</code>, tidak ada <code>verifyNotification</code> (signature), tidak ada webhook receiver. Adapter <code>PaymentGatewayAdapter</code> dapat di-stub dengan implementasi <code>ManualWhatsappAdapter</code> yang return <code>CheckoutCreated { provider: 'manual_whatsapp', providerIntentId: bookingId, snapToken: null, snapRedirectUrl: null, expiresAt: null }</code> — semua field opsional menjadi <code>null</code>, dan aplikasi tidak memanggil endpoint apa pun ke provider eksternal.</li>
+<li><strong>Booking state machine disederhanakan</strong>:</li>
+</ul>
+<p><code>pending_manual_payment
+      │  (klien menekan "Saya sudah bayar" → opsional; atau otomatis setelah invoice dikirim)
+      ▼
+  awaiting_confirmation
+      │  (Admin Mark as paid dengan payment_proof verified)
+      ▼
+  confirmed
+      │
+      ▼
+  (lifecycle lanjut: Appointment scheduling, package entitlement, etc.)</code></p>
+<p>Terminal: <code>cancelled</code> (via CancellationRequest approve, atau Admin manual cancel jika bukti tidak datang sama sekali dalam retention window).</p>
+<ul>
+<li><strong><code>payment_proof</code> schema</strong> (D1/SQLite + Postgres equivalent):</li>
+</ul>
+<p>```sql
+  CREATE TABLE payment_proof (
+    id                          TEXT PRIMARY KEY,
+    booking_id                  TEXT NOT NULL REFERENCES booking(id),
+    payment_method              TEXT NOT NULL CHECK (payment_method IN ('bank_transfer','va','qris_manual')),
+    amount_idr                  INTEGER NOT NULL CHECK (amount_idr &gt; 0),
+    evidence_url                TEXT,                 -- nullable; URL ke uploaded screenshot di R2
+    evidence_note               TEXT,                 -- nullable; Admin free-text, max ~500 char
+    verified_by_membership_id   TEXT NOT NULL REFERENCES staff_membership(id),
+    verified_at                 TEXT NOT NULL,       -- ISO timestamp Asia/Jakarta
+    status                      TEXT NOT NULL CHECK (status IN ('verified','rejected')),
+    correction_of               TEXT REFERENCES payment_proof(id),  -- nullable; jika ini re-verify dari row rejected
+    created_at                  TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
+  );</p>
+<p>CREATE INDEX idx_payment_proof_booking_id ON payment_proof(booking_id);
+  CREATE INDEX idx_payment_proof_verified_at ON payment_proof(verified_at);
+  ```</p>
+<p>Append-only: tidak ada <code>UPDATE</code> untuk field <code>id</code>, <code>booking_id</code>, <code>payment_method</code>, <code>amount_idr</code>, <code>verified_by_membership_id</code>, <code>verified_at</code>. Status boleh bertransisi <code>verified → rejected</code> (reject dengan alasan) atau <code>verified → supersede</code> (re-verify dengan row baru). Setiap transisi adalah <code>payment_proof</code> row baru + <code>audit_record</code>.</p>
+<ul>
+<li><strong>Atomicity</strong>: <code>MarkAsPaid</code> command dalam satu transaction: (1) <code>INSERT INTO payment_proof ...</code>; (2) <code>UPDATE booking SET status = 'confirmed', payment_proof_id = ...</code>; (3) <code>UPDATE payment SET status = 'paid', settled_at = now(), provider = 'manual_whatsapp'</code>; (4) emit outbox event untuk email konfirmasi; (5) <code>INSERT INTO audit_record ...</code>. Semua atomic. Crash di tengah = rollback + retry-safe (idempotent karena <code>payment_proof.id</code> di-generate deterministic dari <code>booking_id + sequence</code>).</li>
+<li><strong>Settlement uniqueness tetap berlaku</strong>: at-most-one <code>Payment</code> dengan <code>status = 'paid'</code> per <code>Booking.id</code> (<code>ADR 0093 §1.2</code>). Unique partial index <code>payment(booking_id) WHERE status = 'paid' AND settled_at IS NOT NULL</code> tetap aktif. Manual flow hanya menyentuh <code>Payment</code> row existing (yang sudah di-insert saat booking creation dengan <code>status = 'pending_manual_payment'</code>).</li>
+<li><strong>Idempotency dari MarkAsPaid</strong>: tombol Mark as paid menghasilkan command yang menerima <code>idempotency_key = booking_id</code>. Re-klik tombol dalam window pendek (mis. network retry) tidak membuat <code>payment_proof</code> row kedua.</li>
+</ul>
+<h3 id="ux-checkout-admin">UX (checkout &amp; Admin)</h3>
+<ul>
+<li><strong>Client side (booking confirmation page setelah checkout submit)</strong>:</li>
+<li>Tampilan: "Booking Anda diterima. Silakan selesaikan pembayaran dalam <strong>24 jam</strong> dengan detail pada invoice terlampir."</li>
+<li>Tombol: <strong>Download Invoice (PDF)</strong> — generate PDF dari template (booking ID, amount, rekening/VA/QRIS instructions, expiry).</li>
+<li>Tombol: <strong>Copy Invoice Text</strong> — plain text version siap di-paste ke WhatsApp chat dengan Admin.</li>
+<li>Tombol: <strong>Kirim via WhatsApp</strong> — <code>wa.me/&lt;admin_number&gt;?text=&lt;encoded_invoice_text&gt;</code> deep link.</li>
+<li>Tampilan: "Setelah membayar, mohon kirim bukti transfer ke Admin WhatsApp ini. Kami akan konfirmasi paling lambat dalam 1 hari kerja."</li>
+<li>State polling: page poll <code>/api/booking/{id}/status</code> setiap 30 detik; ketika <code>status = 'confirmed'</code>, tampilkan "Pembayaran confirmed. Janji temu Anda sudah terjadwal."</li>
+<li><strong>Admin workspace (Booking detail page)</strong>:</li>
+<li>Tampilan: <code>Booking</code> summary + <code>payment_proof</code> history (list).</li>
+<li>Tombol: <strong>Mark as Paid</strong> — membuka modal dengan form: <code>payment_method</code> (dropdown), <code>amount_idr</code> (auto-fill dari OfferSnapshot, editable), <code>evidence_url</code> (file upload ke R2), <code>evidence_note</code> (textarea), submit.</li>
+<li>Tombol: <strong>Reject Proof</strong> — jika ada bukti meragukan atau nominal salah, Admin reject existing <code>payment_proof</code> row dengan reason note; klien diminta kirim bukti ulang. Reject membuka input row baru (re-verify path).</li>
+<li>Tombol: <strong>Cancel Booking</strong> — Admin manual cancel jika klien tidak mengirim bukti dalam retention window; CancellationDecision append-only dengan reason <code>client_no_payment_proof</code>.</li>
+<li><strong>Invoice generation</strong>:</li>
+<li><strong>PDF</strong>: render dari template (<code>booking_id</code>, <code>client_name</code>, <code>service_offering_name</code>, <code>package_session_count</code> (nullable), <code>amount_idr</code>, <code>currency = 'IDR'</code>, <code>payment_instructions</code> (bank account / VA number / QRIS image), <code>expiry_at</code>, <code>support_contact_whatsapp</code>). Generated server-side; served via signed URL dengan retention mengikuti Booking retention.</li>
+<li><strong>Plain text</strong>: copy yang sama dalam plain text format, ready untuk di-forward via WhatsApp. Template single-language (Bahasa Indonesia untuk launch).</li>
+<li><strong>Payment instructions</strong> di-hardcode di Admin CMS config (bank account number, VA number, QRIS image URL). Admin mengelola via workspace; tidak di-hardcode di code.</li>
+</ul>
+<h2 id="decision">Decision</h2>
+<h3 id="1-launch-payment-surface-whatsapp-manual">1. Launch payment surface: WhatsApp manual</h3>
+<table>
+<thead>
+<tr>
+<th>Concern</th>
+<th>Decision</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Payment gateway</td>
+<td><strong>None.</strong> Tidak ada Midtrans, Xendit, atau gateway lain di launch.</td>
+</tr>
+<tr>
+<td>Payment methods</td>
+<td><code>bank_transfer</code> (manual ke rekening Seraya), <code>va</code> (manual ke nomor VA Seraya), <code>qris_manual</code> (scan QRIS statis Seraya). Semuanya <strong>off-platform</strong>.</td>
+</tr>
+<tr>
+<td>Invoice delivery</td>
+<td>WhatsApp. PDF + plain text. Client dapat download / copy / forward.</td>
+</tr>
+<tr>
+<td>Payment confirmation</td>
+<td><strong>Admin manual</strong> via "Mark as Paid" button di Admin workspace.</td>
+</tr>
+<tr>
+<td>Evidence</td>
+<td><code>payment_proof.evidence_url</code> (uploaded screenshot) atau <code>payment_proof.evidence_note</code> (free-text Admin note). Either or both.</td>
+</tr>
+<tr>
+<td>Refund</td>
+<td>Off-platform transfer balik. <code>RefundAction</code> tetap <code>full_refund</code> / <code>no_refund</code> per <code>ADR 0077</code>. <code>provider_reference = "manual_bank_transfer"</code>.</td>
+</tr>
+<tr>
+<td>Midtrans deferred</td>
+<td><code>ADR 0068</code> dan <code>ADR 0069</code> <strong>superseded for MVP launch</strong>; kept as future option. Re-activation memerlukan ADR baru.</td>
+</tr>
+</tbody>
+</table>
+<h3 id="2-booking-state-machine-payment-relevant">2. Booking state machine (payment-relevant)</h3>
+<pre><code>pending_manual_payment   -- booking + payment row created, invoice belum dikirim
+   │
+   │  (system: invoice generated dan tersedia untuk download/share)
+   │  -- state tetap pending_manual_payment sampai klien &quot;konfirmasi kirim&quot; atau Admin &quot;Mark as Paid&quot;
+   ▼
+awaiting_confirmation     -- klien mengklaim sudah bayar / Admin melihat bukti masuk
+   │
+   │  (Admin Mark as Paid → payment_proof verified, payment.status = 'paid', booking.status = 'confirmed')
+   ▼
+confirmed                 -- terminal untuk payment flow; lifecycle Appointment / Package / Cancellation berlanjut
+   │
+   │  (alternative path: CancellationRequest approve → cancelled, atau Admin manual cancel → cancelled)
+   ▼
+cancelled                 -- terminal; RefundAction terpisah jika applicable
+</code></pre>
+<table>
+<thead>
+<tr>
+<th>State</th>
+<th>Trigger to enter</th>
+<th>Side effects</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>pending_manual_payment</code></td>
+<td>Booking created (checkout submit).</td>
+<td><code>payment</code> row <code>status = 'pending_manual_payment'</code>, <code>provider = 'manual_whatsapp'</code>, <code>providerIntentId = bookingId</code>. SlotHold active (10 min default, <code>ADR 0094</code> cutoff). Invoice generated on-demand via API.</td>
+</tr>
+<tr>
+<td><code>awaiting_confirmation</code></td>
+<td>Klien klik "Saya sudah bayar" di confirmation page, <strong>atau</strong> Admin melihat bukti masuk via WhatsApp dan toggle state.</td>
+<td>Email reminder ke Admin (<code>admin_invoice_sent</code>). SlotHold <strong>released</strong> (slot di-release ke available pool; reacquire di-handle saat Mark as Paid).</td>
+</tr>
+<tr>
+<td><code>confirmed</code></td>
+<td>Admin Mark as Paid → <code>payment_proof</code> verified.</td>
+<td>Atomic: <code>payment_proof</code> insert, <code>payment.status = 'paid'</code>, <code>payment.settled_at = now()</code>, <code>booking.status = 'confirmed'</code>, outbox event <code>booking_confirmed</code>, email ke klien <code>payment_received</code>. Untuk package: <code>PackagePurchase</code> created dengan <code>SessionEntitlement #1.state = 'scheduled'</code> (slot reacquire atomic per <code>ADR 0091</code>) atau <code>'pending_schedule'</code> (slot reacquire gagal, Admin resolution via existing reconciliation <code>ADR 0067</code>).</td>
+</tr>
+<tr>
+<td><code>cancelled</code></td>
+<td>CancellationRequest approve, <strong>atau</strong> Admin manual cancel (no proof dalam retention window).</td>
+<td>Existing cancellation matrix per <code>ADR 0095</code>. Slot released per atomic effects. <code>RefundAction</code> terpisah jika applicable.</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Tidak ada state <code>paid_late_*</code></strong> untuk manual flow (tidak ada provider late event). Package late-scheduling mengikuti pola <code>ADR 0093 §5</code> Option A: jika slot reacquire gagal saat Mark as Paid, <code>SessionEntitlement #1.state = 'pending_schedule'</code> dan <code>PackagePurchase.requires_first_session_scheduling = true</code> (sama seperti paid_late package).</p>
+<h3 id="3-payment_proof-table-final-schema">3. <code>payment_proof</code> table (final schema)</h3>
+<p>Fields (semua required kecuali nullable ditandai):</p>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Type</th>
+<th>Nullable</th>
+<th>Constraint / Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>id</code></td>
+<td>TEXT PK</td>
+<td>no</td>
+<td>Deterministic: <code>pp_&lt;booking_id&gt;_&lt;sequence&gt;</code> (sequence increments untuk re-verify)</td>
+</tr>
+<tr>
+<td><code>booking_id</code></td>
+<td>TEXT FK → <code>booking.id</code></td>
+<td>no</td>
+<td>ON DELETE RESTRICT</td>
+</tr>
+<tr>
+<td><code>payment_method</code></td>
+<td>TEXT</td>
+<td>no</td>
+<td>ENUM: <code>bank_transfer</code> | <code>va</code> | <code>qris_manual</code></td>
+</tr>
+<tr>
+<td><code>amount_idr</code></td>
+<td>INTEGER</td>
+<td>no</td>
+<td>Integer minor unit (rupiah penuh dalam hal ini, bukan sen). Wajib <code>&gt; 0</code>.</td>
+</tr>
+<tr>
+<td><code>evidence_url</code></td>
+<td>TEXT</td>
+<td>yes</td>
+<td>URL ke R2 / object storage. Signed URL dengan retention mengikuti Booking.</td>
+</tr>
+<tr>
+<td><code>evidence_note</code></td>
+<td>TEXT</td>
+<td>yes</td>
+<td>Free-text Admin note. Max 500 char (config). Contoh: nama pengirim, waktu transfer, kode referensi.</td>
+</tr>
+<tr>
+<td><code>verified_by_membership_id</code></td>
+<td>TEXT FK → <code>staff_membership.id</code></td>
+<td>no</td>
+<td>Admin yang memverifikasi.</td>
+</tr>
+<tr>
+<td><code>verified_at</code></td>
+<td>TEXT (ISO 8601 Asia/Jakarta)</td>
+<td>no</td>
+<td>Timestamp verifikasi.</td>
+</tr>
+<tr>
+<td><code>status</code></td>
+<td>TEXT</td>
+<td>no</td>
+<td>ENUM: <code>verified</code> | <code>rejected</code></td>
+</tr>
+<tr>
+<td><code>correction_of</code></td>
+<td>TEXT FK → <code>payment_proof.id</code></td>
+<td>yes</td>
+<td>Jika row ini adalah re-verify dari row rejected sebelumnya.</td>
+</tr>
+<tr>
+<td><code>created_at</code></td>
+<td>TEXT (ISO 8601)</td>
+<td>no</td>
+<td>Default now().</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Append-only invariant</strong>: tidak ada <code>UPDATE</code> pada <code>id</code>, <code>booking_id</code>, <code>payment_method</code>, <code>amount_idr</code>, <code>verified_by_membership_id</code>, <code>verified_at</code>, <code>created_at</code>. <code>status</code> boleh ber-transisi dari <code>verified → rejected</code> (via Admin reject dengan reason) — ini di-record sebagai <code>payment_proof_rejection</code> audit event, bukan in-place update.</p>
+<p><strong>Idempotency</strong>: <code>MarkAsPaid</code> command menerima <code>idempotency_key</code>. Re-submit dengan key yang sama return existing <code>payment_proof</code> row (no duplicate insert).</p>
+<p><strong>Re-verify path</strong>:
+1. Admin menerima bukti baru dari klien (mis. bukti pertama blur, klien kirim ulang).
+2. Admin reject existing <code>payment_proof</code> row (status <code>verified → rejected</code>) dengan reason note.
+3. Admin create new <code>payment_proof</code> row dengan <code>status = 'verified'</code> dan <code>correction_of = &lt;original_row_id&gt;</code>.
+4. Original row immutable; row baru menjadi canonical.</p>
+<p><strong>Multiple verified rows</strong>: hanya <strong>satu</strong> <code>payment_proof</code> dengan <code>status = 'verified'</code> per <code>booking_id</code> pada satu waktu (enforced by partial unique index <code>payment_proof(booking_id) WHERE status = 'verified'</code>). Reject + new verified row: atomic transaction.</p>
+<h3 id="4-admin-workspace-mark-as-paid-command">4. Admin workspace — "Mark as paid" command</h3>
+<p><strong>Command</strong>: <code>MarkAsPaid</code></p>
+<table>
+<thead>
+<tr>
+<th>Aspect</th>
+<th>Spec</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Input</td>
+<td><code>booking_id</code>, <code>payment_method</code>, <code>amount_idr</code>, <code>evidence_url</code> (nullable), <code>evidence_note</code> (nullable), <code>actor_membership_id</code> (dari Admin session)</td>
+</tr>
+<tr>
+<td>Precondition</td>
+<td><code>booking.status IN ('pending_manual_payment', 'awaiting_confirmation')</code>; <code>payment.status = 'pending_manual_payment'</code>; <code>payment.provider = 'manual_whatsapp'</code>; tidak ada <code>payment_proof</code> existing dengan <code>status = 'verified'</code> untuk <code>booking_id</code> ini</td>
+</tr>
+<tr>
+<td>Authorization</td>
+<td>Admin only (StaffMembership.role = 'admin')</td>
+</tr>
+<tr>
+<td>Atomic effects (single transaction)</td>
+<td>(1) <code>INSERT INTO payment_proof ...</code>; (2) <code>UPDATE payment SET status = 'paid', settled_at = now() WHERE id = ?</code>; (3) <code>UPDATE booking SET status = 'confirmed' WHERE id = ?</code>; (4) untuk package: <code>INSERT INTO package_purchase ...</code> + ordered <code>SessionEntitlement</code> rows; attempt slot reacquire per <code>ADR 0091</code> (<code>SessionEntitlement #1.state = 'scheduled'</code> jika sukses, <code>'pending_schedule'</code> jika gagal); (5) <code>INSERT INTO audit_record (action='mark_as_paid', before='pending_manual_payment|awaiting_confirmation', after='confirmed', actor_membership_id, reason_code='manual_whatsapp_verified')</code>; (6) outbox: <code>booking_confirmed</code>, <code>payment_received</code></td>
+</tr>
+<tr>
+<td>Idempotency</td>
+<td><code>idempotency_key = booking_id</code>; re-submit dengan key sama = no-op + return existing <code>payment_proof.id</code></td>
+</tr>
+<tr>
+<td>Output</td>
+<td><code>payment_proof_id</code>, <code>booking.status = 'confirmed'</code>, <code>payment.status = 'paid'</code>, <code>payment.settled_at</code></td>
+</tr>
+</tbody>
+</table>
+<p><strong>Command</strong>: <code>RejectPaymentProof</code></p>
+<table>
+<thead>
+<tr>
+<th>Aspect</th>
+<th>Spec</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Input</td>
+<td><code>payment_proof_id</code>, <code>reason_note</code> (required, max 500 char), <code>actor_membership_id</code></td>
+</tr>
+<tr>
+<td>Precondition</td>
+<td><code>payment_proof.status = 'verified'</code>; <code>booking.status = 'confirmed'</code></td>
+</tr>
+<tr>
+<td>Effect</td>
+<td><code>payment_proof.status = 'rejected'</code> (audit-logged). <strong>Tidak</strong> mengubah <code>booking.status</code> atau <code>payment.status</code>. Booking tetap confirmed secara financial, tetapi Admin follow-up dengan klien untuk klarifikasi.</td>
+</tr>
+<tr>
+<td>Follow-up</td>
+<td>Admin meminta bukti baru via WhatsApp; jika diterima, Admin create new <code>payment_proof</code> row dengan <code>correction_of = &lt;original_row_id&gt;</code>. Original row immutable history.</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Command</strong>: <code>MarkAwaitingConfirmation</code> (Admin melihat bukti masuk via WhatsApp, toggle state sebelum verify)</p>
+<table>
+<thead>
+<tr>
+<th>Aspect</th>
+<th>Spec</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Input</td>
+<td><code>booking_id</code>, <code>actor_membership_id</code></td>
+</tr>
+<tr>
+<td>Precondition</td>
+<td><code>booking.status = 'pending_manual_payment'</code></td>
+</tr>
+<tr>
+<td>Effect</td>
+<td><code>booking.status = 'awaiting_confirmation'</code>. SlotHold released (slot kembali ke available pool). Tidak menggerakkan payment.</td>
+</tr>
+<tr>
+<td>Use case</td>
+<td>Admin ingin flag Booking sebagai "sudah ada bukti masuk, akan segera diverifikasi" tanpa langsung mark as paid.</td>
+</tr>
+</tbody>
+</table>
+<h3 id="5-invoice-generation">5. Invoice generation</h3>
+<p><strong>PDF invoice template</strong>:</p>
+<pre><code>┌─────────────────────────────────────────────────┐
+│             SERAYA PSIKOLOGI — INVOICE          │
+├─────────────────────────────────────────────────┤
+│ Invoice ID:     INV-&lt;booking_id&gt;                │
+│ Issued:         &lt;YYYY-MM-DD HH:mm WIB&gt;          │
+│ Due:            &lt;YYYY-MM-DD HH:mm WIB&gt; +24h     │
+│                                                  │
+│ Client:         &lt;client_name&gt;                   │
+│ Email:          &lt;client_email&gt;                  │
+│ Booking ID:     &lt;booking_id&gt;                    │
+│ Service:        &lt;service_offering_name&gt;         │
+│ Mode:           &lt;online|offline&gt;                │
+│ Sessions:       &lt;1 | 2 | 3 | couple-3&gt;          │
+│ Amount:         Rp &lt;amount formatted&gt;           │
+│                                                  │
+│ ─── Payment Instructions ───                    │
+│ Method: &lt;bank_transfer|va|qris_manual&gt;          │
+│ &lt;bank_name&gt;: &lt;account_number&gt;                   │
+│ a/n: &lt;account_holder&gt;                           │
+│ &lt;VA number&gt;  (if applicable)                    │
+│ &lt;QRIS image QR link&gt;  (if applicable)           │
+│                                                  │
+│ Setelah membayar, mohon kirim bukti              │
+│ transfer ke WhatsApp Admin:                     │
+│ wa.me/&lt;admin_number&gt;                             │
+│                                                  │
+│ Pembayaran akan dikonfirmasi dalam              │
+│ 1 hari kerja setelah bukti diterima.            │
+└─────────────────────────────────────────────────┘
+</code></pre>
+<p><strong>Plain text invoice template</strong> (tersedia via tombol "Copy Invoice Text"):</p>
+<pre><code>*SERAYA PSIKOLOGI — INVOICE*
+
+Invoice ID: INV-&lt;booking_id&gt;
+Issued: &lt;YYYY-MM-DD HH:mm WIB&gt;
+Due: &lt;YYYY-MM-DD HH:mm WIB&gt; (24 jam)
+
+Client: &lt;client_name&gt;
+Email: &lt;client_email&gt;
+Booking ID: &lt;booking_id&gt;
+Service: &lt;service_offering_name&gt;
+Mode: &lt;online|offline&gt;
+Sessions: &lt;1 | 2 | 3 | couple-3&gt;
+Amount: Rp &lt;amount formatted&gt;
+
+*Payment Instructions*
+Method: &lt;bank_transfer|va|qris_manual&gt;
+&lt;bank_name&gt;: &lt;account_number&gt;
+a/n: &lt;account_holder&gt;
+&lt;VA number&gt;  (jika applicable)
+&lt;QRIS image: &lt;url&gt;&gt;  (jika applicable)
+
+Setelah membayar, mohon kirim bukti transfer ke WhatsApp Admin: wa.me/&lt;admin_number&gt;
+
+Pembayaran akan dikonfirmasi dalam 1 hari kerja.
+</code></pre>
+<p><strong>Generation rules</strong>:
+- Invoice dapat di-generate kapan saja saat <code>booking.status IN ('pending_manual_payment', 'awaiting_confirmation')</code>.
+- PDF di-render server-side via template engine (mis. headless Chromium → PDF, atau <code>puppeteer</code>).
+- Plain text adalah static template dengan field substitution.
+- Invoice <strong>tidak</strong> include clinical information, contact phone (jika ada), atau BookingParticipant detail untuk couple — hanya identitas payer.
+- Invoice di-cache per booking_id (regenerate hanya jika <code>OfferSnapshot</code> berubah, yang seharusnya tidak terjadi karena snapshot immutable).
+- Signed URL dengan retention mengikuti Booking retention (12 bulan setelah last active service per <code>ADR 0083</code>).</p>
+<p><strong>Payment instructions</strong> di Admin CMS config (bukan hardcode):
+- <code>bank_transfer</code>: <code>bank_name</code>, <code>account_number</code>, <code>account_holder</code> (≥ 1 entry)
+- <code>va</code>: <code>va_number</code> (≥ 1 entry per bank jika multiple)
+- <code>qris_manual</code>: <code>qris_image_url</code> (signed URL, image QRIS statis)</p>
+<p>Admin mengelola via Admin CMS → Payment Settings page. Default fallback saat kosong: tampilkan error "Payment instructions not configured. Hubungi Admin." (graceful failure, tidak expose empty state ke client).</p>
+<h3 id="6-slot-reacquisition-saat-mark-as-paid">6. Slot reacquisition saat Mark as Paid</h3>
+<p>Mengikuti <code>ADR 0093 §5</code> (Option A) — atomic <code>CapacityReservation</code> claim per <code>ADR 0091</code>:</p>
+<ul>
+<li><strong>Single-session Booking</strong>: Mark as Paid → slot reacquire attempt → jika sukses, <code>Appointment</code> confirmed; jika gagal (overlap), Admin resolution via existing reconciliation flow (<code>ADR 0067</code>). Booking status <code>confirmed</code> dalam kedua kasus (Payment settled); <code>Appointment</code> mungkin <code>pending_schedule</code> (reconcile) atau <code>confirmed</code>.</li>
+<li><strong>Package Booking</strong>: Mark as Paid → slot reacquire attempt untuk <code>SessionEntitlement #1</code> → jika sukses, <code>SessionEntitlement #1.state = 'scheduled'</code> + <code>Appointment</code> confirmed; jika gagal, <code>SessionEntitlement #1.state = 'pending_schedule'</code> + <code>PackagePurchase.requires_first_session_scheduling = true</code>. Admin resolution: schedule alternative, atau <code>full_refund</code> (close package), atau hold via WhatsApp.</li>
+</ul>
+<p><strong>Critical</strong>: ini adalah satu-satunya titik di mana slot di-acquire untuk Booking manual flow. SlotHold released saat <code>awaiting_confirmation</code> enter; reacquire terjadi di Mark as Paid. Ini <strong>bukan</strong> late payment (hold sudah expired), melainkan <strong>normal path</strong> — hold di-release sengaja saat menunggu bukti.</p>
+<h3 id="7-audit-trail">7. Audit trail</h3>
+<p>Setiap perubahan state Booking / Payment / payment_proof di-log ke <code>audit_record</code>:</p>
+<table>
+<thead>
+<tr>
+<th>Action</th>
+<th>Before</th>
+<th>After</th>
+<th>Actor</th>
+<th>Reason code</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>booking_created</code></td>
+<td>(none)</td>
+<td><code>pending_manual_payment</code></td>
+<td>client (guest)</td>
+<td><code>checkout_submit</code></td>
+</tr>
+<tr>
+<td><code>awaiting_confirmation_set</code></td>
+<td><code>pending_manual_payment</code></td>
+<td><code>awaiting_confirmation</code></td>
+<td>admin or client</td>
+<td><code>proof_received</code></td>
+</tr>
+<tr>
+<td><code>mark_as_paid</code></td>
+<td><code>pending_manual_payment</code> or <code>awaiting_confirmation</code></td>
+<td><code>confirmed</code></td>
+<td>admin</td>
+<td><code>manual_whatsapp_verified</code></td>
+</tr>
+<tr>
+<td><code>payment_proof_rejected</code></td>
+<td><code>verified</code> (payment_proof row)</td>
+<td><code>rejected</code></td>
+<td>admin</td>
+<td><code>proof_unclear</code> / <code>amount_mismatch</code> / <code>other:&lt;note&gt;</code></td>
+</tr>
+<tr>
+<td><code>payment_proof_re_verified</code></td>
+<td>(none)</td>
+<td>(new row <code>verified</code> with <code>correction_of</code>)</td>
+<td>admin</td>
+<td><code>manual_whatsapp_re_verified</code></td>
+</tr>
+<tr>
+<td><code>booking_cancelled</code></td>
+<td><code>pending_manual_payment</code> / <code>awaiting_confirmation</code></td>
+<td><code>cancelled</code></td>
+<td>admin</td>
+<td><code>client_no_payment_proof</code> / <code>client_requested</code> / <code>other:&lt;note&gt;</code></td>
+</tr>
+</tbody>
+</table>
+<p>Tidak ada rewrite in-place. <code>audit_record</code> append-only per <code>IMPLEMENTATION-GUIDE.md §8.1</code>.</p>
+<h3 id="8-refund-off-platform">8. Refund (off-platform)</h3>
+<p>Mengikuti <code>ADR 0077</code> vocabulary (<code>full_refund</code> / <code>no_refund</code>):</p>
+<ul>
+<li><code>RefundAction</code> row di-create oleh Admin di Admin Cancellation &amp; Refund Workspace setelah <code>CancellationDecision approve</code>.</li>
+<li><code>RefundAction.provider_reference = "manual_bank_transfer:&lt;YYYY-MM-DD&gt;:&lt;admin_internal_ref&gt;"</code>.</li>
+<li><code>RefundAction.status</code> transitions: <code>pending</code> → <code>completed</code> (setelah Admin konfirmasi transfer balik selesai) atau <code>failed</code> (jika transfer gagal, perlu retry / bank berbeda).</li>
+<li>Tidak ada automatic disbursement. Admin adalah operator.</li>
+<li><code>Payment.status</code> summary update via derived projection (<code>refunded_full</code> jika RefundAction <code>completed</code> dengan <code>full_refund</code>) — bukan in-place rewrite historical.</li>
+</ul>
+<h3 id="9-settlement-uniqueness-tetap-berlaku">9. Settlement uniqueness tetap berlaku</h3>
+<p><code>ADR 0093 §1.2</code> invariant <strong>tetap aktif</strong>: at-most-one <code>Payment</code> dengan <code>status = 'paid'</code> per <code>Booking.id</code>. Unique partial index <code>payment(booking_id) WHERE status = 'paid' AND settled_at IS NOT NULL</code>. Mark as Paid attempt kedua (race atau double-click) → DB constraint reject + audit log <code>mark_as_paid_duplicate_attempt</code> + return existing payment_proof.</p>
+<h2 id="consequences">Consequences</h2>
+<p>Positive:</p>
+<ul>
+<li><strong>Tidak ada payment gateway dependency</strong> di launch. Menghilangkan 4 blocker operasional (Midtrans onboarding, sandbox evidence, provider expiry alignment, webhook receiver infrastructure).</li>
+<li><strong>SlotHold ↔ payment expiry invariant</strong> selesai secara default: tidak ada provider expiry karena tidak ada provider.</li>
+<li><strong>Lower engineering footprint</strong>: tidak ada <code>createCheckout</code>, tidak ada signature verification, tidak ada webhook handler, tidak ada retry/dead-letter, tidak ada provider reconciliation script. Adapter <code>PaymentGatewayAdapter</code> di-stub atau dihapus dari dependency tree launch.</li>
+<li><strong>Financial transparency</strong>: <code>payment_proof</code> table adalah audit trail natural per verifikasi (siapa Admin, kapan, bukti apa). Tidak perlu parsing provider dashboard.</li>
+<li><strong>Operational flexibility</strong>: Admin dapat <code>reject</code> lalu <code>re-verify</code> tanpa batasan teknis; dispute handling eksplisit di workflow.</li>
+<li><strong>Cost</strong>: zero payment gateway fee (vs Midtrans 0.7%–2% per transaksi). Untuk volume launch rendah, ini material.</li>
+</ul>
+<p>Costs and constraints:</p>
+<ul>
+<li><strong>Admin overhead</strong>: setiap transaksi memerlukan Admin manual verification. Untuk MVP volume rendah ini acceptable; untuk scale perlu automasi.</li>
+<li><strong>Client friction</strong>: klien harus (a) download invoice atau copy text, (b) buka mobile banking / e-wallet, (c) transfer manual, (d) screenshot bukti, (e) kirim ke Admin WhatsApp. Lebih banyak langkah dibanding Snap checkout.</li>
+<li><strong>Tidak ada real-time confirmation</strong>: ada delay antara bukti dikirim dan <code>booking.status = 'confirmed'</code>. Email konfirmasi <code>payment_received</code> dikirim hanya setelah Mark as Paid.</li>
+<li><strong>Slot reacquire race</strong>: saat <code>awaiting_confirmation</code>, slot di-release. Saat Mark as Paid, reacquire attempt mungkin gagal (slot sudah diambil orang lain via jalur lain, mis. booking berbeda). Untuk single-session: Admin resolution via <code>ADR 0067</code>. Untuk package: <code>SessionEntitlement #1.state = 'pending_schedule'</code>.</li>
+<li><strong>No idempotency via provider event</strong>: replay safety harus di-handle di level command (<code>MarkAsPaid</code> dengan <code>idempotency_key</code>), bukan via webhook idempotency record (<code>ADR 0093 §3</code>). Berlaku: <code>payment_event_idempotency</code> table tidak diperlukan untuk manual flow, dapat di-skip.</li>
+<li><strong>Midtrans re-activation memerlukan ADR baru</strong>: jika post-MVP Midtrans diaktifkan kembali, harus ada ADR yang menjelaskan transisi dari manual ke gateway — apakah existing Booking manual-flow di-migrasi (tidak boleh per append-only invariant), atau Midtrans hanya untuk Booking baru (forward-only), atau full reset. Out of scope untuk ADR ini.</li>
+</ul>
+<h2 id="open-follow-up">Open follow-up</h2>
+<ol>
+<li><code>TBC-PAY-MANUAL-01</code> — <strong>Admin verification SLA, payment_proof retention policy, dispute handling escalation path</strong>. Default aman untuk launch: verification ≤ 24 jam kerja, retention mengikuti Booking (12 bulan), dispute via WhatsApp re-verify path. Formal policy text menyusul; bukan blocker untuk launch.</li>
+<li>Payment instructions di Admin CMS (bank account / VA / QRIS) — initial setup oleh Admin sebelum go-live. Bukan ADR concern; operational checklist.</li>
+<li>PDF rendering library choice (puppeteer, pdfkit, dll.) — implementation detail, bukan domain decision.</li>
+<li>Post-MVP: kapan dan bagaimana Midtrans diaktifkan kembali. ADR baru akan dibutuhkan; tidak dibahas di sini.</li>
+</ol>
+<h2 id="supersedes">Supersedes</h2>
+<ul>
+<li><code>ADR 0068-midtrans-snap-launch-gateway.md</code> — Midtrans Snap tidak lagi launch path. Status updated to <strong>"Superseded for MVP launch; kept as future option. WhatsApp manual payment is launch path per ADR 0097."</strong></li>
+<li><code>ADR 0069-launch-payment-methods.md</code> — QRIS / bank transfer / VA tetap launch-eligible <strong>methods</strong>, tetapi delivery-nya manual off-platform (bukan via Midtrans Snap). Status updated to <strong>"Superseded for MVP launch; payment methods retained as off-platform manual settlement per ADR 0097."</strong></li>
+</ul>
+<h2 id="reference">Reference</h2>
+<ul>
+<li><code>ADR 0066</code> — WhatsApp optional manual support boundary</li>
+<li><code>ADR 0076</code> — no automatic cancellation cutoff; Admin case-by-case</li>
+<li><code>ADR 0077</code> — <code>RefundAction</code> vocabulary <code>full_refund</code> / <code>no_refund</code></li>
+<li><code>ADR 0090</code> — <code>BookingParticipant</code> / <code>AppointmentParticipant</code> couple model (couple invoice hides participant detail)</li>
+<li><code>ADR 0091</code> — <code>CapacityReservation</code> + TransitionBuffer (slot reacquire atomic)</li>
+<li><code>ADR 0093</code> — settlement uniqueness invariant (at-most-one paid Payment per Booking)</li>
+<li><code>ADR 0094</code> — intake schema (Nama lengkap, Email wajib, Nomor HP opsional, Consent version)</li>
+<li><code>ADR 0095</code> — package cancellation matrix + outcome race</li>
+<li><code>IMPLEMENTATION-GUIDE.md §7</code> — patched to reflect manual flow + 7.1 invoice generation + 7.2 mark-as-paid + 7.3 payment_proof audit</li>
+<li><code>DOMAIN-MODEL.md</code> Payment and refund section — patched with new state machine + payment_proof table</li>
+<li><code>PRD-GUIDELINE-REVIEW.md</code> TBC register — <code>TBC-PAY-01</code> redirect to ADR 0097; Midtrans-specific evidence deferred; <code>TBC-PAY-MANUAL-01</code> added for operational concerns</li>
+<li><code>CONTEXT.md</code> glossary — patched to add <code>payment_proof</code>, <code>awaiting_confirmation</code> state, and mark-as-paid terminology</li>
+</ul></main><footer>Seraya Psikologi · Documentation generated from the repository · <a href="../../reference/index.html">Long-form reference</a></footer></div></body></html>

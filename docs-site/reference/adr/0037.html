@@ -1,0 +1,25 @@
+<!doctype html><html lang="id"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>ADR 0037 — Seraya Psikologi</title><link rel="stylesheet" href="../../assets/main.css"></head><body><div class="shell"><header class="site-header"><div><a class="brand" href="../../index.html">Seraya Psikologi</a><div class="subtitle">Project control center · MVP review</div></div><nav class="topnav"><a href="../../index.html">Overview</a><a href="../../workboard.html">Workboard</a><a href="../../prd/index.html">Focused PRDs</a><a href="../../reference/index.html">Reference</a></nav></header><div class="muted" style="font-size:.84rem;margin-bottom:18px"><a href="../../index.html">Home</a> / ADR</div><main><h1 id="37-schedule-package-sessions-in-sequence">37. Schedule Package Sessions in Sequence</h1>
+<h2 id="status">Status</h2>
+<p>Accepted for the MVP working model; normal sequence, Admin override capability, expired/closed-unit skipping, and restored original sequence/expiry are resolved by ADR 0037/0038/0062. Transfer/amendment and additional Admin override limits remain open.</p>
+<h2 id="context">Context</h2>
+<p>A package has multiple equivalent-looking SessionEntitlement units, but clients and staff need an unambiguous “next session” for balance, reminders, cancellation restoration, and progress. Allowing arbitrary unused units to be scheduled can create gaps and confusing history.</p>
+<h2 id="decision">Decision</h2>
+<p>Each SessionEntitlement has an immutable <code>sequence_number</code> within its PackagePurchase. Normal client scheduling selects the next available sequence in order. An authorized admin may override the order only with an audited operational reason. A cancelled/restored entitlement retains its sequence unless an explicit correction policy says otherwise.</p>
+<p>Sequence is an operational package rule, not a clinical treatment plan.</p>
+<h2 id="consequences">Consequences</h2>
+<p>Positive:</p>
+<ul>
+<li>remaining balance and guest UI have a clear next action;</li>
+<li>reminder and expiry logic can identify the next session;</li>
+<li>cancellation restoration is deterministic;</li>
+<li>package history is easier to reconcile.</li>
+</ul>
+<p>Costs and constraints:</p>
+<ul>
+<li>admin override and correction semantics are required;</li>
+<li>a blocked/expired earlier entitlement may affect later scheduling;</li>
+<li>APIs must enforce sequence server-side;</li>
+<li>future package types may need a deliberate exception.</li>
+</ul>
+<h2 id="open-follow-up">Open follow-up</h2>
+<p>Define transfer or package amendment behavior and any additional limits on Admin sequence override. Restoration sequence/expiry is resolved by ADR 0062.</p></main><footer>Seraya Psikologi · Documentation generated from the repository · <a href="../../reference/index.html">Long-form reference</a></footer></div></body></html>

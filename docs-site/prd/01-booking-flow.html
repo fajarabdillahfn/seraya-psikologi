@@ -1,0 +1,47 @@
+<!doctype html><html lang="id"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>PRD 01 — Booking Flow — Seraya Psikologi</title><link rel="stylesheet" href="../assets/main.css"></head><body><div class="shell"><header class="site-header"><div><a class="brand" href="../index.html">Seraya Psikologi</a><div class="subtitle">Project control center · MVP review</div></div><nav class="topnav"><a href="../index.html">Overview</a><a href="../workboard.html">Workboard</a><a href="../prd/index.html">Focused PRDs</a><a href="../reference/index.html">Reference</a></nav></header><div class="muted" style="font-size:.84rem;margin-bottom:18px"><a href="../index.html">Home</a> / Focused PRD</div><main><h1 id="prd-01-booking-flow">PRD 01 — Booking Flow</h1>
+<h2 id="goal">Goal</h2>
+<p>A client can choose a published SERAYA PULANG offering, choose a future slot, submit minimum intake, and receive a manual-payment handoff.</p>
+<h2 id="in-scope">In scope</h2>
+<ul>
+<li>Individual counseling, online or offline, 60 minutes.</li>
+<li>Guest booking; no full account required.</li>
+<li>Required: full name, email, consent acknowledgement.</li>
+<li>Optional: phone, short non-clinical message.</li>
+<li>Eligibility: self-service 18–40; ages 16–17 use guardian route.</li>
+<li>Cutoff: booking must be at least 1 hour before session start.</li>
+<li>Slot hold: 10 minutes.</li>
+<li>Capacity: 15-minute transition buffer on both sides.</li>
+</ul>
+<h2 id="happy-path">Happy path</h2>
+<ol>
+<li>Client opens SERAYA PULANG.</li>
+<li>Client selects online/offline offering.</li>
+<li>Client selects a future slot.</li>
+<li>Client submits intake and consent.</li>
+<li>System creates Booking + OfferSnapshot + SlotHold + CapacityReservation atomically.</li>
+<li>Booking starts as <code>pending_manual_payment</code>.</li>
+<li>Client sees invoice and WhatsApp handoff.</li>
+</ol>
+<h2 id="important-states">Important states</h2>
+<p><code>pending_manual_payment</code> → <code>awaiting_confirmation</code> → <code>confirmed</code></p>
+<p>Other terminal/exception states are defined in the implementation reference and ADRs. The website must not promise a confirmed appointment before Admin verifies payment.</p>
+<h2 id="acceptance-checks">Acceptance checks</h2>
+<ul>
+<li>Invalid/missing name, email, consent, crisis acknowledgement, or cutoff returns a useful error.</li>
+<li>A held slot cannot be claimed by an overlapping booking.</li>
+<li>Repeating the same write request does not create duplicate business records.</li>
+<li>Confirmation page contains booking ID, hold expiry, invoice links, and WhatsApp handoff.</li>
+<li>No clinical narrative is persisted.</li>
+</ul>
+<h2 id="open-for-next-review">Open for next review</h2>
+<ul>
+<li>Replace demo schedule with Fuja's real availability and venue/meeting instructions.</li>
+<li>Decide whether couple checkout remains deferred for launch.</li>
+</ul>
+<h2 id="references">References</h2>
+<ul>
+<li><code>docs/adr/0089-architecture-worker-d1.md</code></li>
+<li><code>docs/adr/0090-couple-participant-model.md</code></li>
+<li><code>docs/adr/0091-capacity-overlap-buffer.md</code></li>
+<li><code>docs/adr/0094-intake-eligibility-cutoff.md</code></li>
+</ul></main><footer>Seraya Psikologi · Documentation generated from the repository · <a href="../reference/index.html">Long-form reference</a></footer></div></body></html>

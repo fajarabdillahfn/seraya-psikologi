@@ -1,0 +1,24 @@
+<!doctype html><html lang="id"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>ADR 0027 — Seraya Psikologi</title><link rel="stylesheet" href="../../assets/main.css"></head><body><div class="shell"><header class="site-header"><div><a class="brand" href="../../index.html">Seraya Psikologi</a><div class="subtitle">Project control center · MVP review</div></div><nav class="topnav"><a href="../../index.html">Overview</a><a href="../../workboard.html">Workboard</a><a href="../../prd/index.html">Focused PRDs</a><a href="../../reference/index.html">Reference</a></nav></header><div class="muted" style="font-size:.84rem;margin-bottom:18px"><a href="../../index.html">Home</a> / ADR</div><main><h1 id="27-no-show-consumes-package-entitlement-by-default">27. No-show Consumes Package Entitlement by Default</h1>
+<h2 id="status">Status</h2>
+<p>Accepted for the MVP working model; no-show grace period is resolved by ADR 0028, initial marking/correction authority by ADR 0028/0054, and restored-entitlement expiry by ADR 0062. Client notification, offering-specific grace variation, and Admin extension/refund effects remain open.</p>
+<h2 id="context">Context</h2>
+<p>A no-show reserves psychologist time without a completed session. Automatically restoring the entitlement would make the practice absorb the capacity cost without a policy decision; treating it as a clinical judgment would cross the data boundary.</p>
+<h2 id="decision">Decision</h2>
+<p>When an authorized psychologist or admin marks an Appointment as <code>no_show</code>, the related SessionEntitlement is consumed by default. An admin may override/reverse the consumption only through an audited operational action. No-show handling contains no clinical content.</p>
+<h2 id="consequences">Consequences</h2>
+<p>Positive:</p>
+<ul>
+<li>package balance reflects reserved professional capacity;</li>
+<li>no-show behavior is predictable and explainable before purchase;</li>
+<li>exceptions remain possible without silent edits;</li>
+<li>outcome and consumption are linked but still separate concepts.</li>
+</ul>
+<p>Costs and constraints:</p>
+<ul>
+<li>marking authority and grace period must be defined;</li>
+<li>client communication must explain the policy;</li>
+<li>corrections may restore entitlement and affect expiry/refund calculations;</li>
+<li>staff must not use no-show as a proxy for clinical judgment.</li>
+</ul>
+<h2 id="open-follow-up">Open follow-up</h2>
+<p>Define whether grace can vary by ServiceOffering, client notification, and package restoration/expiry effects after an outcome correction.</p></main><footer>Seraya Psikologi · Documentation generated from the repository · <a href="../../reference/index.html">Long-form reference</a></footer></div></body></html>

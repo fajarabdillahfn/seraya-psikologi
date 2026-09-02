@@ -1,0 +1,321 @@
+<!doctype html><html lang="id"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>ADR 0092 — Seraya Psikologi</title><link rel="stylesheet" href="../../assets/main.css"></head><body><div class="shell"><header class="site-header"><div><a class="brand" href="../../index.html">Seraya Psikologi</a><div class="subtitle">Project control center · MVP review</div></div><nav class="topnav"><a href="../../index.html">Overview</a><a href="../../workboard.html">Workboard</a><a href="../../prd/index.html">Focused PRDs</a><a href="../../reference/index.html">Reference</a></nav></header><div class="muted" style="font-size:.84rem;margin-bottom:18px"><a href="../../index.html">Home</a> / ADR</div><main><h1 id="92-finalize-appointment-outcome-timing-late-arrival-and-correction-window">92. Finalize Appointment Outcome Timing, Late-arrival, and Correction Window</h1>
+<h2 id="status">Status</h2>
+<p>Accepted. This ADR is the <strong>final model</strong> for no-show timing, late-arrival handling, and outcome correction on the launch counseling product. It supersedes the open questions in <code>ADR 0015-appointment-outcomes.md</code> (line 40), <code>ADR 0026-entitlement-consumption.md</code> (line 38), <code>ADR 0027-no-show-consumption.md</code> (line 33), <code>ADR 0028-no-show-grace-period.md</code> (line 35), and <code>ADR 0054-outcome-correction-events.md</code> (line 35). It closes <code>TBC-NO-SHOW-01</code> from <code>PRD-GUIDELINE-REVIEW.md:499</code>. It is compatible with the couple participant model in <code>ADR 0090</code>.</p>
+<h2 id="ringkasan-eksekutif-bahasa-indonesia">Ringkasan eksekutif (Bahasa Indonesia)</h2>
+<ul>
+<li><strong><code>no_show</code> adalah early operational checkpoint pada T+15 menit</strong>, bukan terminal post-session outcome. Ia mengunci entitlement consumption sejak T+15 dan menjadi history; sesi masih dapat berlangsung dan outcome akhirnya ditentukan oleh psikolog di akhir sesi (<code>completed</code> atau varian <code>completed_partial</code> / <code>no_show_late</code>).</li>
+<li><strong>Grace period 15 menit</strong> dari scheduled start (<code>Asia/Jakarta</code>) tidak berubah dari <code>ADR 0028</code>. Sistem otomatis menandai <code>no_show</code> checkpoint pada T+15 jika tidak ada explicit <code>client_arrived</code> event yang direkam.</li>
+<li><strong>Late-arrival</strong>:</li>
+<li>Klien yang datang terlambat tetap diterima. Psikolog merekam <code>client_arrived</code> (timestamp) yang membatalkan auto-checkpoint <code>no_show</code>.</li>
+<li>Jika sesi berjalan ≥1 menit efektif (diukur dari <code>client_arrived</code> sampai <code>session_ended</code>): outcome akhir <code>completed_partial</code> (subtype dari <code>completed</code>). Entitlement ter-konsume penuh karena slot dipakai; Admin dapat memberi compensation token (entitlement tambahan tanpa refund monetary) melalui Admin workspace, audited.</li>
+<li>Jika klien tidak datang sebelum T+15: <code>no_show</code> checkpoint terkunci. Klien yang datang setelah T+15 (mis. T+20) tetap diterima, tetapi outcome akhir <code>no_show_late</code> (subtype) dan <strong>entitlement tetap ter-konsume</strong> (slot sudah auto-marked). Tidak ada refund otomatis.</li>
+<li><strong>Correction window</strong>: Admin boleh membuat <code>OutcomeCorrection</code> event hingga <strong>7×24 jam (7 hari kalender)</strong> setelah <code>marked_at</code> outcome. Lewat window, outcome immutable; perubahan hanya dapat dilakukan melalui <code>CancellationDecision</code> baru (untuk <code>cancelled</code>) atau melalui explicit Admin extension/exception yang di-audit terpisah.</li>
+<li><strong>Entitlement coupling</strong>:</li>
+<li><code>no_show</code> checkpoint (T+15): consume entitlement pada saat marking. Coupled.</li>
+<li><code>completed</code> / <code>completed_partial</code> / <code>no_show_late</code>: consume entitlement. Coupled.</li>
+<li><code>cancelled</code> (approved): tidak consume; restore jika entitlement valid. Decoupled.</li>
+<li>Correction <code>no_show → completed</code> atau <code>completed → no_show</code> dalam 7 hari: adjust entitlement atomically dengan event koreksi. Original outcome tetap immutable history.</li>
+<li><strong>Notification</strong>:</li>
+<li>T+15 auto-<code>no_show</code>: email ke klien (template <code>no_show_recorded</code>, copy netral non-klinis) + notifikasi internal ke Admin workspace (in-app + email).</li>
+<li>Saat psikolog menandai outcome akhir (di end-of-session atau lewat Admin correction): email ke klien (<code>outcome_finalized</code>) + audit record.</li>
+<li>Late-arrival <code>client_arrived</code> event <strong>tidak</strong> trigger notifikasi ke klien (untuk menghindari spam); event muncul di Admin workspace saja.</li>
+<li>Correction dalam window 7 hari: email ke klien (<code>outcome_corrected</code>, menyebutkan old → new outcome tanpa clinical framing).</li>
+<li><strong>Authority</strong>: psikolog menandai initial dan final outcome; Admin menandai initial atas nama psikolog jika psikolog tidak reachable, dan satu-satunya actor untuk <code>OutcomeCorrection</code>. Couple session mengikuti <code>ADR 0090</code> dengan <code>AppointmentParticipant.presence_status</code> tetap dicatat terpisah.</li>
+</ul>
+<h2 id="context">Context</h2>
+<p><code>ADR 0015-appointment-outcomes.md:13–20</code> mendefinisikan <code>completed</code>/<code>no_show</code> sebagai post-session outcomes. <code>ADR 0028-no-show-grace-period.md:11–15</code> mengizinkan <code>no_show</code> marking 15 menit setelah scheduled start dan langsung mengonsumsi entitlement (<code>ADR 0027</code>). Dengan sesi 60 menit (<code>ADR 0073</code>), konsumsi entitlement terjadi saat masih tersisa 45 menit sesi, sementara late-arrival handling dan correction window belum diputuskan (<code>ADR 0028:33–35</code>, <code>ADR 0054:33–35</code>). <code>PRD-GUIDELINE-REVIEW.md</code> P1-12 (<code>PRD-GUIDELINE-REVIEW.md:400–411</code>) mengangkat kontradiksi ini sebagai blocker.</p>
+<p>Pertanyaan yang harus dijawab:</p>
+<ol>
+<li>Apakah <code>no_show</code> early operational checkpoint atau terminal post-session outcome?</li>
+<li>Kapan <code>no_show</code> dianggap final?</li>
+<li>Bagaimana late-arrival ditangani (sesi berlanjut? partial completed? outcome khusus)?</li>
+<li>Berapa lama Admin boleh mengoreksi outcome dengan audited <code>OutcomeCorrection</code>?</li>
+<li>Apakah <code>no_show</code> selalu konsumsi entitlement, atau berdasarkan durasi attended?</li>
+<li>Kapan klien/Admin diberi tahu tentang outcome?</li>
+</ol>
+<h2 id="diskusi-multi-perspektif">Diskusi multi-perspektif</h2>
+<h3 id="operations">Operations</h3>
+<ul>
+<li><strong>Checkpoint vs terminal outcome</strong>: early checkpoint mengunci entitlement consumption pada T+15 sehingga package balance, refund calculation, dan reporting tidak menggantung pada psikolog menandai outcome di akhir sesi. Terminal post-session outcome akan membiarkan balance menggantung 45 menit dan meningkatkan risiko drift jika psikolog lupa/terlambat menandai. <strong>Early checkpoint lebih aman untuk operasional</strong>, dengan konsekuensi: late-arrival harus ditangani secara eksplisit karena checkpoint sudah terkunci.</li>
+<li><strong>Late-arrival friction</strong>: model "checkpoint + late arrival tetap diterima" membutuhkan dua event terpisah (<code>no_show</code> checkpoint pada T+15, lalu outcome akhir di end-of-session). Ini menambah dua state per Appointment. Alternatif "checkpoint final, late arrival diabaikan" lebih sederhana tetapi menghukum klien yang terlambat karena akses (macet, link rusak). Operasional lebih memilih fleksibilitas.</li>
+<li><strong>Compensation token</strong>: untuk <code>completed_partial</code>, refund monetary tidak tersedia (launch refund hanya <code>full_refund</code> atau <code>no_refund</code> per <code>ADR 0077</code>). Memberi entitlement tambahan sebagai compensation adalah kompromi yang audited dan reversible.</li>
+<li><strong>Correction window</strong>: 7 hari adalah rentang yang cukup untuk Admin menanggapi case review dari klien via WhatsApp (admin SLA <code>ADR 0066</code>) tanpa membiarkan koreksi tidak terbatas. Lewat 7 hari, integrity historical reporting terjaga.</li>
+</ul>
+<h3 id="clinicalethics">Clinical/ethics</h3>
+<ul>
+<li><code>no_show</code> adalah <strong>operational label</strong>, bukan clinical judgment. Copy template harus menyebut "tidak hadir pada sesi" bukan "tidak menyelesaikan sesi" untuk menghindari framing klinis.</li>
+<li><code>completed_partial</code> bukan "kurang berhasil"; itu hanya indikator durasi attended &lt;60 menit. Tidak boleh dipakai untuk menurunkan outcome quality assessment.</li>
+<li><code>no_show_late</code> (klien datang terlambat setelah T+15) berbeda dari <code>no_show</code> checkpoint di mata operasional (entitlement tetap consumed) tetapi klien tetap dilayani sebagian. Ini harus dijelaskan di komunikasi klien, bukan hanya internal.</li>
+</ul>
+<h3 id="engineering">Engineering</h3>
+<ul>
+<li>Dua timestamp harus disimpan atomically dengan outcome: <code>marked_at</code> (saat auto-checkpoint di T+15 atau saat psikolog menandai di akhir) dan <code>client_arrived_at</code> (nullable, hanya jika klien terlambat datang). Schema D1: tambah kolom nullable pada tabel <code>appointment_outcome</code> (atau projection equivalent).</li>
+<li>OutcomeCorrection membawa field <code>correction_window_deadline_at</code> yang di-compute dari <code>marked_at + 7 hari</code>. UI Admin menampilkan countdown dan menolak koreksi lewat deadline dengan error <code>correction_window_expired</code>.</li>
+<li>Idempotency: command <code>MarkAppointmentOutcome</code> (initial/final) dan <code>CorrectAppointmentOutcome</code> membawa <code>idempotency_key</code>; duplicate call return existing record tanpa side effect. <code>RecordClientArrived</code> (event baru) membawa <code>idempotency_key</code> per appointment.</li>
+</ul>
+<h3 id="ux">UX</h3>
+<ul>
+<li>Email template <code>no_show_recorded</code> (T+15): subjek "Sesi [tanggal] tercatat tidak hadir", body: rangkuman jadwal,提醒 bahwa sesi masih dapat dimulai jika klien terlambat, instruksi untuk menghubungi Admin via WhatsApp jika ada kesalahan.</li>
+<li>Email <code>outcome_corrected</code>: subjek "Pembaruan catatan sesi [tanggal]", body: old → new outcome, tanggal koreksi, kontak Admin untuk pertanyaan.</li>
+<li>Tidak ada perubahan UI pada ClientAccess selain halaman "booking saya" yang sudah ada (<code>IMPLEMENTATION-GUIDE.md §10</code>).</li>
+</ul>
+<h2 id="decision">Decision</h2>
+<p>Model final menggunakan tiga konsep outcome yang terpisah secara konseptual tapi tetap berasal dari satu enum <code>appointment_outcome</code>:</p>
+<ol>
+<li><strong>Early checkpoint</strong> (auto-generated pada T+15 jika tidak ada <code>client_arrived</code>): <code>no_show</code>. Locked at marking. Consumes entitlement.</li>
+<li><strong>Final outcome</strong> (marked by psychologist at end-of-session atau lewat Admin): <code>completed</code> | <code>completed_partial</code> | <code>no_show_late</code> | <code>cancelled</code> (via <code>CancellationDecision</code>). Consumes entitlement kecuali <code>cancelled</code>.</li>
+<li><strong>Correction</strong> (Admin-only, audited, append-only <code>OutcomeCorrection</code>): up to 7 hari kalender setelah <code>marked_at</code>.</li>
+</ol>
+<h3 id="1-grace-period-dan-auto-checkpoint">1. Grace period dan auto-checkpoint</h3>
+<ul>
+<li><strong>Grace period: 15 menit</strong> dari scheduled start (Asia/Jakarta). Tidak berbeda per ServiceOffering.</li>
+<li>Pada T+15, jika <code>client_arrived_at IS NULL</code>, sistem menandai <code>no_show</code> checkpoint dengan <code>marked_by = system</code>, <code>marked_at = scheduled_start + 15m</code>, dan mengirim notifikasi.</li>
+<li>Pada T+15, jika <code>client_arrived_at IS NOT NULL</code>, <strong>tidak ada auto-checkpoint</strong>. Outcome final ditentukan psikolog di end-of-session.</li>
+<li>Auto-checkpoint hanya terjadi jika Appointment status masih <code>confirmed</code> (bukan <code>cancelled</code>, <code>rescheduled</code>, atau sudah ada final outcome).</li>
+</ul>
+<h3 id="2-late-arrival-handling">2. Late-arrival handling</h3>
+<ul>
+<li><strong>Klien datang kapan saja sebelum atau setelah T+15</strong>: psikolog atau Admin merekam event <code>client_arrived</code> (timestamp). Sistem menerima event kapanpun, tetapi efek berbeda:</li>
+<li><code>client_arrived_at &lt;= scheduled_start + 15m</code>: batalkan auto-checkpoint. Outcome final di end-of-session: <code>completed</code> (default) atau <code>completed_partial</code> (jika durasi attended &lt;60 menit).</li>
+<li><code>client_arrived_at &gt; scheduled_start + 15m</code>: checkpoint <code>no_show</code> sudah terkunci; catat <code>client_arrived_at</code> sebagai informational. Outcome final di end-of-session: <code>no_show_late</code>. Entitlement tetap consumed.</li>
+<li><strong>Durasi attended</strong>: dihitung dari <code>client_arrived_at</code> (atau <code>scheduled_start</code> jika klien on-time) sampai <code>session_ended_at</code> (event baru yang direkam oleh psikolog).</li>
+<li><code>&gt;= 60 menit</code>: <code>completed</code>.</li>
+<li><code>&gt;= 1 menit dan &lt; 60 menit</code>: <code>completed_partial</code>. Entitlement tetap consumed; compensation token eligibility flag di-set pada Appointment.</li>
+<li><strong>Tidak ada outcome <code>cancelled</code> lewat late-arrival</strong>: late-arrival yang berakhir dengan klien pergi lagi tanpa sesi efektif adalah <code>no_show</code> (jika T+15 lewat) atau <code>completed_partial</code> (jika T+15 belum lewat dan durasi 1–59 menit).</li>
+</ul>
+<h3 id="3-final-outcome-enum-dan-semantics">3. Final outcome enum dan semantics</h3>
+<pre><code>appointment_outcome:
+  - completed            # sesi berjalan ≥60 menit
+  - completed_partial    # sesi berjalan 1–59 menit (late arrival atau early end)
+  - no_show              # auto-checkpoint T+15, klien tidak datang sebelum T+15
+  - no_show_late         # klien datang setelah T+15, sesi berjalan ≥1 menit
+  - cancelled            # via CancellationDecision approve
+</code></pre>
+<ul>
+<li><code>completed</code>, <code>completed_partial</code>, <code>no_show</code>, <code>no_show_late</code> consume entitlement. <code>cancelled</code> tidak consume.</li>
+<li><code>no_show</code> dan <code>no_show_late</code> adalah operational labels, bukan clinical judgment. UI copy harus netral.</li>
+<li>Untuk couple session, <code>AppointmentParticipant.presence_status</code> dicatat terpisah mengikuti <code>ADR 0090 §5</code>. Outcome appointment level tetap salah satu dari lima nilai di atas.</li>
+</ul>
+<h3 id="4-correction-window-dan-outcomecorrection">4. Correction window dan OutcomeCorrection</h3>
+<ul>
+<li><strong>Window: 7×24 jam (7 hari kalender)</strong> dari <code>marked_at</code> original outcome. Asia/Jakarta.</li>
+<li>Lewat window: outcome immutable. Perubahan hanya via:</li>
+<li><code>CancellationDecision</code> baru (untuk mengubah ke <code>cancelled</code>).</li>
+<li>Explicit Admin extension/exception action (TBD di <code>TBC-EXTENSION-01</code>, di luar scope ADR ini).</li>
+<li><code>OutcomeCorrection</code> event membawa:</li>
+<li><code>original_outcome</code> (immutable reference);</li>
+<li><code>new_outcome</code> (salah satu dari <code>completed</code> | <code>completed_partial</code> | <code>no_show</code> | <code>no_show_late</code> | <code>cancelled</code>);</li>
+<li><code>reason_category</code> (enum: <code>client_provided_evidence</code> | <code>admin_data_correction</code> | <code>system_clock_error</code> | <code>other</code>);</li>
+<li><code>reason_text</code> (maks 200 karakter, non-klinis);</li>
+<li><code>actor_admin_id</code>, <code>actor_admin_email</code>, <code>marked_at_correction</code>;</li>
+<li><code>entitlement_delta</code> (computed: +1 jika dari <code>no_show</code>/<code>no_show_late</code> ke <code>completed*</code>, -1 jika sebaliknya, 0 jika tidak ada entitlement effect);</li>
+<li><code>refund_action_required</code> (bool, default false);</li>
+<li><code>correction_window_deadline_at</code> (untuk audit; harus = <code>marked_at_original + 7 hari</code>).</li>
+<li>Correction <strong>tidak</strong> menghapus original outcome; original tetap di-history.</li>
+<li>Correction <strong>dapat</strong> memerlukan <code>RefundAction</code> terpisah jika Admin juga memutuskan <code>full_refund</code>. Ini bukan satu transaction dengan correction; Admin mengeksekusi refund command terpisah (<code>ADR 0067</code>).</li>
+<li>Compensation token (untuk <code>completed_partial</code>): Admin membuat <code>EntitlementCredit</code> event (TBC di <code>TBC-EXTENSION-01</code>, di luar scope ADR ini). ADR ini hanya mencatat eligibility flag.</li>
+<li>Duplicate <code>OutcomeCorrection</code> dengan idempotency key yang sama: return existing event, no side effect.</li>
+<li>Dua koreksi berurutan dalam window: koreksi kedua merujuk ke outcome hasil koreksi pertama (lineage chain), tetapi original outcome tetap referensi pertama. Ini audited via <code>previous_correction_id</code>.</li>
+</ul>
+<h3 id="5-authority">5. Authority</h3>
+<table>
+<thead>
+<tr>
+<th>Action</th>
+<th>Actor</th>
+<th>Window</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Auto-checkpoint <code>no_show</code></td>
+<td>system</td>
+<td>T+15</td>
+<td>jika <code>confirmed</code> dan <code>client_arrived_at IS NULL</code></td>
+</tr>
+<tr>
+<td>Record <code>client_arrived</code></td>
+<td>psychologist | admin</td>
+<td>kapan saja sebelum final outcome</td>
+<td>timestamp dicatat</td>
+</tr>
+<tr>
+<td>Record <code>session_ended</code></td>
+<td>psychologist | admin</td>
+<td>kapan saja setelah <code>client_arrived_at</code> (atau scheduled_start jika on-time)</td>
+<td>timestamp dicatat</td>
+</tr>
+<tr>
+<td>Mark final outcome</td>
+<td>psychologist (assigned) | admin (override)</td>
+<td>setelah scheduled_start, sebelum OutcomeCorrection window dari auto-checkpoint</td>
+<td>initial marking</td>
+</tr>
+<tr>
+<td>Mark <code>cancelled</code></td>
+<td>admin via CancellationDecision</td>
+<td>sesuai <code>ADR 0051</code></td>
+<td>bukan via late-arrival path</td>
+</tr>
+<tr>
+<td><code>OutcomeCorrection</code></td>
+<td>admin only</td>
+<td>dalam 7 hari kalender dari <code>marked_at</code></td>
+<td>audited, append-only</td>
+</tr>
+</tbody>
+</table>
+<h3 id="6-entitlement-coupling-table">6. Entitlement coupling table</h3>
+<table>
+<thead>
+<tr>
+<th>Outcome</th>
+<th>Entitlement effect</th>
+<th>Coupling</th>
+<th>Reversible via OutcomeCorrection dalam 7 hari?</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>no_show</code> (auto-checkpoint T+15)</td>
+<td>consumed</td>
+<td>coupled</td>
+<td>ya, ke <code>completed</code>/<code>completed_partial</code> jika ada bukti kehadiran</td>
+</tr>
+<tr>
+<td><code>completed</code></td>
+<td>consumed</td>
+<td>coupled</td>
+<td>ya, ke <code>completed_partial</code>/<code>no_show</code>/<code>no_show_late</code></td>
+</tr>
+<tr>
+<td><code>completed_partial</code></td>
+<td>consumed</td>
+<td>coupled</td>
+<td>ya, dengan evidence</td>
+</tr>
+<tr>
+<td><code>no_show_late</code></td>
+<td>consumed</td>
+<td>coupled</td>
+<td>ya, ke <code>completed</code>/<code>completed_partial</code> jika durasi attended efektif</td>
+</tr>
+<tr>
+<td><code>cancelled</code> (via CancellationDecision)</td>
+<td>tidak consumed; restored jika valid</td>
+<td>decoupled</td>
+<td>di luar scope; CancellationDecision adalah command terpisah</td>
+</tr>
+</tbody>
+</table>
+<p><code>SessionEntitlement.status</code> transisi:</p>
+<pre><code>available → scheduled → consumed         # completed, completed_partial, no_show, no_show_late
+available → scheduled → available        # cancelled approved (restore jika valid)
+consumed → available                     # OutcomeCorrection yang me-restore entitlement (dalam window 7 hari)
+</code></pre>
+<h3 id="7-notification">7. Notification</h3>
+<table>
+<thead>
+<tr>
+<th>Event</th>
+<th>Recipient</th>
+<th>Channel</th>
+<th>Template ID</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Auto-checkpoint <code>no_show</code> di T+15</td>
+<td>client</td>
+<td>email</td>
+<td><code>no_show_recorded</code></td>
+</tr>
+<tr>
+<td>Auto-checkpoint <code>no_show</code> di T+15</td>
+<td>admin</td>
+<td>in-app + email</td>
+<td><code>no_show_admin_alert</code></td>
+</tr>
+<tr>
+<td><code>client_arrived</code> recorded</td>
+<td>admin only (in-app)</td>
+<td>in-app</td>
+<td><code>client_arrived_admin</code></td>
+</tr>
+<tr>
+<td>Final outcome marked oleh psikolog</td>
+<td>client</td>
+<td>email</td>
+<td><code>outcome_finalized</code></td>
+</tr>
+<tr>
+<td>Final outcome marked oleh Admin override</td>
+<td>client + admin</td>
+<td>email + in-app</td>
+<td><code>outcome_finalized_admin</code></td>
+</tr>
+<tr>
+<td><code>OutcomeCorrection</code> dalam window 7 hari</td>
+<td>client</td>
+<td>email</td>
+<td><code>outcome_corrected</code></td>
+</tr>
+<tr>
+<td><code>OutcomeCorrection</code> di luar window (rejected)</td>
+<td>admin</td>
+<td>in-app</td>
+<td><code>correction_window_expired</code></td>
+</tr>
+</tbody>
+</table>
+<p>Email <code>outcome_finalized</code> untuk <code>no_show_late</code> menyertakan kalimat: "Sesi Anda tercatat tetap berlangsung setelah waktu mulai yang dijadwalkan. Entitlement sesi ini telah tercatat terpakai sesuai kebijakan; silakan hubungi Admin via WhatsApp jika ada pertanyaan."</p>
+<p>Email <code>outcome_corrected</code> netral: tidak menyebut clinical framing; hanya "Pembaruan catatan sesi" dengan old → new outcome dan tanggal koreksi.</p>
+<p>Reminder normal 24h/2h (<code>ADR 0052</code>) tidak berubah.</p>
+<h2 id="consequences">Consequences</h2>
+<p>Positive:</p>
+<ul>
+<li>Entitlement consumption deterministic sejak T+15 — package balance, reporting, refund calculation stabil.</li>
+<li>Late-arrival tetap dihormati tanpa membatalkan checkpoint, sehingga klien tidak dirugikan akibat akses (macet, link rusak).</li>
+<li>Correction window 7 hari cukup untuk Admin menanggapi evidence dari klien tanpa risiko historical drift berkepanjangan.</li>
+<li>Notification copy eksplisit di setiap transisi outcome mengurangi ambiguity bagi klien.</li>
+<li>Couple session di <code>ADR 0090</code> tidak perlu patch: outcome enum baru (5 nilai) tetap compatible dengan <code>AppointmentParticipant.presence_status</code>.</li>
+</ul>
+<p>Costs and constraints:</p>
+<ul>
+<li>Schema baru: kolom <code>client_arrived_at</code>, <code>session_ended_at</code>, <code>effective_attended_minutes</code> (computed) pada outcome/projection; enum outcome di-extend.</li>
+<li>Email template baru: <code>no_show_recorded</code>, <code>no_show_admin_alert</code>, <code>client_arrived_admin</code>, <code>outcome_finalized</code>, <code>outcome_finalized_admin</code>, <code>outcome_corrected</code>, <code>correction_window_expired</code>.</li>
+<li>Admin workspace UI: tampilkan outcome enum baru, <code>correction_window_deadline_at</code> countdown, original vs current outcome.</li>
+<li>Notification provider load naik ~2 email per Appointment (T+15 auto-checkpoint + final outcome); untuk launch dengan 1 psikolog, beban rendah.</li>
+<li>7 hari window mengunci integritas reporting jangka panjang; Admin yang telat menanggapi evidence klien lewat 7 hari harus menggunakan CancellationDecision atau extension (di luar scope).</li>
+<li>Late-arrival handling memerlukan psikolog/Admin untuk secara aktif menandai <code>client_arrived</code> dan <code>session_ended</code>. Tanpa pencatatan, default fallback ke <code>no_show</code> (jika T+15 lewat) atau <code>completed</code> (jika on-time).</li>
+<li><code>compensation_token</code> dan <code>EntitlementCredit</code> deferred ke <code>TBC-EXTENSION-01</code>; untuk launch, Admin menandai eligibility via flag tanpa sistem entitlement credit otomatis.</li>
+</ul>
+<h2 id="open-follow-up">Open follow-up</h2>
+<ul>
+<li><code>TBC-EXTENSION-01</code> — implementasi <code>EntitlementCredit</code> dan compensation token untuk <code>completed_partial</code>. Di luar scope ADR ini.</li>
+<li><code>TBC-NOTIFY-02</code> — final wording email template Indonesia untuk <code>no_show_recorded</code>, <code>outcome_corrected</code>, dan copy <code>no_show_late</code>. Owner: operations/clinical sign-off.</li>
+<li><code>TBC-COMPENSATION-POLICY-01</code> — kapan Admin wajib vs optional memberi compensation token untuk <code>completed_partial</code>. Default launch: optional.</li>
+<li><code>TBC-CLOCK-01</code> — server clock drift handling; client tidak boleh percaya dengan <code>client_arrived_at</code> yang datang dari browser tanpa server-side validation. Recommended: psikolog/Admin merekam dari Admin workspace dengan server timestamp; client tidak punya UI untuk self-mark arrival pada launch.</li>
+</ul>
+<h2 id="reference">Reference</h2>
+<ul>
+<li><code>ADR 0015-appointment-outcomes.md</code> — appointment outcomes enum</li>
+<li><code>ADR 0025-cancellation-pending-reservation.md</code> — pending preserves reservation</li>
+<li><code>ADR 0026-entitlement-consumption.md</code> — completed consumes, cancelled does not</li>
+<li><code>ADR 0027-no-show-consumption.md</code> — no-show consumes by default</li>
+<li><code>ADR 0028-no-show-grace-period.md</code> — 15-minute grace</li>
+<li><code>ADR 0051-cancellation-decision-record.md</code> — CancellationDecision approve/deny</li>
+<li><code>ADR 0052-reminder-schedule.md</code> — 24h/2h reminder</li>
+<li><code>ADR 0054-outcome-correction-events.md</code> — correction events</li>
+<li><code>ADR 0062-restored-entitlement-expiry.md</code> — restored expiry</li>
+<li><code>ADR 0063-package-refund-at-purchase-level.md</code> — purchase-level refund</li>
+<li><code>ADR 0066-flexible-admin-whatsapp-support.md</code> — WhatsApp optional</li>
+<li><code>ADR 0067-admin-cancellation-refund-workspace.md</code> — admin workspace</li>
+<li><code>ADR 0073-counseling-session-duration.md</code> — 60-minute session</li>
+<li><code>ADR 0077-launch-full-or-no-refund.md</code> — refund vocabulary</li>
+<li><code>ADR 0090-couple-participant-model.md</code> — couple participant model (compatible)</li>
+<li><code>IMPLEMENTATION-GUIDE.md</code> §6.1, §6.2, §10 — patched alongside this ADR</li>
+<li><code>DOMAIN-MODEL.md</code> Lifecycle section — patched alongside this ADR</li>
+<li><code>PRD-GUIDELINE-REVIEW.md</code> P1-12, TBC-NO-SHOW-01 — closed by this ADR</li>
+</ul></main><footer>Seraya Psikologi · Documentation generated from the repository · <a href="../../reference/index.html">Long-form reference</a></footer></div></body></html>

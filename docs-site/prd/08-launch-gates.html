@@ -1,0 +1,28 @@
+<!doctype html><html lang="id"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>PRD 08 — Launch Gates — Seraya Psikologi</title><link rel="stylesheet" href="../assets/main.css"></head><body><div class="shell"><header class="site-header"><div><a class="brand" href="../index.html">Seraya Psikologi</a><div class="subtitle">Project control center · MVP review</div></div><nav class="topnav"><a href="../index.html">Overview</a><a href="../workboard.html">Workboard</a><a href="../prd/index.html">Focused PRDs</a><a href="../reference/index.html">Reference</a></nav></header><div class="muted" style="font-size:.84rem;margin-bottom:18px"><a href="../index.html">Home</a> / Focused PRD</div><main><h1 id="prd-08-launch-gates">PRD 08 — Launch Gates</h1>
+<h2 id="goal">Goal</h2>
+<p>Separate “the MVP can be reviewed” from “real clients can use production”.</p>
+<h2 id="must-be-true-before-production">Must be true before production</h2>
+<ol>
+<li>Real Admin WhatsApp number, bank account, account holder, and QRIS asset configured.</li>
+<li>Real Fuja schedule, venue, and online-meeting instructions verified.</li>
+<li>Fuja profile credentials/publication consent verified.</li>
+<li>Google SSO + StaffMembership + role checks wired; placeholder auth disabled.</li>
+<li>Admin payment/cancellation workspace tested with real authorization boundaries.</li>
+<li>Consent, privacy, safety, cancellation, and payment copy signed off.</li>
+<li>Email provider and sender domain configured; confirmation/reminder delivery tested.</li>
+<li>D1 backup/export and restore drill recorded with RPO/RTO evidence.</li>
+<li>Rate limits, access-token lifecycle, and abuse response documented.</li>
+<li>UAT covers booking, overlap, hold expiry, manual payment, rejection, confirmation, cancellation, and recovery paths.</li>
+<li>No demo fixture or placeholder value is presented as production data.</li>
+<li>Release sign-off is recorded by business, clinical/ethics, operations, finance, and technical owners.</li>
+</ol>
+<h2 id="not-required-for-current-mvp-review">Not required for current MVP review</h2>
+<ul>
+<li>Midtrans onboarding.</li>
+<li>Couple bookable launch.</li>
+<li>Clinical record/EMR.</li>
+<li>Automated WhatsApp provider.</li>
+<li>Full CMS/editor workflow.</li>
+</ul>
+<h2 id="evidence-format">Evidence format</h2>
+<p>For each gate, record: owner, date, environment, test/result link, and sign-off. Keep the detailed G-1..G-14 checklist in <code>docs/adr/0096-launch-gate-checklist.md</code> as reference.</p></main><footer>Seraya Psikologi · Documentation generated from the repository · <a href="../reference/index.html">Long-form reference</a></footer></div></body></html>

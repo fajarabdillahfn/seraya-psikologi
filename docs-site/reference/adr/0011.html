@@ -1,0 +1,25 @@
+<!doctype html><html lang="id"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>ADR 0011 — Seraya Psikologi</title><link rel="stylesheet" href="../../assets/main.css"></head><body><div class="shell"><header class="site-header"><div><a class="brand" href="../../index.html">Seraya Psikologi</a><div class="subtitle">Project control center · MVP review</div></div><nav class="topnav"><a href="../../index.html">Overview</a><a href="../../workboard.html">Workboard</a><a href="../../prd/index.html">Focused PRDs</a><a href="../../reference/index.html">Reference</a></nav></header><div class="muted" style="font-size:.84rem;margin-bottom:18px"><a href="../../index.html">Home</a> / ADR</div><main><h1 id="11-keep-rescheduling-administrative-and-audited">11. Keep Rescheduling Administrative and Audited</h1>
+<h2 id="status">Status</h2>
+<p>Accepted for the MVP working model; replacement, same-payment, and same-entitlement behavior are resolved by ADR 0039. Admin permission, policy cutoff, and notification details remain open.</p>
+<h2 id="context">Context</h2>
+<p>Mutating an Appointment's time in place destroys the original schedule history and complicates slot release, notifications, payment reconciliation, and audit. Client self-service rescheduling adds another high-risk concurrency path before the basic booking lifecycle is proven.</p>
+<h2 id="decision">Decision</h2>
+<p>No client self-service rescheduling in MVP. An authorized admin may perform a RescheduleAction. The operation must preserve the original Appointment history and create/link an explicit replacement schedule/slot rather than silently overwriting the original time.</p>
+<p>The action must be audited and should trigger the applicable schedule-change notification. ADR 0039 resolves the relation: the Booking remains the same, a replacement Appointment is created, package replacements reuse the same SessionEntitlement, and the existing Payment carries forward without a new charge.</p>
+<h2 id="consequences">Consequences</h2>
+<p>Positive:</p>
+<ul>
+<li>original schedule history remains traceable;</li>
+<li>lower concurrency and authorization complexity for MVP;</li>
+<li>staff can handle exceptional cases with context;</li>
+<li>notification and payment behavior can be made explicit per action.</li>
+</ul>
+<p>Costs and constraints:</p>
+<ul>
+<li>admin operations need a clear UI and reason field;</li>
+<li>client UX must explain how to request a change;</li>
+<li>replacement-slot availability must be checked atomically;</li>
+<li>audit and notification failures need recovery paths.</li>
+</ul>
+<h2 id="open-follow-up">Open follow-up</h2>
+<p>Define admin reschedule permissions, policy cutoff, client request channel, and exact status/event vocabulary. Replacement Appointment cardinality and payment/entitlement carry-forward are resolved by ADR 0039.</p></main><footer>Seraya Psikologi · Documentation generated from the repository · <a href="../../reference/index.html">Long-form reference</a></footer></div></body></html>

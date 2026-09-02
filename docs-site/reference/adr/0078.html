@@ -1,0 +1,31 @@
+<!doctype html><html lang="id"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>ADR 0078 — Seraya Psikologi</title><link rel="stylesheet" href="../../assets/main.css"></head><body><div class="shell"><header class="site-header"><div><a class="brand" href="../../index.html">Seraya Psikologi</a><div class="subtitle">Project control center · MVP review</div></div><nav class="topnav"><a href="../../index.html">Overview</a><a href="../../workboard.html">Workboard</a><a href="../../prd/index.html">Focused PRDs</a><a href="../../reference/index.html">Reference</a></nav></header><div class="muted" style="font-size:.84rem;margin-bottom:18px"><a href="../../index.html">Home</a> / ADR</div><main><h1 id="78-one-admin-may-execute-separate-cancellation-and-refund-actions">78. One Admin May Execute Separate Cancellation and Refund Actions</h1>
+<h2 id="status">Status</h2>
+<p>Accepted for launch planning.</p>
+<h2 id="context">Context</h2>
+<p>The MVP has a small operational team and already separates cancellation decisions from refund actions. A second-approver workflow would add operational friction without a current threshold policy, but combining both outcomes into one mutable status would weaken auditability.</p>
+<h2 id="decision">Decision</h2>
+<p>One authorized <strong>Admin</strong> may:</p>
+<ol>
+<li>record and approve/deny the <code>CancellationDecision</code>; and</li>
+<li>separately create/execute the <code>RefundAction</code> (<code>full_refund</code> or <code>no_refund</code>).</li>
+</ol>
+<p>The two actions remain separate commands and append-only records even when the same Admin performs both. Each records actor, timestamp, reason/category, policy/version, target, correlation/idempotency data, and resulting status. The Admin UI must not imply that approving cancellation automatically executes a gateway refund.</p>
+<p>No second approval, dual-control requirement, or amount threshold is required in MVP. Future financial controls may introduce one as an explicit policy change.</p>
+<p>A failed/pending/reversed gateway refund does not rewrite or silently roll back the already-recorded CancellationDecision or its atomic Appointment/slot/entitlement effects. Admin handles retry or explicit resolution through the RefundAction record.</p>
+<h2 id="consequences">Consequences</h2>
+<p>Positive:</p>
+<ul>
+<li>supports the small launch team and simple operational workflow;</li>
+<li>preserves clear separation between service/capacity decision and financial action;</li>
+<li>makes retries and gateway failures auditable;</li>
+<li>leaves room for future dual-control policy without changing domain history.</li>
+</ul>
+<p>Costs and constraints:</p>
+<ul>
+<li>one Admin has significant authority, so audit and access protection matter;</li>
+<li>refunds must be reviewed carefully before execution;</li>
+<li>UI must expose two distinct actions and statuses;</li>
+<li>no automatic rollback from a refund failure is available.</li>
+</ul>
+<h2 id="open-follow-up">Open follow-up</h2>
+<p>Define exact Admin permission flag/invite, audit view, notification copy, refund retry/reconciliation runbook, and future threshold/dual-control policy if the team grows.</p></main><footer>Seraya Psikologi · Documentation generated from the repository · <a href="../../reference/index.html">Long-form reference</a></footer></div></body></html>

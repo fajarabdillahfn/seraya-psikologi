@@ -1,0 +1,28 @@
+<!doctype html><html lang="id"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>PRD 07 — Staff &amp; Admin Operations — Seraya Psikologi</title><link rel="stylesheet" href="../assets/main.css"></head><body><div class="shell"><header class="site-header"><div><a class="brand" href="../index.html">Seraya Psikologi</a><div class="subtitle">Project control center · MVP review</div></div><nav class="topnav"><a href="../index.html">Overview</a><a href="../workboard.html">Workboard</a><a href="../prd/index.html">Focused PRDs</a><a href="../reference/index.html">Reference</a></nav></header><div class="muted" style="font-size:.84rem;margin-bottom:18px"><a href="../index.html">Home</a> / Focused PRD</div><main><h1 id="prd-07-staff-admin-operations">PRD 07 — Staff &amp; Admin Operations</h1>
+<h2 id="goal">Goal</h2>
+<p>Give authorized staff the minimum workspace needed to verify payment and operate bookings safely.</p>
+<h2 id="roles">Roles</h2>
+<ul>
+<li>Admin: operational review and privileged commands.</li>
+<li>Psychologist: scoped access to relevant appointments/clients only.</li>
+<li>Client: scoped booking access; no global account required for MVP.</li>
+</ul>
+<h2 id="current-state">Current state</h2>
+<p>The live MVP uses a clearly labeled placeholder auth gate for development. It is not production staff authentication.</p>
+<h2 id="production-requirements">Production requirements</h2>
+<ul>
+<li>Google SSO identity verification.</li>
+<li>Explicit StaffMembership record.</li>
+<li>Role assignment and two-Admin bootstrap.</li>
+<li>Session lifecycle: state/nonce, cookie, CSRF, re-authentication, revocation, and recovery.</li>
+<li>Audit trail for payment/cancellation/refund actions.</li>
+</ul>
+<h2 id="admin-payment-procedure">Admin payment procedure</h2>
+<p>Receive proof in WhatsApp → identify booking → record proof → verify/reject → confirm client through the approved channel → retain evidence per approved policy.</p>
+<h2 id="acceptance-checks">Acceptance checks</h2>
+<ul>
+<li>Unauthenticated requests cannot reach privileged commands.</li>
+<li>Psychologist cannot see unrelated clients/bookings.</li>
+<li>Admin verification is atomic and idempotent.</li>
+<li>Last-Admin removal/recovery is protected.</li>
+</ul></main><footer>Seraya Psikologi · Documentation generated from the repository · <a href="../reference/index.html">Long-form reference</a></footer></div></body></html>

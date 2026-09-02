@@ -1,0 +1,44 @@
+<!doctype html><html lang="id"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>PRD 02 — Payment Flow — Seraya Psikologi</title><link rel="stylesheet" href="../assets/main.css"></head><body><div class="shell"><header class="site-header"><div><a class="brand" href="../index.html">Seraya Psikologi</a><div class="subtitle">Project control center · MVP review</div></div><nav class="topnav"><a href="../index.html">Overview</a><a href="../workboard.html">Workboard</a><a href="../prd/index.html">Focused PRDs</a><a href="../reference/index.html">Reference</a></nav></header><div class="muted" style="font-size:.84rem;margin-bottom:18px"><a href="../index.html">Home</a> / Focused PRD</div><main><h1 id="prd-02-payment-flow">PRD 02 — Payment Flow</h1>
+<h2 id="goal">Goal</h2>
+<p>MVP collects payment manually without a payment gateway. The system gives the client a clear invoice and gives Admin a controlled verification action.</p>
+<h2 id="launch-decision">Launch decision</h2>
+<ul>
+<li>Payment gateway is <strong>deferred</strong>.</li>
+<li>Client pays via bank transfer or manual QRIS.</li>
+<li>Client sends proof to Admin via WhatsApp.</li>
+<li>Admin verifies in the Admin workspace.</li>
+<li>Only verified proof can move a booking to <code>confirmed</code>.</li>
+</ul>
+<h2 id="client-flow">Client flow</h2>
+<ol>
+<li>Booking is created with <code>pending_manual_payment</code>.</li>
+<li>System generates a text invoice and a downloadable PDF invoice.</li>
+<li>Client receives a WhatsApp deep-link with booking ID, amount, expiry, and instructions.</li>
+<li>Client transfers money and sends proof to Admin.</li>
+<li>Client waits for Admin confirmation.</li>
+</ol>
+<h2 id="admin-flow">Admin flow</h2>
+<ol>
+<li>Admin opens the payment queue.</li>
+<li>Admin records proof metadata: method, evidence URL/note, and booking.</li>
+<li>Admin verifies or rejects the proof.</li>
+<li>Verify atomically updates proof + booking; reject records the reason and closes the booking according to the accepted rule.</li>
+<li>Every privileged action is audited.</li>
+</ol>
+<h2 id="data-boundary">Data boundary</h2>
+<p><code>payment_proof</code> is the launch payment record. It stores payment evidence metadata and verification status. It must not store unnecessary clinical content.</p>
+<h2 id="acceptance-checks">Acceptance checks</h2>
+<ul>
+<li>Invoice amount comes from the immutable OfferSnapshot.</li>
+<li>Invoice includes a real configured Admin number and real payment instructions before production.</li>
+<li>Same proof verification repeated is idempotent.</li>
+<li>A rejected proof cannot confirm a booking.</li>
+<li>Demo bank details and placeholder Admin auth never pass production launch gates.</li>
+</ul>
+<h2 id="later-option">Later option</h2>
+<p>Midtrans remains a separate future adapter/decision. Do not mix gateway assumptions into this MVP flow.</p>
+<h2 id="references">References</h2>
+<ul>
+<li><code>docs/adr/0097-whatsapp-manual-payment.md</code></li>
+<li><code>docs/adr/0068-midtrans-snap-launch-gateway.md</code> (deferred/superseded for current launch)</li>
+</ul></main><footer>Seraya Psikologi · Documentation generated from the repository · <a href="../reference/index.html">Long-form reference</a></footer></div></body></html>

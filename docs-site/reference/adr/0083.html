@@ -1,0 +1,23 @@
+<!doctype html><html lang="id"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>ADR 0083 — Seraya Psikologi</title><link rel="stylesheet" href="../../assets/main.css"></head><body><div class="shell"><header class="site-header"><div><a class="brand" href="../../index.html">Seraya Psikologi</a><div class="subtitle">Project control center · MVP review</div></div><nav class="topnav"><a href="../../index.html">Overview</a><a href="../../workboard.html">Workboard</a><a href="../../prd/index.html">Focused PRDs</a><a href="../../reference/index.html">Reference</a></nav></header><div class="muted" style="font-size:.84rem;margin-bottom:18px"><a href="../../index.html">Home</a> / ADR</div><main><h1 id="83-retain-client-and-contact-data-for-12-months">83. Retain Client and Contact Data for 12 Months</h1>
+<h2 id="status">Status</h2>
+<p>Accepted for launch planning; duration selected, exact trigger implementation remains to be specified in the RetentionPolicy record.</p>
+<h2 id="context">Context</h2>
+<p>Seraya stores minimal Client/contact data for booking, appointment communication, ClientAccess, and optional manual support. The retention model is category-specific and must not be confused with Payment, audit, or security retention.</p>
+<h2 id="decision">Decision</h2>
+<p>Retain Client/contact data for <strong>12 months after the client's last active service</strong>. The retention clock and policy version must be stored explicitly; the implementation must not delete a Client row while active Booking, Appointment, PackagePurchase, Payment/Refund, PrivacyRequest, or audit dependencies require a permitted reference. When deletion is not legally/operationally possible, apply the approved category-specific redaction/anonymization outcome and preserve only the minimum integrity reference.</p>
+<p>This decision covers Client/contact identity and optional WhatsApp-capable contact data. It does not set the retention duration for Payment/Refund, ConsentRecord, Notification delivery, or Audit/security metadata.</p>
+<h2 id="consequences">Consequences</h2>
+<p>Positive:</p>
+<ul>
+<li>limits long-lived contact data while supporting post-service operational needs;</li>
+<li>keeps retention category-specific;</li>
+<li>makes redaction/anonymization a controlled policy outcome rather than a destructive cascade.</li>
+</ul>
+<p>Costs and constraints:</p>
+<ul>
+<li>the system must calculate and audit the last-active-service trigger;</li>
+<li>active financial/audit/consent dependencies may require redaction instead of physical deletion;</li>
+<li>the clinical/data owner must approve the exact implementation trigger and evidence.</li>
+</ul>
+<h2 id="open-follow-up">Open follow-up</h2>
+<p>Define the exact last-active-service event, exception precedence, PrivacyRequest workflow, anonymization fields, and retention durations for Payment/Refund, ConsentRecord, Notification, and Audit/security categories.</p></main><footer>Seraya Psikologi · Documentation generated from the repository · <a href="../../reference/index.html">Long-form reference</a></footer></div></body></html>

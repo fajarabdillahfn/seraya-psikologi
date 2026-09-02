@@ -1,0 +1,24 @@
+<!doctype html><html lang="id"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>ADR 0040 — Seraya Psikologi</title><link rel="stylesheet" href="../../assets/main.css"></head><body><div class="shell"><header class="site-header"><div><a class="brand" href="../../index.html">Seraya Psikologi</a><div class="subtitle">Project control center · MVP review</div></div><nav class="topnav"><a href="../../index.html">Overview</a><a href="../../workboard.html">Workboard</a><a href="../../prd/index.html">Focused PRDs</a><a href="../../reference/index.html">Reference</a></nav></header><div class="muted" style="font-size:.84rem;margin-bottom:18px"><a href="../../index.html">Home</a> / ADR</div><main><h1 id="40-generate-availability-on-a-rolling-ninety-day-horizon">40. Generate Availability on a Rolling Ninety-day Horizon</h1>
+<h2 id="status">Status</h2>
+<p>Accepted for the MVP working model; 90-day rolling horizon, rule/exception source, and preservation of held/booked history are resolved by ADR 0040/0061. Exact generation trigger, backfill cadence, and publication controls remain open.</p>
+<h2 id="context">Context</h2>
+<p>Recurring rules and exceptions are durable sources, while concrete AvailabilitySlot records are bookable capacity. Generating indefinitely creates unnecessary data and exposes dates the practice may not want to commit to; generating too little makes package follow-up scheduling frustrating.</p>
+<h2 id="decision">Decision</h2>
+<p>Use a rolling BookingHorizon of 90 days by default, configurable by Admin. Generate/expose offering-specific AvailabilitySlot instances only within the horizon and Asia/Jakarta operational semantics. The horizon moves forward as time passes; rules/exceptions are the source of truth and regeneration must not overwrite held/booked history.</p>
+<h2 id="consequences">Consequences</h2>
+<p>Positive:</p>
+<ul>
+<li>future capacity is bounded and predictable;</li>
+<li>package clients can schedule remaining sessions meaningfully ahead;</li>
+<li>admin can adjust horizon without changing domain structure;</li>
+<li>old slots can be archived/retained as history separately from future capacity.</li>
+</ul>
+<p>Costs and constraints:</p>
+<ul>
+<li>a scheduled generation/rolling job or on-demand boundary is required;</li>
+<li>rule/exception changes need idempotent regeneration;</li>
+<li>package expiry may fall beyond the horizon and require later extension;</li>
+<li>UI must distinguish no availability in horizon from no availability ever.</li>
+</ul>
+<h2 id="open-follow-up">Open follow-up</h2>
+<p>Define generation trigger/backfill cadence, exact horizon configuration owner, slot archival, and how package expiry beyond the current horizon is presented. Rule-change regeneration and preservation boundaries are resolved by ADR 0061.</p></main><footer>Seraya Psikologi · Documentation generated from the repository · <a href="../../reference/index.html">Long-form reference</a></footer></div></body></html>

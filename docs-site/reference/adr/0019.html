@@ -1,0 +1,25 @@
+<!doctype html><html lang="id"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>ADR 0019 — Seraya Psikologi</title><link rel="stylesheet" href="../../assets/main.css"></head><body><div class="shell"><header class="site-header"><div><a class="brand" href="../../index.html">Seraya Psikologi</a><div class="subtitle">Project control center · MVP review</div></div><nav class="topnav"><a href="../../index.html">Overview</a><a href="../../workboard.html">Workboard</a><a href="../../prd/index.html">Focused PRDs</a><a href="../../reference/index.html">Reference</a></nav></header><div class="muted" style="font-size:.84rem;margin-bottom:18px"><a href="../../index.html">Home</a> / ADR</div><main><h1 id="19-give-packages-a-visible-configurable-validity-period">19. Give Packages a Visible Configurable Validity Period</h1>
+<h2 id="status">Status</h2>
+<p>Accepted for the MVP working model; validity is configurable per ServicePackage (ADR 0048), calendar-period arithmetic is resolved by ADR 0055, and payment-success anchoring/Asia-Jakarta semantics are resolved by ADR 0036. Restoration retains original expiry under ADR 0062 and package refund accounting is manual purchase-level under ADR 0063. Exact duration values, allowed units/range, end-of-month boundary, extension, and refund eligibility/amount remain open.</p>
+<h2 id="context">Context</h2>
+<p>Multi-session packages create a future obligation to schedule unused sessions. An indefinite entitlement complicates capacity planning, reporting, notifications, policy changes, and refunds. A hidden expiry would be unfair and difficult to explain.</p>
+<h2 id="decision">Decision</h2>
+<p>Every ServicePackage has a visible, configurable PackageValidity period. The applicable expiry is recorded with the Booking/SessionEntitlement. After expiry, unused entitlements enter an expired state and cannot be scheduled through the normal client flow. An authorized admin may grant an exception only with an audit reason.</p>
+<p>The period and expiry boundary must use the operational timezone/policy version and be shown before payment.</p>
+<h2 id="consequences">Consequences</h2>
+<p>Positive:</p>
+<ul>
+<li>clients know the commitment before purchase;</li>
+<li>unused-session liability has a defined boundary;</li>
+<li>reminders and reporting can target upcoming expiry;</li>
+<li>exceptions are auditable rather than silent indefinite extensions.</li>
+</ul>
+<p>Costs and constraints:</p>
+<ul>
+<li>exact durations may need different package configurations later;</li>
+<li>expiry notifications and timezone semantics are required;</li>
+<li>refund/credit behavior for expired unused sessions needs business policy;</li>
+<li>admin exception access must be controlled.</li>
+</ul>
+<h2 id="open-follow-up">Open follow-up</h2>
+<p>Choose exact duration values/allowed units, end-of-month and local expiry boundary, extension/restoration, reminder offsets, and launch full/no-refund/credit behavior. Partial monetary refunds are deferred beyond launch.</p></main><footer>Seraya Psikologi · Documentation generated from the repository · <a href="../../reference/index.html">Long-form reference</a></footer></div></body></html>

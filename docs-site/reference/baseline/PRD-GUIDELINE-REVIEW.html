@@ -1,0 +1,1778 @@
+<!doctype html><html lang="id"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Seraya Psikologi — Review PRD dan Implementation Guide — Seraya Psikologi</title><link rel="stylesheet" href="../../assets/main.css"></head><body><div class="shell"><header class="site-header"><div><a class="brand" href="../../index.html">Seraya Psikologi</a><div class="subtitle">Project control center · MVP review</div></div><nav class="topnav"><a href="../../index.html">Overview</a><a href="../../workboard.html">Workboard</a><a href="../../prd/index.html">Focused PRDs</a><a href="../../reference/index.html">Reference</a></nav></header><div class="muted" style="font-size:.84rem;margin-bottom:18px"><a href="../../index.html">Home</a> / Baseline</div><main><h1 id="seraya-psikologi-review-prd-dan-implementation-guide">Seraya Psikologi — Review PRD dan Implementation Guide</h1>
+<h2 id="status-review">Status review</h2>
+<p><strong>Read-only artifact audit.</strong> Review ini tidak mengubah PRD, ADR, domain model, atau implementation guide.</p>
+<h2 id="executive-verdict">Executive verdict</h2>
+<table>
+<thead>
+<tr>
+<th>Area</th>
+<th>Verdict</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Diskusi/domain exploration</td>
+<td>Kuat dan bernilai; keputusan inti sudah banyak</td>
+</tr>
+<tr>
+<td>PRD/design handoff</td>
+<td><strong>Boleh dengan catatan</strong>: source drift dan TBC harus terlihat</td>
+</tr>
+<tr>
+<td>Architecture-neutral foundation</td>
+<td><strong>Boleh mulai sebagian</strong>: vocabulary, error model, fake clock, test fixtures, idempotency primitives</td>
+</tr>
+<tr>
+<td>Database schema/migrations</td>
+<td><strong>Belum boleh dikunci</strong>: stack/persistence dan aggregate boundary konflik</td>
+</tr>
+<tr>
+<td>End-to-end feature implementation</td>
+<td><strong>Belum implementation-ready</strong></td>
+</tr>
+<tr>
+<td>Production launch</td>
+<td><strong>Belum siap</strong> dan memang masih gated</td>
+</tr>
+</tbody>
+</table>
+<p><code>IMPLEMENTATION-GUIDE.md</code> lebih matang daripada dua form PRD, tetapi statusnya saat ini terlalu kuat. Label <strong>“Implementation Baseline — boleh dipakai sebagai pegangan implementasi”</strong> perlu diturunkan menjadi <strong>conditional draft</strong> sampai blocker P0 diselesaikan.</p>
+<h2 id="source-yang-diaudit">Source yang diaudit</h2>
+<ol>
+<li><code>seraya-psikologi-prd-nonteknis-filled-rev46.html</code></li>
+<li><code>seraya-psikologi-prd-teknis-filled-rev168.html</code></li>
+<li>Live PRD readback:
+   - Non-Teknis revision 46;
+   - Teknis revision 170.</li>
+<li><code>IMPLEMENTATION-GUIDE.md</code> — 679 baris.</li>
+<li><code>DOMAIN-MODEL.md</code> — 178 baris.</li>
+<li><code>CONTEXT.md</code> — 285 baris.</li>
+<li>Seluruh <strong>88 ADR</strong> di <code>docs/adr/</code>:
+   - 87 berstatus accepted/accepted-for-planning dalam berbagai bentuk;
+   - ADR 0064 berstatus superseded, tetapi status/body-nya masih membawa keputusan yang bertentangan.</li>
+<li>Form serializer, server autosave, Worker API, dan D1 migration untuk memeriksa integritas source PRD.</li>
+</ol>
+<h2 id="completeness-faktual">Completeness faktual</h2>
+<h3 id="prd-teknis-revision-168">PRD Teknis revision 168</h3>
+<ul>
+<li>Form fields: <strong>164</strong>.</li>
+<li>Required fields: <strong>156</strong>.</li>
+<li>Raw JSON non-empty required values: <strong>46</strong>; raw empty required: <strong>110</strong>.</li>
+<li>Rendered-valid required fields: <strong>43</strong>; <strong>113</strong> tetap kosong di UI.</li>
+<li>Tiga required answer (<code>mvp_caps</code>, <code>client_auth</code>, <code>test_layers</code>) berisi narrative string yang tidak cocok dengan option value radio/checkbox, sehingga <code>apply()</code> tidak memilih option apa pun.</li>
+</ul>
+<p>Missing required per section:</p>
+<table>
+<thead>
+<tr>
+<th>Section</th>
+<th style="text-align: right;">Missing</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Functional Requirements</td>
+<td style="text-align: right;">27</td>
+</tr>
+<tr>
+<td>Data Model &amp; Classification</td>
+<td style="text-align: right;">39</td>
+</tr>
+<tr>
+<td>Booking, Payment &amp; Concurrency</td>
+<td style="text-align: right;">1</td>
+</tr>
+<tr>
+<td>Payment Gateway Integration</td>
+<td style="text-align: right;">3</td>
+</tr>
+<tr>
+<td>Authentication &amp; Authorization</td>
+<td style="text-align: right;">1</td>
+</tr>
+<tr>
+<td>Security, Privacy &amp; Data Lifecycle</td>
+<td style="text-align: right;">4</td>
+</tr>
+<tr>
+<td>External Integrations</td>
+<td style="text-align: right;">22</td>
+</tr>
+<tr>
+<td>UX, Accessibility, Performance &amp; SEO</td>
+<td style="text-align: right;">4</td>
+</tr>
+<tr>
+<td>Environments, CI/CD &amp; Operations</td>
+<td style="text-align: right;">5</td>
+</tr>
+<tr>
+<td>Testing, UAT &amp; Release</td>
+<td style="text-align: right;">1</td>
+</tr>
+<tr>
+<td>Decisions, Risks &amp; Milestones</td>
+<td style="text-align: right;">3</td>
+</tr>
+</tbody>
+</table>
+<h3 id="prd-non-teknis-revision-46">PRD Non-Teknis revision 46</h3>
+<ul>
+<li>Form fields: <strong>142</strong>.</li>
+<li>Required fields: <strong>78</strong>.</li>
+<li>Raw JSON non-empty required values: <strong>17</strong>; raw empty required: <strong>61</strong>.</li>
+<li>Rendered-valid required fields: <strong>15</strong>; <strong>63</strong> tetap kosong di UI.</li>
+<li>Dua required answer (<code>profile_proof</code>, <code>landing_sections</code>) memakai value yang tidak ada dalam allowed option schema, sehingga tidak tampil sebagai pilihan tercentang.</li>
+<li>Dari 63 rendered gaps tersebut, 20 berasal dari fixed template Psychologist 2–5 yang tidak relevan bila hanya Fuja yang confirmed untuk launch.</li>
+<li>Setelah mengeluarkan fixed-repeat tersebut, masih ada <strong>43 substantive rendered gaps</strong>.</li>
+</ul>
+<p>Kesimpulan: dua artifact bernama “filled PRD” sebenarnya masih merupakan <strong>partially-filled forms</strong>, bukan completed PRD. Unknown values juga mayoritas tetap kosong, bukan diberi ID <code>TBC-*</code> sebagaimana aturan yang diminta.</p>
+<h2 id="yang-sudah-kuat-dan-konsisten">Yang sudah kuat dan konsisten</h2>
+<p>Bagian berikut sudah cukup jelas lintas guide/domain model/ADR:</p>
+<ul>
+<li>hanya SERAYA PULANG yang bookable/paid pada launch;</li>
+<li>counseling lebih dulu; assessment deferred;</li>
+<li>online/offline, 60 menit;</li>
+<li>individual dan couple catalog/pricing tercatat;</li>
+<li>Fuja satu-satunya psychologist launch yang confirmed;</li>
+<li>clinical records, diagnosis, assessment result, transcript, dan session notes di luar MVP;</li>
+<li>Booking, Appointment, Payment, dan AvailabilitySlot adalah konsep berbeda;</li>
+<li>browser redirect bukan payment truth;</li>
+<li>signed/server-verified provider event menjadi PaymentEvent authority;</li>
+<li>late payment tidak boleh auto-assign slot alternatif;</li>
+<li>cancellation request, decision, dan refund action terpisah;</li>
+<li>cancellation approval + eligible release + entitlement restoration harus atomic;</li>
+<li>launch refund hanya <code>full_refund</code> atau <code>no_refund</code>;</li>
+<li>Google SSO tidak otomatis memberi staff access;</li>
+<li>StaffMembership/invite/allowlist wajib;</li>
+<li>WhatsApp adalah optional manual support, bukan lifecycle/source of truth;</li>
+<li>privacy boundary, redaction, pseudonymous minimum links, dan production gates sudah diarahkan dengan benar.</li>
+</ul>
+<hr />
+<h1 id="ranked-findings">Ranked findings</h1>
+<h2 id="p0-blocker-sebelum-implementation-baseline-disahkan">P0 — blocker sebelum implementation baseline disahkan</h2>
+<h3 id="p0-01-product-stack-dan-persistence-belum-benar-benar-diputuskan">P0-01 — Product stack dan persistence belum benar-benar diputuskan</h3>
+<p><strong>Evidence</strong></p>
+<ul>
+<li>Technical PRD answer store: <code>database = "supabase"</code> (<code>teknis-embedded.json:25</code>).</li>
+<li>Technical PRD answer store: <code>architecture = "docker"</code> (<code>teknis-embedded.json:31</code>).</li>
+<li>Implementation guide menetapkan Cloudflare Worker + D1 (<code>IMPLEMENTATION-GUIDE.md:79</code>).</li>
+<li>Guide kemudian mewajibkan D1 migrations (<code>IMPLEMENTATION-GUIDE.md:378</code>, <code>:501</code>).</li>
+<li>Tidak ada architecture ADR di ADR 0001–0088 yang memilih D1/Worker untuk aplikasi booking.</li>
+</ul>
+<p><strong>Why this blocks</strong></p>
+<p>Slice 0 langsung meminta schema/migrations. Memilih D1 versus Supabase/Postgres mengubah concurrency enforcement, transaction model, migration tooling, backup/restore, auth integration, dan observability. Ini bukan detail reversible setelah schema dan repository dibangun.</p>
+<p><strong>Required correction</strong></p>
+<p>Buat satu architecture ADR aplikasi booking yang eksplisit memilih deployment runtime, database, transaction strategy, migration path, backup/restore, dan alasan budget/operational fit. Jangan menganggap infrastruktur website PRD sebagai arsitektur produk booking.</p>
+<h3 id="p0-02-source-of-truth-prd-tidak-stabil-dan-canonical-content-dapat-hilang">P0-02 — Source-of-truth PRD tidak stabil dan canonical content dapat hilang</h3>
+<p><strong>Evidence</strong></p>
+<ul>
+<li>Technical snapshot revision 168 dan live revision 170 berbeda pada 11 key.</li>
+<li>Live revision 170 kehilangan tujuh key dari snapshot, termasuk <code>entity</code>, <code>client_auth</code>, <code>privacy</code>, <code>non_goals</code>, <code>integrations</code>, <code>availability</code>, dan <code>retention</code>.</li>
+<li>Enam canonical summary key revision 168 (<code>entity</code>, <code>privacy</code>, <code>non_goals</code>, <code>integrations</code>, <code>availability</code>, <code>retention</code>) tidak ada di form schema.</li>
+<li>Lima stored choice fields menggunakan value di luar option schema: Technical <code>mvp_caps</code>, <code>client_auth</code>, <code>test_layers</code>; Non-Teknis <code>profile_proof</code>, <code>landing_sections</code>. Nilainya ada di JSON tetapi tidak terlihat sebagai selected answer di UI.</li>
+<li><code>currentData()</code> hanya menyalin element <code>[name]</code> yang dirender (<code>public/teknis.html:9</code>).</li>
+<li>Autosave melakukan whole-document PUT dari <code>currentData()</code> (<code>public/server-sync.js:72–81</code>).</li>
+<li>Worker mengganti seluruh JSON blob, bukan merge field-level (<code>src/index.ts:138–148</code>).</li>
+<li>D1 hanya menyimpan current document row; tidak ada revision-history table (<code>migrations/0001_init.sql:1–10</code>).</li>
+</ul>
+<p><strong>Why this blocks</strong></p>
+<p>Implementer tidak dapat mengetahui apakah field yang hilang adalah keputusan yang dicabut atau data yang terhapus. Authority order tidak berguna bila source yang lebih tinggi dapat kehilangan content tanpa audit/recovery.</p>
+<p><strong>Required correction</strong></p>
+<ul>
+<li>Jangan simpan canonical decision dalam key yang tidak dirender/schema-owned.</li>
+<li>Putuskan satu canonical implementation document.</li>
+<li>Gunakan schema validation + merge/preserve semantics atau tolak unknown/omitted canonical fields.</li>
+<li>Tambahkan immutable revision snapshot/history sebelum melanjutkan collaborative editing.</li>
+<li>Reconcile live revision 170 terhadap closure snapshot 168 dengan review manusia, bukan overwrite otomatis.</li>
+</ul>
+<h3 id="p0-03-couple-package-tidak-memiliki-participant-consent-dan-access-model">P0-03 — Couple package tidak memiliki participant, consent, dan access model</h3>
+<p><strong>Evidence</strong></p>
+<ul>
+<li>Couple package adalah confirmed launch scope dengan sequence partner A, partner B, joint (<code>IMPLEMENTATION-GUIDE.md:68–73</code>).</li>
+<li>Entity model hanya memiliki satu <code>Client</code> dan Booking-scoped ClientAccess; tidak ada Booking/Appointment participant entity (<code>IMPLEMENTATION-GUIDE.md:132–181</code>).</li>
+<li>ADR 0074 secara eksplisit menyatakan couple booking masih memerlukan participant identity/consent/communication model (<code>0074-launch-counseling-catalog-prices.md:53–60</code>).</li>
+</ul>
+<p><strong>Why this blocks</strong></p>
+<p>Tanpa model ini, implementer harus menebak:</p>
+<ul>
+<li>siapa payer versus service recipient;</li>
+<li>siapa yang menerima akses dan notifikasi;</li>
+<li>Appointment A/B/joint terhubung ke siapa;</li>
+<li>consent masing-masing partner;</li>
+<li>apakah satu partner boleh melihat jadwal/detail individual partner lain;</li>
+<li>perubahan participant dan cancellation scope.</li>
+</ul>
+<p>Ini menyentuh data model, authorization, consent, Notification, dan package scheduling sekaligus.</p>
+<p><strong>Required correction</strong></p>
+<p>Tambahkan <code>TBC-COUPLE-01</code> dan putuskan model <code>BookingParticipant</code>/<code>AppointmentParticipant</code> atau ekuivalennya, role payer/recipient, consent per participant, visibility, contact ownership, dan client-access scope. Couple checkout tidak boleh diimplementasikan sebelum ini selesai.</p>
+<h3 id="p0-04-booking-eligibility-dan-minimum-intake-belum-diputuskan">P0-04 — Booking eligibility dan minimum intake belum diputuskan</h3>
+<p><strong>Evidence</strong></p>
+<p>PRD Non-Teknis masih kosong untuk:</p>
+<ul>
+<li>audience age (<code>aud_age</code>, line 11);</li>
+<li>needs/exclusions (<code>aud_needs</code>, <code>aud_exclusion</code>, lines 12–13);</li>
+<li>booking minimum intake (<code>booking_intake</code>, line 111);</li>
+<li>booking cutoff (<code>booking_cutoff</code>, line 112);</li>
+<li>minor/guardian policy (<code>booking_minor</code>, line 115);</li>
+<li>crisis/referral process (<code>crisis</code>, <code>referrals</code>, lines 142–143).</li>
+</ul>
+<p>Guide hanya memberi kategori data yang boleh disimpan, bukan exact required fields atau eligibility rules (<code>IMPLEMENTATION-GUIDE.md:399–422</code>).</p>
+<p><strong>Why this blocks</strong></p>
+<p>Schema Client/Booking, validation, consent, UI copy, referral behavior, dan legal/clinical sign-off bergantung pada jawaban ini. Developer tidak boleh diam-diam memilih “adult only”, mengizinkan minor, atau mengumpulkan symptom narrative.</p>
+<p><strong>Required correction</strong></p>
+<p>Tambahkan paling tidak:</p>
+<ul>
+<li><code>TBC-INTAKE-01</code> — exact transactional fields and validation;</li>
+<li><code>TBC-MINOR-01</code> — under-18 eligibility/guardian consent;</li>
+<li><code>TBC-ELIGIBILITY-01</code> — served/excluded audience and referral boundary;</li>
+<li><code>TBC-BOOKING-CUTOFF-01</code> — minimum lead time/same-day behavior.</li>
+</ul>
+<p>Mark sebagai blocker sebelum Slice 2, UAT booking, dan production.</p>
+<hr />
+<h2 id="p1-must-fix-sebelum-feature-slice-terkait">P1 — must-fix sebelum feature slice terkait</h2>
+<h3 id="p1-01-booking-dan-appointment-state-machine-masih-tercampur">P1-01 — Booking dan Appointment state machine masih tercampur</h3>
+<p><strong>Evidence</strong></p>
+<ul>
+<li>Context menegaskan Booking dan Appointment berbeda (<code>CONTEXT.md:11–21</code>).</li>
+<li>Guide menulis satu flow <code>Create Booking → pending_payment → confirmed → completed/no_show/cancelled/rescheduled</code> (<code>IMPLEMENTATION-GUIDE.md:252–267</code>).</li>
+<li><code>completed</code>, <code>no_show</code>, dan <code>rescheduled</code> adalah Appointment semantics, bukan otomatis Booking state.</li>
+<li>Guide sendiri mensyaratkan aggregate ownership clear sebelum implementation-ready (<code>IMPLEMENTATION-GUIDE.md:648–655</code>), tetapi tidak mendefinisikan aggregate roots atau command transaction boundaries.</li>
+<li>Semua Functional Requirement ID/rules/acceptance fields masih kosong (<code>teknis-embedded.json:34–60</code>).</li>
+<li><code>AvailabilityModule</code> dan <code>BookingModule</code> sama-sama memiliki responsibility atas hold creation/expiry (<code>IMPLEMENTATION-GUIDE.md:192–196</code>), sementara Payment, Package, Cancellation, dan Refund perlu mengubah state lintas modul tanpa application orchestrator/unit-of-work seam (<code>:197–207</code>).</li>
+</ul>
+<p><strong>Required correction</strong></p>
+<p>Tulis transition table terpisah untuk:</p>
+<ul>
+<li>Booking;</li>
+<li>SlotHold;</li>
+<li>Appointment;</li>
+<li>Payment;</li>
+<li>PackagePurchase;</li>
+<li>SessionEntitlement;</li>
+<li>CancellationRequest/Decision;</li>
+<li>RefundAction.</li>
+</ul>
+<p>Untuk setiap transition: command, precondition/version, actor, atomic writes, emitted event, idempotency key, typed failure, dan forbidden transition. Tetapkan aggregate ownership dan cross-aggregate transaction strategy.</p>
+<h3 id="p1-02-capacity-overlap-dan-transitionbuffer-belum-implementable">P1-02 — Capacity overlap dan TransitionBuffer belum implementable</h3>
+<p><strong>Evidence</strong></p>
+<ul>
+<li>Guide menyebut Availability sebagai CONFIRMED (<code>IMPLEMENTATION-GUIDE.md:327–336</code>).</li>
+<li>ADR 0013 masih membuka candidate-slot granularity, overlap strategy, dan exact concurrency mechanism (<code>0013-offering-specific-slots.md:27–35</code>).</li>
+<li>ADR 0041 masih membuka apakah 15-minute buffer diterapkan before, after, atau both sides (<code>0041-transition-buffer.md:33–35</code>).</li>
+<li>Technical PRD required field <code>buffer</code> masih kosong (<code>teknis-embedded.json:106</code>).</li>
+<li>Tidak ada TBC khusus untuk dua keputusan tersebut di guide.</li>
+</ul>
+<p><strong>Why this matters</strong></p>
+<p>Offering-specific candidate slots dapat saling overlap untuk psikolog yang sama. Unique constraint per slot tidak cukup mencegah double booking lintas offering/duration.</p>
+<p><strong>Required correction</strong></p>
+<p>Tambahkan <code>TBC-CAPACITY-01</code> dan <code>TBC-BUFFER-01</code>. Putuskan interval model, buffer placement, slot granularity, atomic overlap-claim mechanism, dan database constraint/transaction strategy sebelum Slice 1 availability atau Slice 2 hold.</p>
+<h3 id="p1-03-slothold-ttl-tidak-terikat-ke-payment-expiry">P1-03 — SlotHold TTL tidak terikat ke payment expiry</h3>
+<p><strong>Evidence</strong></p>
+<ul>
+<li>SlotHold default 10 menit (<code>IMPLEMENTATION-GUIDE.md:271</code>).</li>
+<li>Launch methods mencakup QRIS dan bank transfer/VA (<code>IMPLEMENTATION-GUIDE.md:360–370</code>).</li>
+<li>Exact provider expiry behavior masih TBC-PAY-01 (<code>:370</code>).</li>
+<li>Late success selalu masuk reacquisition/manual reconciliation path (<code>:263–267</code>).</li>
+</ul>
+<p><strong>Required correction</strong></p>
+<p>Definisikan invariant antara checkout/payment expiry dan SlotHold TTL per enabled method, client-visible countdown/message, kapan payment intent ditutup/expired, dan expected treatment untuk provider success setelah hold expiry. Adapter/fake dapat dibuat, tetapi production payment flow tidak boleh disahkan sebelum ini.</p>
+<h3 id="p1-04-contextmd-dan-beberapa-adr-masih-membawa-semantics-yang-sudah-ditolak">P1-04 — <code>CONTEXT.md</code> dan beberapa ADR masih membawa semantics yang sudah ditolak</h3>
+<p><strong>Direct contradictions</strong></p>
+<ol>
+<li><code>CONTEXT.md:181</code> menyebut WhatsApp-capable number required, sedangkan ADR 0066 lines 13–18 dan guide lines 458–466 menyatakannya optional.</li>
+<li>ADR 0064 status line 5 mengklaim required WhatsApp contact tetap valid, sedangkan ADR 0066 secara eksplisit menggantinya dengan optional contact.</li>
+<li><code>CONTEXT.md:219</code> masih menyebut cancellation policy full/partial/no-refund tanpa menjelaskan partial deferred.</li>
+<li><code>CONTEXT.md:231</code> memberi CancellationDecision outcome approve/deny/partial/other, bertentangan dengan ADR 0077 lines 15–19.</li>
+<li><code>CONTEXT.md:271</code> masih mendeskripsikan RefundAction full/partial.</li>
+<li><code>CONTEXT.md:117–131</code> dan ADR 0030 menyebut Editor aktif dalam MVP, sedangkan ADR 0079 menunda Editor dari launch.</li>
+<li>ADR 0077 open follow-up masih meminta approval role/separation, padahal ADR 0078 sudah memutuskan one-Admin separate actions.</li>
+<li>ADR 0079 open follow-up masih meminta identity provider, padahal ADR 0080 sudah memilih Google SSO.</li>
+</ol>
+<p><strong>Required correction</strong></p>
+<p>Patch status/follow-up dari ADR lama dengan explicit “superseded by” pointer dan update <code>CONTEXT.md</code> sebagai current-state glossary. Historical decision body boleh dipertahankan, tetapi status/current implication tidak boleh ambigu.</p>
+<h3 id="p1-05-security-staff-session-dan-operations-belum-punya-acceptance-baseline">P1-05 — Security, staff session, dan operations belum punya acceptance baseline</h3>
+<p><strong>Evidence</strong></p>
+<p>Technical PRD required fields kosong:</p>
+<ul>
+<li>RLS/database authorization (<code>rls</code>, line 117);</li>
+<li>secrets (<code>secrets</code>, line 121);</li>
+<li>logging/redaction (<code>logging</code>, line 122);</li>
+<li>backup/restore (<code>backup</code>, line 125);</li>
+<li>threat model (<code>threats</code>, line 126);</li>
+<li>environments/CI/CD/observability/alerts/runbooks (<code>lines 156–160</code>);</li>
+<li>test data/privacy (<code>line 164</code>).</li>
+</ul>
+<p>Guide menjelaskan authorization intent, tetapi belum menetapkan Google OAuth state/nonce/session/cookie/CSRF/re-auth/revocation/recovery behavior. <code>TBC-ACCESS-01</code> hanya membahas ClientAccess, bukan staff sessions.</p>
+<p><strong>Required correction</strong></p>
+<p>Tambahkan <code>TBC-STAFF-SESSION-01</code> dan concrete security/operations acceptance sebelum Slice 5 atau payment production integration. Architecture ADR harus menentukan backup/restore dan operational ownership.</p>
+<h3 id="p1-06-guideline-belum-menjadi-full-website-implementation-guide">P1-06 — Guideline belum menjadi full website implementation guide</h3>
+<p><strong>Evidence</strong></p>
+<p>PRD Non-Teknis masih kosong untuk:</p>
+<ul>
+<li>positioning differentiator/tone;</li>
+<li>audience/persona;</li>
+<li>price-display choice;</li>
+<li>booking confirmation/support/channels;</li>
+<li>hero copy/CTA/proof claims/FAQ;</li>
+<li>brand voice/assets;</li>
+<li>website data, crisis copy, legal documents.</li>
+</ul>
+<p><code>support</code>, <code>channels</code>, <code>confirmation</code>, dan <code>reminders</code> juga kosong, padahal email menjadi dependency ClientAccess, konfirmasi, reminder, dan perubahan status. <code>TBC-NOTIFY-01</code> belum diklasifikasikan tegas sebagai production gate.</p>
+<p>Guide menyebut marketing/CMS in scope, tetapi required module list tidak memiliki <code>ContentModule</code>; <code>CrisisNotice</code> dari domain context tidak ada di minimum entity/module/command list. Accessibility hanya berupa generic UAT item; tidak ada measurable accessibility/performance/SEO acceptance.</p>
+<p><strong>Required correction</strong></p>
+<p>Pisahkan readiness:</p>
+<ul>
+<li>backend/domain implementation;</li>
+<li>public marketing/content implementation;</li>
+<li>operations/admin implementation.</li>
+</ul>
+<p>Tambahkan ContentModule/CrisisNotice atau eksplisit defer; mark content, claims, crisis/referral, legal copy, accessibility/performance/SEO sebagai TBC/gate yang jelas. Jangan menyebut full website implementation-ready sebelum bagian ini tersedia.</p>
+<h3 id="p1-07-package-validity-tbc-terlalu-luas-sekaligus-belum-punya-nilai-bisnis">P1-07 — Package validity TBC terlalu luas sekaligus belum punya nilai bisnis</h3>
+<p><strong>Evidence</strong></p>
+<ul>
+<li>Guide mengatakan “exact package validity/expiry calendar semantics” TBC (<code>IMPLEMENTATION-GUIDE.md:290</code>).</li>
+<li>ADR 0055 sudah memutuskan calendar-period model dan snapshot concrete expiry (<code>0055-calendar-package-validity.md:11–15</code>).</li>
+<li>Yang masih open adalah actual duration value, allowed units/range, end-of-month policy, local expiry time, dan extension authority.</li>
+</ul>
+<p><strong>Required correction</strong></p>
+<p>Persempit <code>TBC-PACKAGE-01</code>; jangan membuka ulang keputusan calendar-period yang sudah accepted. Mark actual launch package validity value dan expiry-boundary policy sebagai blocker sebelum package checkout/publication.</p>
+<h3 id="p1-08-entity-dan-command-catalog-belum-sinkron">P1-08 — Entity dan command catalog belum sinkron</h3>
+<p>Contoh entity/operation yang muncul di Context/ADR/Domain Model tetapi tidak lengkap di guide:</p>
+<ul>
+<li>couple participant/consent model;</li>
+<li><code>CrisisNotice</code>;</li>
+<li><code>ClientMergeAction</code>;</li>
+<li><code>PackageAvailabilityResolution</code>;</li>
+<li>explicit late-payment reconciliation record;</li>
+<li>explicit extension exception/action;</li>
+<li><code>CorrectAppointmentOutcome</code> command;</li>
+<li>ContentModule/content commands.</li>
+</ul>
+<p><strong>Required correction</strong></p>
+<p>Buat one-page aggregate/entity catalog dengan status <code>launch</code>, <code>supporting</code>, <code>deferred</code>, atau <code>TBC</code>. Setiap launch entity harus punya owner module dan lifecycle; setiap accepted command harus punya input/precondition/result/failure contract.</p>
+<h3 id="p1-09-authority-order-dan-handoff-gate-saling-bertentangan">P1-09 — Authority order dan handoff gate saling bertentangan</h3>
+<p><strong>Evidence</strong></p>
+<ul>
+<li>Guide source note mengatakan accepted ADR + guide menjadi authority sampai live form direconcile (<code>IMPLEMENTATION-GUIDE.md:9–15</code>).</li>
+<li>Authority order justru menempatkan Technical PRD revision 168 di atas guide dan tidak memasukkan Non-Teknis PRD/Domain Model (<code>:19–28</code>).</li>
+<li><code>TBC-LIVE-PRD-01</code> diberi gate “before implementation handoff” (<code>:644</code>).</li>
+<li>Guide kemudian mengatakan implementation/design handoff dapat proceed now (<code>:666</code>).</li>
+</ul>
+<p><strong>Required correction</strong></p>
+<p>Gunakan authority matrix per concern, bukan satu linear order. Contoh:</p>
+<ul>
+<li>business scope/catalog/content: reviewed Non-Teknis decisions + latest accepted ADR;</li>
+<li>domain semantics: current Context + latest accepted ADR;</li>
+<li>implementation behavior: reviewed Implementation Guide;</li>
+<li>live form: collaboration input, bukan otomatis canonical bila belum reconciled.</li>
+</ul>
+<h3 id="p1-10-paymentrefund-projection-uniqueness-dan-package-refund-effects-belum-tertutup">P1-10 — Payment/Refund projection, uniqueness, dan package-refund effects belum tertutup</h3>
+<p><strong>Evidence</strong></p>
+<ul>
+<li>Technical summary menyebut Payment sebagai “append-only original transaction” (<code>teknis-embedded.json:103</code>), tetapi Payment juga membutuhkan current status projection; yang benar-benar append-only adalah provider events/attempt records.</li>
+<li>Guide membatasi cumulative refund agar tidak melebihi captured amount (<code>IMPLEMENTATION-GUIDE.md:323</code>), tetapi belum mendefinisikan business uniqueness, concurrent duplicate-refund prevention, atau current/refund-attempt projection.</li>
+<li>Context mengizinkan multiple payment attempts, tetapi belum ada invariant <strong>at-most-one successful settlement</strong> per Booking/purchase intent. Provider-event idempotency saja tidak mencegah dua Payment berbeda sama-sama sukses.</li>
+<li>ADR 0059 mendefinisikan <code>paid_late</code> dan original-slot reacquisition, tetapi untuk package tidak menjelaskan apakah/kapan PackagePurchase, SessionEntitlement, dan PackageValidity dibuat bila slot pertama tidak dapat direacquire.</li>
+<li>Efek <code>full_refund</code> terhadap PackagePurchase yang sudah sebagian terpakai, future Appointment, dan remaining SessionEntitlement tidak ditentukan.</li>
+<li>Persist verified PaymentEvent dan semua internal effects belum dinyatakan sebagai satu atomic/idempotent application transaction.</li>
+</ul>
+<p><strong>Required correction</strong></p>
+<p>Pisahkan <code>Payment</code> current projection dari append-only <code>PaymentEvent</code>; modelkan RefundAction/attempt/event secara eksplisit; tetapkan uniqueness/idempotency per provider event, payment intent, dan refund command; verifikasi amount/currency/order/merchant; definisikan <code>paid_late</code> package creation serta package-close/cancel effects; dan pastikan verified event + state transitions + outbox/audit committed secara atomik.</p>
+<h3 id="p1-11-append-only-audit-belum-selaras-dengan-data-minimization-dan-redaction">P1-11 — Append-only audit belum selaras dengan data minimization dan redaction</h3>
+<p><strong>Evidence</strong></p>
+<ul>
+<li>Guide mengizinkan audit menyimpan before/after state dan reason (<code>IMPLEMENTATION-GUIDE.md:486–495</code>). Tanpa payload allowlist, ini dapat menyalin contact data atau narrative yang seharusnya tidak masuk sistem.</li>
+<li>Seluruh entity classification fields PRD Teknis masih kosong (<code>teknis-embedded.json:61–99</code>).</li>
+<li>Belum dijelaskan bagaimana redaction/retention berlaku ke AuditEvent, DeliveryAttempt, application logs, dan backup sambil menjaga append-only integrity.</li>
+<li>Dua bootstrap Admin dapat mengelola/revoke staff, tetapi tidak ada explicit last-active-Admin guard atau tested recovery invariant.</li>
+</ul>
+<p><strong>Required correction</strong></p>
+<p>Buat per-field data inventory dan audit payload allowlist; simpan stable identifier/hash/reason code daripada full state bila tidak perlu; definisikan redaction tombstone/metadata untuk append-only record, log/backup handling, dan last-Admin/recovery invariant sebelum Slice 5/8.</p>
+<h3 id="p1-12-no-show-pada-menit-ke-15-bertentangan-dengan-istilah-post-session-outcome-closed-by-adr-0092-appointment-outcome-timingmd">P1-12 — No-show pada menit ke-15 bertentangan dengan istilah “post-session outcome” — <strong>CLOSED by <code>ADR 0092-appointment-outcome-timing.md</code></strong></h3>
+<p><strong>Evidence (historical)</strong></p>
+<ul>
+<li>ADR 0015 menyebut <code>completed</code>/<code>no_show</code> sebagai post-session outcomes dan hanya boleh ditandai oleh actor berwenang (<code>0015-appointment-outcomes.md:13–20</code>).</li>
+<li>ADR 0028 mengizinkan <code>no_show</code> 15 menit setelah scheduled start dan langsung mengonsumsi entitlement (<code>0028-no-show-grace-period.md:11–15</code>).</li>
+<li>Session launch berlangsung 60 menit, sehingga status terminal/consumption dapat terjadi saat masih tersisa 45 menit; late-arrival dan correction window masih open (<code>ADR 0028:33–35</code>).</li>
+</ul>
+<p><strong>Required correction (resolved)</strong></p>
+<ul>
+<li><code>ADR 0092</code> memilih <strong><code>no_show</code> sebagai early operational checkpoint</strong> (T+15m, locked) dan outcome final tetap di end-of-session dengan enum 5 nilai: <code>completed</code> | <code>completed_partial</code> | <code>no_show</code> | <code>no_show_late</code> | <code>cancelled</code>. Late-arrival tetap diterima; klien datang setelah T+15m tetap dilayani dengan outcome <code>no_show_late</code> (entitlement tetap consumed karena slot sudah reserved). Correction window <strong>7×24 jam</strong> Asia/Jakarta untuk Admin via <code>OutcomeCorrection</code>. Entitlement coupling: <code>completed</code>/<code>completed_partial</code>/<code>no_show</code>/<code>no_show_late</code> semua consume; <code>cancelled</code> tidak consume. Notifications eksplisit (<code>no_show_recorded</code>, <code>outcome_finalized</code>, <code>outcome_corrected</code>, dll). <code>IMPLEMENTATION-GUIDE.md §6.1.1–§6.1.4</code> dan §6.2, <code>DOMAIN-MODEL.md</code> Lifecycle section, dan <code>TBC-NO-SHOW-01</code> di register semuanya di-patch.</li>
+</ul>
+<h3 id="p1-13-package-wide-cancellation-dan-race-dengan-appointment-outcome-belum-punya-matrix">P1-13 — Package-wide cancellation dan race dengan Appointment outcome belum punya matrix</h3>
+<p><strong>Evidence</strong></p>
+<ul>
+<li>ADR 0024 menyatakan package cancellation/entitlement accounting masih open (<code>0024-admin-cancellation-review.md:13–15,33–35</code>).</li>
+<li>Refund package adalah purchase-level full/no-refund, sedangkan entitlement state tetap operational (<code>0063-package-refund-at-purchase-level.md:11–15</code>).</li>
+<li>Belum ditentukan apakah package-wide approval menutup semua future Appointment dan unused entitlement secara atomic.</li>
+<li>CancellationRequest yang pending membiarkan Appointment aktif, sehingga dapat beradu dengan <code>completed</code>/<code>no_show</code> sebelum keputusan Admin.</li>
+</ul>
+<p><strong>Status (2026-08-31)</strong>: <strong>CLOSED by <code>ADR 0095-package-cancellation-matrix.md</code></strong>.</p>
+<ul>
+<li>Target types: <code>appointment</code>, <code>booking</code>, <code>package_purchase</code> (no direct <code>session_entitlement</code> target).</li>
+<li>At-most-one open <code>CancellationRequest</code> per target enforced by unique partial index.</li>
+<li>Pending-vs-outcome race resolved deterministically: R1 (completed first) / R2 (no_show first) → request <code>auto_resolved</code> with reason code; R3 (approval first) → late outcome marking rejected by trigger; R4 (reschedule first) → request rebinds to replacement Appointment.</li>
+<li>Atomic per-target effects in single transaction: target=appointment/booking → Appointment <code>cancelled</code> + <code>CapacityReservation</code> <code>cancelled</code> (<code>release_reason = appointment_cancelled</code>) + linked <code>SessionEntitlement</code> restored if valid else closed; target=<code>package_purchase</code> → all future non-terminal Appointments + their <code>CapacityReservation</code> rows + unused <code>SessionEntitlement</code> (split <code>closed_restored_by_cancellation</code> vs <code>closed_cancelled_with_package</code>) + <code>PackagePurchase → closed_by_cancellation</code> (terminal, no re-open) + <code>PackageValidity.valid_until</code> unchanged + consumed/expired untouched.</li>
+<li>Partial-package 1-of-N uses target=appointment path (PackagePurchase stays <code>partially_consumed</code>).</li>
+<li>Repeat/correction = new <code>CancellationRequest</code> with <code>correction_of</code> linkage; original immutable history; new decision applies §3 idempotently.</li>
+<li><code>RescheduleAction</code> transition table enumerated (§5): forbidden transitions (<code>completed</code>/<code>no_show</code>/<code>no_show_late</code>/<code>completed_partial</code>/<code>cancelled</code>/<code>rescheduled</code>/before-payment) + couple-package rules via <code>BookingParticipant</code>.</li>
+<li>Couple-package target resolution (§6): individual A/B cancellation vs joint pre-start vs package-wide; mid-session withdrawal is <strong>not</strong> a cancellation path.</li>
+<li>Migration schema (D1/SQLite + Postgres equivalent) with triggers and unique partial index in <code>ADR 0095 §8–§9</code>.</li>
+<li>15 acceptance criteria tests including the ticket-mandated package-wide integration test (closing 3 future appointments + restore entitlement + atomic effects).</li>
+<li>Refund remains <code>full_refund</code>/<code>no_refund</code> only per <code>ADR 0063</code>/<code>0077</code>; this ADR adds no refund semantics.</li>
+</ul>
+<hr />
+<h2 id="p2-cleanup-dan-usability">P2 — cleanup dan usability</h2>
+<ol>
+<li><code>IMPLEMENTATION-GUIDE.md:306</code> memiliki typo <code>den y:</code>.</li>
+<li>Technical synthetic summary memiliki typo <code>issue/refconcile RefundAction</code> (<code>teknis-embedded.json:177</code>).</li>
+<li>Non-Teknis <code>biz_story</code> masih mengatakan status empat program “harus diputuskan”, padahal ADR 0070/guide sudah memutuskan hanya SERAYA PULANG bookable.</li>
+<li>Technical PRD masih memiliki target launch date tetapi milestones dan production checklist kosong; date perlu diberi status current/TBC/obsolete, bukan dibiarkan tampak authoritative.</li>
+<li>Fixed-repeat Psychologist 2–5 semuanya required walaupun hanya satu launch psychologist; form harus conditional atau slot tambahan ditandai N/A.</li>
+<li>Technical form hanya menyediakan 13 repeated entity slots, sementara guide menyebut sekitar 30 entities; form schema tidak cocok dengan domain baseline.</li>
+<li>Lima TBC hanya muncul di register tanpa inline pointer dari section terkait (<code>TBC-CONSENT-01</code>, <code>TBC-LIVE-PRD-01</code>, <code>TBC-POLICY-01</code>, <code>TBC-REC-01</code>, <code>TBC-SCHEDULE-01</code>).</li>
+<li>Business KPI fields kosong bukan blocker coding; jika tim memang tidak menggunakan target tersebut, ubah menjadi optional/N/A daripada memaksa metric spekulatif.</li>
+<li>Urutan slice memiliki dependency terbalik: Client OTP ada di Slice 5 sebelum email seam Slice 7; payment success Slice 3 memiliki package side effects yang baru muncul di Slice 4; privileged workflows muncul sebelum auth primitives lengkap.</li>
+<li>Foundation belum menyebut fake/seam untuk identity provider, email, scheduler, ID generator, unit-of-work, transactional outbox, dan fault injection.</li>
+</ol>
+<hr />
+<h1 id="cross-document-decision-matrix">Cross-document decision matrix</h1>
+<table>
+<thead>
+<tr>
+<th>Concern</th>
+<th>PRD</th>
+<th>Guide/domain/ADR</th>
+<th>Review status</th>
+<th>Correction</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Launch program scope</td>
+<td>Non-Teknis story stale; launch gate clear</td>
+<td>ADR 0070/guide clear</td>
+<td>Confirmed with stale copy</td>
+<td>Backfill story/launch fields</td>
+</tr>
+<tr>
+<td>Catalog/pricing</td>
+<td>Mostly recorded</td>
+<td>Guide/domain model clear</td>
+<td>Confirmed</td>
+<td>Structured couple offering fields</td>
+</tr>
+<tr>
+<td>Product stack</td>
+<td>Supabase + Docker</td>
+<td>Worker + D1</td>
+<td><strong>Conflict</strong></td>
+<td>Architecture ADR</td>
+</tr>
+<tr>
+<td>Booking/Appointment split</td>
+<td>Hidden summaries, FR blank</td>
+<td>Concept clear; combined state flow</td>
+<td>Partial</td>
+<td>Separate transition tables</td>
+</tr>
+<tr>
+<td>Availability</td>
+<td>Rules summarized</td>
+<td>Exact overlap/buffer open</td>
+<td><strong>Blocked for implementation</strong></td>
+<td>Capacity/buffer ADR/TBC</td>
+</tr>
+<tr>
+<td>Guest intake/eligibility</td>
+<td>Mostly blank</td>
+<td>Only high-level data boundary</td>
+<td><strong>Blocked for booking UI</strong></td>
+<td>Intake/minor/eligibility TBC</td>
+</tr>
+<tr>
+<td>Payment truth</td>
+<td>Clear</td>
+<td>Clear</td>
+<td>Confirmed seam</td>
+<td>Resolve expiry/TTL/provider evidence</td>
+</tr>
+<tr>
+<td>Couple package</td>
+<td>Catalog confirmed</td>
+<td>Participant model absent</td>
+<td><strong>Blocked</strong></td>
+<td>Couple participant/consent model</td>
+</tr>
+<tr>
+<td>Package validity</td>
+<td>No business value</td>
+<td>Calendar model decided; exact value open</td>
+<td>Partial</td>
+<td>Narrow TBC + decide values</td>
+</tr>
+<tr>
+<td>Cancellation/refund</td>
+<td>Non-Teknis summary clear</td>
+<td>Context/old ADR stale</td>
+<td>Conflict in source text</td>
+<td>Patch glossary/statuses</td>
+</tr>
+<tr>
+<td>WhatsApp</td>
+<td>Non-Teknis mostly optional</td>
+<td>Context/ADR 0064 conflict</td>
+<td>Conflict in source text</td>
+<td>Make optional everywhere current-state</td>
+</tr>
+<tr>
+<td>Staff roles/auth</td>
+<td>Summary clear</td>
+<td>Guide clear; session policy open</td>
+<td>Partial</td>
+<td>Staff-session TBC/security baseline</td>
+</tr>
+<tr>
+<td>Privacy/retention</td>
+<td>Strategy clear; exact copy/docs blank</td>
+<td>Direction clear</td>
+<td>Partial/production gate</td>
+<td>Field map, trigger, policy evidence</td>
+</tr>
+<tr>
+<td>Public content/CMS</td>
+<td>Largely blank</td>
+<td>Module/command incomplete</td>
+<td>Not frontend-ready</td>
+<td>Content/crisis/a11y/SEO handoff</td>
+</tr>
+<tr>
+<td>Operations</td>
+<td>Blank</td>
+<td>Generic gates</td>
+<td>Not production-ready</td>
+<td>Environments, backup, observability, runbooks</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h1 id="tbc-audit">TBC audit</h1>
+<h2 id="tbc-yang-sudah-baik">TBC yang sudah baik</h2>
+<p>Guide memiliki 12 stable IDs dan seluruh ID yang muncul tercatat di register:</p>
+<ul>
+<li>ACCESS;</li>
+<li>ADMIN;</li>
+<li>API;</li>
+<li>CONSENT;</li>
+<li>LIVE-PRD;</li>
+<li>NOTIFY;</li>
+<li>PACKAGE;</li>
+<li>PAY;</li>
+<li>POLICY;</li>
+<li>PRIVACY;</li>
+<li>RECONCILIATION;</li>
+<li>SCHEDULE.</li>
+</ul>
+<h2 id="tbc-yang-hilang-atau-perlu-dipecah">TBC yang hilang atau perlu dipecah</h2>
+<ol>
+<li><code>TBC-STACK-01</code></li>
+<li><code>TBC-COUPLE-01</code></li>
+<li><code>TBC-INTAKE-01</code></li>
+<li><code>TBC-MINOR-01</code></li>
+<li><code>TBC-ELIGIBILITY-01</code></li>
+<li><code>TBC-BOOKING-CUTOFF-01</code></li>
+<li><code>TBC-CAPACITY-01</code></li>
+<li><code>TBC-BUFFER-01</code></li>
+<li><code>TBC-PAY-EXPIRY-01</code></li>
+<li><code>TBC-STAFF-SESSION-01</code></li>
+<li><code>TBC-DELIVERY-MODE-01</code> — online meeting mechanism/offline venue/instructions</li>
+<li><code>TBC-CONTENT-01</code></li>
+<li><code>TBC-RESCHEDULE-01</code> — allowed lifecycle states/cutoff/repeat handling — <strong>CLOSED by <code>ADR 0095-package-cancellation-matrix.md §5</code></strong>: RescheduleAction forbidden transitions enumerated (only from <code>scheduled</code>/<code>confirmed</code>; rejected after <code>completed</code>/<code>no_show_late</code>/<code>completed_partial</code>/<code>no_show</code>/<code>cancelled</code>/<code>rescheduled</code>/already-<code>rescheduled</code>/before-payment); replacement capacity overlap enforced via <code>ADR 0091</code> <code>CapacityReservation</code>; couple-package rules via <code>BookingParticipant</code> (<code>ADR 0090</code>); cancellation-request rebound (R4) to replacement Appointment; migration schema in <code>ADR 0095 §8</code> (trigger blocking late outcome marking). Acceptance criteria tests 10, 11, 12 di <code>ADR 0095 §7</code>.</li>
+<li><code>TBC-PAY-SETTLEMENT-01</code> — <strong>Closed by Round 5 (<code>ADR 0093-payment-settlement-uniqueness.md</code>)</strong>: at-most-one successful settlement per <code>Booking.id</code> ditegakkan oleh unique partial index <code>payment(booking_id) WHERE status = 'paid' AND settled_at IS NOT NULL</code> plus application-level precheck (defense-in-depth, same pattern as <code>ADR 0091</code> capacity overlap). Amount/currency/order/merchant value match wajib selain signature. Idempotency keys (<code>payment_event_idempotency</code> keyed by <code>(provider_event_id, payment_intent_id)</code>) lifetime-scoped dengan <code>payload_hash</code> fingerprint; same-key/different-payload → typed failure <code>idempotency_key_collision</code> (rollback, tidak diam-diam overwrite). Out-of-order/repeated-status/reversal mapping table ada di <code>ADR 0093 §4.1</code>; <code>refund</code>/<code>chargeback</code> adalah no-op pada <code>Payment</code> (refund melalui <code>RefundAction</code> terpisah). Crash window tiga-lapis: (a) createCheckout → persistence (optimistic <code>Payment status=pending</code> + idempotency); (b) verified webhook → state transition (webhook handler transaction membungkus idempotency + <code>PaymentEvent</code> + value match + state transition + outbox); (c) transition → outbox delivery (transactional outbox dengan retry + dead-letter). Verified event + state transition + outbox harus atomic. <code>paid_late</code> package creation: <code>PackagePurchase</code> + ordered <code>SessionEntitlement</code> + <code>PackageValidity</code> dibuat <strong>tepat saat webhook verified</strong> (Option A), bukan ditunda. Jika slot reacquire berhasil → <code>paid_late_slot_reacquired</code> + <code>SessionEntitlement #1.state = 'scheduled'</code>. Jika reacquire gagal → <code>paid_late_first_session_pending</code> + <code>SessionEntitlement #1.state = 'pending_schedule'</code> + <code>PackagePurchase.requires_first_session_scheduling = true</code>; Admin resolve via existing reconciliation flow (<code>ADR 0067</code>). SQL migration (Postgres + D1/SQLite equivalent) di <code>ADR 0093 §6–§7</code>. Acceptance criteria #1 dan #2 (duplicate webhook dan paid-late package integration test) didefinisikan eksplisit di <code>IMPLEMENTATION-GUIDE.md §7.6–§7.7</code>.</li>
+<li><code>TBC-NO-SHOW-01</code> — early checkpoint versus terminal outcome/late-arrival correction — <strong>CLOSED by <code>ADR 0092-appointment-outcome-timing.md</code></strong> (model final: early checkpoint <code>no_show</code> di T+15m, late-arrival tetap diterima dengan outcome <code>completed_partial</code>/<code>no_show_late</code>, correction window 7 hari kalender, entitlement coupling deterministic).</li>
+<li><code>TBC-PACKAGE-CANCEL-01</code> — package-wide cancellation dan pending-versus-outcome race — <strong>CLOSED by <code>ADR 0095-package-cancellation-matrix.md</code></strong> (matrix lengkap untuk Booking/Appointment/PackagePurchase/SessionEntitlement: target types = appointment/booking/package_purchase; at-most-one open CancellationRequest invariant via unique partial index; pending-vs-outcome race R1 (completed first) / R2 (no_show first) auto-resolve dengan reason_code; R3 approval-blocks-late-outcome-marking via trigger; R4 reschedule rebinds CancellationRequest to replacement Appointment; atomic per-target effects: target=appointment/booking → Appointment <code>cancelled</code> + CapacityReservation <code>cancelled</code> + linked SessionEntitlement restored if valid else closed; target=package_purchase → single transaction menutup semua future non-terminal Appointments + closes all CapacityReservations + unused entitlements dengan <code>valid_until &gt;= now</code> → <code>closed_restored_by_cancellation</code> (others → <code>closed_cancelled_with_package</code>) + PackagePurchase → <code>closed_by_cancellation</code> terminal no-reopen + PackageValidity.valid_until unchanged; consumed/expired entitlements untouched; refund terpisah di <code>RefundAction</code> <code>full_refund</code>/<code>no_refund</code> only per <code>ADR 0063</code>/<code>0077</code>; partial-package 1-of-N melalui target=appointment tetap meninggalkan PackagePurchase <code>partially_consumed</code>; repeat/correction = new CancellationRequest dengan <code>correction_of</code> linkage, original immutable history, new decision applies §3 effects afresh idempotently; RescheduleAction matrix §5 dengan forbidden transitions enumerated dan couple-package rules §6 via <code>BookingParticipant</code> <code>ADR 0090</code>). Acceptance test 14 integration test "package-wide cancellation closing 3 future appointments + restore entitlement + atomic effects" didefinisikan eksplisit di <code>ADR 0095 §7.5</code>; trigger migrations D1/SQLite + Postgres equivalent di <code>ADR 0095 §8–§9</code>.</li>
+<li><code>TBC-CANCELLATION-PUBLIC-01</code> — public-website copy untuk cancellation/refund WhatsApp routing (resolved 2026-08-31: copy short-statement "handled by Admin via WhatsApp; case-by-case"; tidak ada UI)</li>
+</ol>
+<p>Setiap row harus menyebut owner, blocking stage (<code>before slice</code>, <code>before UAT</code>, atau <code>production only</code>), default behavior yang aman, dan acceptance evidence.</p>
+<hr />
+<h1 id="readiness-per-implementation-slice">Readiness per implementation slice</h1>
+<table>
+<thead>
+<tr>
+<th>Slice</th>
+<th>Verdict</th>
+<th>Yang boleh dilakukan sekarang</th>
+<th>Yang memblokir</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>0 — Foundation</td>
+<td><strong>Partial</strong></td>
+<td>vocabulary, typed errors, fake clock, fixtures, idempotency/correlation primitives</td>
+<td>architecture/database ADR dan aggregate ownership sebelum schema/migrations</td>
+</tr>
+<tr>
+<td>1 — Catalog/availability</td>
+<td><strong>Partial</strong></td>
+<td>catalog types, pricing snapshot model, public shell</td>
+<td>capacity concurrency, buffer placement, real schedule/location, content</td>
+</tr>
+<tr>
+<td>2 — Guest booking/hold</td>
+<td><strong>Blocked</strong></td>
+<td>spike/prototype only</td>
+<td>intake, minor/eligibility, cutoff, participant model, atomic hold mechanism</td>
+</tr>
+<tr>
+<td>3 — Payment adapter</td>
+<td><strong>Partial</strong></td>
+<td>provider-neutral interface + fake adapter</td>
+<td>expiry/hold invariant, exact Midtrans evidence, retry/reconciliation</td>
+</tr>
+<tr>
+<td>4 — Package</td>
+<td><strong>Blocked for full scope</strong></td>
+<td>individual package model after aggregates clear</td>
+<td>validity values/boundary, couple participant model, exception policy</td>
+</tr>
+<tr>
+<td>5 — Staff/ClientAccess</td>
+<td><strong>Partial</strong></td>
+<td>membership vocabulary and authorization tests</td>
+<td>OAuth/session/re-auth/revocation/recovery detail</td>
+</tr>
+<tr>
+<td>6 — Cancellation/refund</td>
+<td><strong>Partial</strong></td>
+<td>pure domain transition tests after state tables</td>
+<td>transaction strategy, repeat/correction rules, provider reconciliation</td>
+</tr>
+<tr>
+<td>7 — Notifications</td>
+<td><strong>Partial</strong></td>
+<td>event intents and fake adapter</td>
+<td>provider/copy/bounce/quiet-hours/package offsets</td>
+</tr>
+<tr>
+<td>8 — Privacy/retention</td>
+<td><strong>Partial</strong></td>
+<td>policy schema and dry-run design</td>
+<td>exact field map/trigger/evidence; no destructive production action</td>
+</tr>
+<tr>
+<td>9 — CMS/UAT</td>
+<td><strong>Not ready</strong></td>
+<td>none beyond UI spike</td>
+<td>content, admin field matrix, crisis/legal copy, security/ops baseline</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h1 id="recommended-correction-order">Recommended correction order</h1>
+<ol>
+<li><strong>Freeze and reconcile canonical sources</strong>
+   - compare technical revisions 168 and 170;
+   - choose canonical values intentionally;
+   - prevent schema-external canonical keys from disappearing.</li>
+<li><strong>Decide architecture/persistence</strong>
+   - runtime, DB, transaction/concurrency, migrations, backup/restore.</li>
+<li><strong>Close four domain blockers</strong>
+   - aggregate/state tables;
+   - couple participant/consent/access;
+   - booking intake/minor/eligibility/cutoff;
+   - capacity overlap/buffer.</li>
+<li><strong>Resolve payment TTL semantics</strong>
+   - provider expiry versus SlotHold, then late-payment UX/runbook.</li>
+<li><strong>Patch stale current-state documentation</strong>
+   - <code>CONTEXT.md</code>, ADR statuses/open follow-ups, authority matrix.</li>
+<li><strong>Backfill both PRDs</strong>
+   - confirmed answer, explicit <code>TBC-*</code>, <code>DEFERRED</code>, atau <code>N/A</code>; jangan biarkan required field kosong.</li>
+<li><strong>Revise Implementation Guide</strong>
+   - conditional status;
+   - complete TBC register;
+   - separate state machines;
+   - aggregate ownership;
+   - Content/Crisis/security/operations coverage.</li>
+<li><strong>Run second review</strong>
+   - trace requirement → command → state/invariant → acceptance test → production gate.</li>
+</ol>
+<h2 id="final-recommendation-round-1">Final recommendation (Round 1)</h2>
+<p>Jangan mulai feature coding end-to-end dari guide versi sekarang. Mulai hanya pekerjaan foundation yang technology-neutral. Setelah P0-01 sampai P0-04 selesai, guide dapat dinaikkan kembali menjadi implementation baseline dan slice-by-slice coding dapat dimulai tanpa developer mengarang keputusan bisnis.</p>
+<p>Lihat sub-bagian <strong>Round 2: v0.1 docs and 2026-08-31 JSON</strong> untuk status konflik terkini setelah review bisnis.</p>
+<hr />
+<h1 id="round-2-v01-docs-and-2026-08-31-json">Round 2: v0.1 docs and 2026-08-31 JSON</h1>
+<p>Round 2 menambahkan empat sumber:</p>
+<ol>
+<li><strong>PRODUCT-CHARTER-v0.1.md</strong> (business outcome, scope discipline, 7 keputusan pra-prototype).</li>
+<li><strong>SERVICE-POLICY-MATRIX-v0.1.md</strong> (operating model, katalog 8 offer, eligibility, journeys, comms, release gates).</li>
+<li><strong>INFORMATION-ARCHITECTURE-v0.1.md</strong> (IA + 11 surface, 3 booking flow prototype, copy guardrails).</li>
+<li><strong><code>seraya-psikologi-nonteknis-2026-08-31.json</code></strong> (export 2026-08-31; 143 key, jawaban psikolog, draft booking_policy/consent penuh).</li>
+</ol>
+<p>Sumber baseline Round 1 tidak berubah.</p>
+<h2 id="yang-sudah-ter-resolved-round-1-round-2">Yang sudah ter-resolved (Round 1 → Round 2)</h2>
+<table>
+<thead>
+<tr>
+<th>Round 1 finding</th>
+<th>Round 2 status</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>P0-04 booking intake/minor/eligibility/cutoff kosong</td>
+<td><strong>Resolved sebagian</strong>: usia 18–40 untuk direct self-service (<code>PRODUCT-CHARTER-v0.1</code> confirmed foundation; <code>aud_age=[18-24,25-34]</code>), 16–17 butuh guardian-consent terpisah, minor/guardian policy ada di JSON (<code>booking_minor</code>), eligibility dan out-of-scope tercatat (<code>aud_exclusion</code>). Cutoff <code>1 jam sebelum</code> dan hold <code>15 menit</code> masih bertentangan dengan guide (<code>10 menit</code>).</td>
+</tr>
+<tr>
+<td>P1-04 CONTEXT/ADR stale soal WhatsApp</td>
+<td><strong>Resolved di Matrix</strong>: WhatsApp adalah opsional manual support, bukan workflow/source of truth (<code>SERVICE-POLICY-MATRIX-v0.1 §6</code>). JSON <code>channels=[email,wa,calendar]</code> masih ambigu karena wa ditampilkan sebagai channel biasa; perlu dipilah jadi optional manual support, bukan lifecycle channel.</td>
+</tr>
+<tr>
+<td>P1-06 tidak ada copy guardrails untuk public site</td>
+<td><strong>Resolved di IA</strong>: lead with client situation, jangan janjikan diagnosis/emergency/cure/availability palsu, tidak publish testimonial/credential tanpa bukti, usia 16–17 tampilkan guardian route (<code>INFORMATION-ARCHITECTURE-v0.1 §6</code>).</td>
+</tr>
+<tr>
+<td>P1-06 FAQ/biz_story kosong</td>
+<td><strong>Resolved</strong>: <code>biz_story</code> panjang di JSON, <code>brand_words</code> hadir, copy positioning dan USP tercatat. Yang masih kosong: <code>hero_copy</code>, <code>primary_cta</code>, <code>proof_claims</code>, <code>testimonials</code>, <code>faq</code>, <code>content_topics</code>, <code>landing_sections</code>, <code>psychologist_1_photo</code>.</td>
+</tr>
+<tr>
+<td>Missing <code>crisis</code></td>
+<td><strong>Resolved</strong>: <code>crisis</code> di JSON menjelaskan non-emergency boundary dengan jelas. <code>referrals</code> masih kosong.</td>
+</tr>
+<tr>
+<td>Missing <code>consents</code></td>
+<td><strong>Resolved</strong>: <code>consents</code> di JSON berisi informed consent 8-section lengkap (tujuan, sukarela, kerahasiaan, data, batasan, daring, darurat, persetujuan).</td>
+</tr>
+<tr>
+<td>Missing <code>approvals</code></td>
+<td><strong>Resolved</strong>: <code>approvals</code> di JSON satu Admin boleh cancellation+refund terpisah, Editor deferred, Google SSO, two-Admin bootstrap. Cocok dengan ADR 0078/0079/0080/0081.</td>
+</tr>
+<tr>
+<td>Missing <code>retention</code></td>
+<td><strong>Resolved</strong>: <code>retention</code> di JSON match dengan ADR 0083 dan ADR 0086: 12 bulan setelah last active service, audit/legal per category, ConsentRecord follow service, audit/security per policy.</td>
+</tr>
+<tr>
+<td>Stack PRD Teknis (Supabase+Docker) vs Guide (Worker+D1)</td>
+<td><strong>Tidak berubah</strong> — Round 2 tidak menyentuh keputusan stack. Tetap konflik sampai architecture ADR.</td>
+</tr>
+<tr>
+<td>Couple participant model (P0-03)</td>
+<td><strong>Tidak berubah</strong> — Matrix bahkan secara eksplisit menulis keputusan participant/consent untuk couple wajib selesai sebelum live bookable (<code>SERVICE-POLICY-MATRIX-v0.1 §4C TBC</code>).</td>
+</tr>
+<tr>
+<td>Capacity overlap/buffer (P1-02)</td>
+<td><strong>Tidak berubah</strong>.</td>
+</tr>
+<tr>
+<td>No-show timing/early terminal (P1-12)</td>
+<td><strong>Tidak berubah</strong> — Matrix tidak membahas.</td>
+</tr>
+<tr>
+<td>Payment/refund settlement uniqueness (P1-10)</td>
+<td><strong>Tidak berubah</strong> — Matrix menyatakan partial refund deferred, full/no-refund only (cocok dengan ADR 0077), tetapi tidak bicara tentang at-most-one settlement atau <code>paid_late</code> package creation.</td>
+</tr>
+</tbody>
+</table>
+<h2 id="konflik-baru-atau-yang-memburuk-di-round-2">Konflik baru atau yang memburuk di Round 2</h2>
+<h3 id="r2-01-json-booking_policy-mementahkan-adr-0077-dan-adr-0076">R2-01 — JSON <code>booking_policy</code> mementahkan ADR 0077 dan ADR 0076</h3>
+<p><strong>Evidence</strong></p>
+<ul>
+<li>JSON <code>booking_policy §C</code> mendefinisikan refund bertingkat: <code>&gt;3 hari → 90%</code>, <code>3–1 hari → 80%</code>, hari H → <code>no refund</code>. Lalu menyebut <code>refund 15%</code> untuk reschedule, <code>refund 50%</code> untuk reschedule &gt;1 kali, dan <code>refund 50%</code> untuk reschedule pasca cancel.</li>
+<li>ADR 0077 line 15–23: <code>RefundAction</code> vocabulary untuk launch adalah <code>full_refund</code> atau <code>no_refund</code>; partial monetary refunds out of scope.</li>
+<li>ADR 0076 line 13–23: tidak ada automatic cancellation cutoff; setiap kasus direview Admin; refund tidak pernah diturunkan dari timing/approval.</li>
+<li>JSON §B menentukan <code>late ≤30 menit masih ditoleransi</code>, <code>&gt;30 menit tanpa kabar = no-show non-refund</code>. Guide/ADR 0028 hanya menyebut no-show grace 15 menit.</li>
+<li>JSON §E menyebut <code>refund ≤7 hari kerja</code>, mengembalikan via <code>metode pembayaran Seraya atau rekening klien</code>, dan biaya admin/transfer pihak ketiga dapat dibebankan ke klien.</li>
+</ul>
+<p><strong>Why this blocks</strong></p>
+<ul>
+<li>Implementer tidak boleh membuat tiga kelas refund parsial + biaya admin + transfer ke rekening klien karena ADR 0077 sudah memilih <code>full_refund</code>/<code>no_refund</code> saja.</li>
+<li><code>no-show &gt;30 menit</code> dan refund bertingkat akan otomatis memberikan keputusan finansial dari timing, padahal ADR 0076 line 19 melarang hal itu.</li>
+<li>Biaya admin/transfer dibebankan ke klien adalah partial refund yang berbeda nama.</li>
+</ul>
+<p><strong>Required correction</strong></p>
+<p>Tetapkan policy ini ke salah satu dari dua mode:</p>
+<ul>
+<li><strong>Mode A (cocok dengan ADR 0077)</strong>: json <code>booking_policy</code> adalah draft copy publik yang akan direkonsiliasi; document eksplisit mengakui launch tidak membedakan 90/80/no-refund otomatis; Admin review case-by-case; refund selalu <code>full_refund</code> atau <code>no_refund</code>; biaya admin/transfer jadi biaya internal Seraya, bukan debit klien.</li>
+<li><strong>Mode B (cocok dengan json)</strong>: ajukan ADR baru yang mencabut ADR 0077 dan mengubah ADR 0076 untuk mengizinkan partial refund otomatis bertingkat. Ini menyentuh PRD Non-Teknis launch claim dan tidak boleh dilakukan sebelum implementasi siap.</li>
+</ul>
+<p>Sampai keputusan ini, <strong>booking_policy di JSON tidak boleh dianggap launch copy</strong>, dan tidak boleh dipakai sebagai source code copy di website.</p>
+<h3 id="r2-02-booking_hold-15-menit-di-json-vs-10-menit-di-guide">R2-02 — <code>booking_hold</code> 15 menit di JSON vs 10 menit di guide</h3>
+<p><strong>Evidence</strong></p>
+<ul>
+<li>JSON <code>booking_hold = "15 menit"</code>.</li>
+<li>Guide line 271: SlotHold default TTL <code>10 menit</code>.</li>
+</ul>
+<p><strong>Required correction</strong></p>
+<p>Pilih satu; default aman adalah tetap <code>10 menit</code> (guide) karena sudah diacu di seluruh invariant. Update JSON atau document sebagai <code>TBC-PAY-01</code> yang menjelaskan exact provider expiry alignment.</p>
+<h3 id="r2-03-pay_methods-json-termasuk-wallet">R2-03 — <code>pay_methods</code> JSON termasuk <code>wallet</code></h3>
+<p><strong>Evidence</strong></p>
+<ul>
+<li>JSON <code>pay_methods = ["qris","va","wallet"]</code>.</li>
+<li>Guide line 91 + line 363: launch payment categories hanya QRIS dan bank transfer/Virtual Account; e-wallet dan payment method lain deferred.</li>
+</ul>
+<p><strong>Required correction</strong></p>
+<p>Hapus <code>wallet</code> dari JSON atau beri label <code>DEFERRED</code>; biarkan launch checkout hanya menampilkan QRIS dan VA. Adapter Midtrans tetap menyembunyikan method lain di Snap UI.</p>
+<h3 id="r2-04-booking_intake-terlalu-minim-untuk-beberapa-flow">R2-04 — <code>booking_intake</code> terlalu minim untuk beberapa flow</h3>
+<p><strong>Evidence</strong></p>
+<ul>
+<li>JSON <code>booking_intake = "Nama \nNO HP"</code>.</li>
+<li>Guide line 40-46 menentukan booking minimum operational data termasuk verified email/phone, contact, mode, snapshot; ConsentRecord.</li>
+<li>Tidak ada field email eksplisit.</li>
+</ul>
+<p><strong>Required correction</strong></p>
+<p>Tambahkan minimal <code>Nama lengkap, Email (wajib, untuk ClientAccess/notification), Nomor telepon (opsional WA support), Consent version</code>. Tetapkan sebagai <code>TBC-INTAKE-01</code> jika perlu.</p>
+<h3 id="r2-05-booking_access-di-json-diset-account-guide-menyebut-guest-primary">R2-05 — <code>booking_access</code> di JSON diset <code>account</code>, guide menyebut guest primary</h3>
+<p><strong>Evidence</strong></p>
+<ul>
+<li>JSON <code>booking_access = "account"</code>.</li>
+<li>Guide line 119–128: guest ClientAccess via email magic link/OTP, opsional UserAccount/Google linking.</li>
+<li>Charter line 35: <code>Checkout preference: Choose a schedule and pay directly</code>.</li>
+</ul>
+<p><strong>Required correction</strong></p>
+<p>Klarifikasi: guest checkout dengan ClientAccess adalah default. <code>account</code> di JSON bukan UserAccount penuh melainkan ClientAccess scoped. Update JSON atau rename field; default produk tetap guest-primary dengan optional linking.</p>
+<h3 id="r2-06-channels-json-menampilkan-whatsapp-sejajar-dengan-emailcalendar">R2-06 — <code>channels</code> JSON menampilkan WhatsApp sejajar dengan email/calendar</h3>
+<p><strong>Evidence</strong></p>
+<ul>
+<li>JSON <code>channels = ["email","wa","calendar"]</code>.</li>
+<li>ADR 0066 line 13–18: WhatsApp opsional manual support, tidak boleh menjadi lifecycle channel atau source of truth.</li>
+</ul>
+<p><strong>Required correction</strong></p>
+<p>Representasikan field <code>channels</code> sebagai: <code>["email (auto)", "wa (optional manual support, bukan lifecycle)", "calendar (admin-only visibility)"]</code> atau rename ke <code>automated_channels</code> dan <code>support_channels</code> terpisah.</p>
+<h3 id="r2-07-couple-booking-diartikan-day-one-bookable-di-charter-dan-ia-tetapi-matrix-menunda-sampai-keputusan-participant">R2-07 — Couple booking diartikan day-one bookable di Charter dan IA, tetapi Matrix menunda sampai keputusan participant</h3>
+<p><strong>Evidence</strong></p>
+<ul>
+<li>Charter line 35: couple counselling adalah day-one offer; Matrix line 30: <code>Couple counselling package | Online | 3 × 60 minutes | Rp350.000 | Bookable (dengan sequence A, B, joint)</code>; IA line 67–70: couple flow siap di-prototype.</li>
+<li>Matrix §4C TBC: participant identity fields, consent wording, who can schedule/change, reminder recipient, withdrawal — semua ini <strong>required sebelum couple live bookable</strong>, walau catalog boleh ditampilkan.</li>
+<li>Charter §6 keputusan #4 eksplisit bertanya apakah couple harus day-one bookable atau hanya ditampilkan.</li>
+</ul>
+<p><strong>Required correction</strong></p>
+<p>Pilih salah satu:</p>
+<ul>
+<li><strong>Couple launch-deferred</strong>: catalog tampil dengan badge <code>coming soon</code>, tidak ada checkout. PRD Non-Teknis <code>packages</code> dan JSON <code>packages</code> dibiarkan kosong atau sebagai placeholder.</li>
+<li><strong>Couple launch-ready</strong>: selesaikan participant/consent model dulu, dengan biaya tidak kurang dari 1–2 sprint.</li>
+</ul>
+<p>Rekomendasi: <strong>defer</strong> sampai participant model fix.</p>
+<h3 id="r2-08-psychologist_234-profile-terisi-padahal-hanya-fuja-launch">R2-08 — <code>psychologist_2/3/4</code> profile terisi padahal hanya Fuja launch</h3>
+<p><strong>Evidence</strong></p>
+<ul>
+<li>JSON terisi untuk psychologist 1–4 dengan license, expertise, education, dan sebagian bio. Psychologist 5 kosong.</li>
+<li>Charter line 17: hanya Fuja launch; Matrix line 7: bookable psychologist Fuja only.</li>
+<li>ADR 0075 line 7–9: <code>other planned profile slots have no confirmed data</code>.</li>
+</ul>
+<p><strong>Required correction</strong></p>
+<p>Untuk launch, hanya profile Fuja yang dipakai di website. Profile 2–4 harus berstatus <code>not_published</code> atau dihapus dari export publik. License yang dimasukkan ke JSON adalah data sensitif dan <code>[REDACTED]</code> untuk shared artifact — saat ini sudah di-redact untuk psychologist_1, tetapi psychologist_2/3/4 menyimpan license asli. <strong>Pertimbangkan juga: hapus/reduct data psychologist_2/3/4 atau pindahkan ke private artifact</strong>.</p>
+<h3 id="r2-09-persona_123-trigger-persis-sama-dengan-goal">R2-09 — <code>persona_1/2/3 trigger</code> persis sama dengan <code>goal</code></h3>
+<p><strong>Evidence</strong></p>
+<ul>
+<li>JSON <code>persona_1_goal == persona_1_trigger</code> (sama persis, 27 karakter).</li>
+<li>JSON <code>persona_2_goal == persona_2_trigger</code> (21 karakter).</li>
+<li>JSON <code>persona_3_goal == persona_3_trigger</code> (23 karakter).</li>
+</ul>
+<p><strong>Required correction</strong></p>
+<p><code>trigger</code> adalah konteks/momen (<code>kapan klien mulai mencari</code>), <code>goal</code> adalah tujuan yang diharapkan. Saat ini dua field identik dan tidak memberikan informasi tambahan. Isi field <code>trigger</code> dengan situasi konkret (misal <code>baru mulai magang</code>, <code>setelah melahirkan</code>), bukan copy dari goal. Ini mengganggu copy IA/landing yang seharusnya menampilkan client-situation-first.</p>
+<h3 id="r2-10-json-biz_story-menyebutkan-kami-berlima-padahal-ia-26-dan-matrix-tidak-menyebut-struktur-tim">R2-10 — JSON <code>biz_story</code> menyebutkan <code>kami berlima</code> padahal IA §2/§6 dan Matrix tidak menyebut struktur tim</h3>
+<p><strong>Evidence</strong></p>
+<ul>
+<li>JSON <code>biz_story</code> paragraf pembuka: <code>SERAYA berawal dari sebuah pertemanan. Kami berlima dipertemukan...</code>. Lalu menyebut <code>kami pun bukan lima orang yang datang tanpa cerita</code>.</li>
+<li>Charter line 11: <code>Locations: Malang (four psychologists) and Mataram (one psychologist)</code> — total lima psikolog.</li>
+<li>Matrix/Guide tidak menyebutkan narasi <code>kami berlima</code>.</li>
+</ul>
+<p><strong>Required correction</strong></p>
+<p><code>biz_story</code> adalah brand origin story dan tidak bertentangan secara substansial, tetapi framing <code>kami berlima</code> sebaiknya konsisten dengan jumlah psikolog aktual dan persona publik. Saat ini tulisannya menyebut <code>lima psikolog</code> sementara launch hanya Fuja bookable — pertimbangkan apakah story ini kompatibel dengan copy <code>For ages 18–40</code>, <code>Fuja is the only confirmed launch psychologist</code>.</p>
+<h3 id="r2-11-pricingcharter-tidak-memasukkan-couple-fee-selaras-dengan-couple-launch-deferred-recommendation">R2-11 — <code>pricing/charter</code> tidak memasukkan <code>Couple</code> fee selaras dengan couple launch-deferred recommendation</h3>
+<p><strong>Evidence</strong></p>
+<ul>
+<li>Matrix line 27–30 mencantumkan harga couple online Rp350.000 dan offline Rp550.000.</li>
+<li>Charter §6 keputusan #4 menanyakan apakah couple day-one bookable.</li>
+</ul>
+<p><strong>Required correction</strong></p>
+<p>Harga couple boleh tetap dicatat sebagai reference copy/catalog fixture untuk prototype/wireframe, tetapi harus ditandai <code>reference; not purchasable until couple participant model is resolved</code>.</p>
+<h3 id="r2-12-biz_location-online0900-1900-menyiratkan-fixed-schedule-padahal-adr-0075-menetapkan-schedule-production-terpisah">R2-12 — <code>biz_location = "Online/09.00-19.00"</code> menyiratkan fixed schedule, padahal ADR 0075 menetapkan schedule production terpisah</h3>
+<p><strong>Evidence</strong></p>
+<ul>
+<li>JSON <code>biz_location = "Online/09.00-19.00"</code>.</li>
+<li>ADR 0075 line 26, ADR 0088 line 17: <code>anytime/anyplace</code> adalah placeholder non-blocking untuk PRD/design, harus diganti sebelum live slots publication.</li>
+<li>Belum ada konfirmasi production recurring schedule.</li>
+</ul>
+<p><strong>Required correction</strong></p>
+<p><code>biz_location</code> saat ini bisa ditampilkan di copy public sebagai placeholder fixture design-only, tetapi jangan tampilkan slot production sampai Fuja recurring schedule confirmed. Tetapkan sebagai <code>TBC-SCHEDULE-01</code> blocker.</p>
+<h3 id="r2-13-launch_gate-di-json-masih-high-level">R2-13 — <code>launch_gate</code> di JSON masih high-level</h3>
+<p><strong>Evidence</strong></p>
+<ul>
+<li>JSON <code>launch_gate</code> paragraf: launch menampilkan 4 program, hanya SERAYA PULANG yang bookable/paid.</li>
+<li>Matrix §7 release gates menyebut 6 gate eksplisit: profile evidence, real availability, consent/privacy/crisis policy, verified payment integration, ops owner, couple-participant jika bookable.</li>
+<li>Charter §6 keputusan #4–#6 masih open.</li>
+</ul>
+<p><strong>Required correction</strong></p>
+<p>Gunakan <strong>Matrix §7</strong> sebagai launch gate yang executable; <code>launch_gate</code> JSON terlalu ringkas. Buat checklist owner-by-owner di implementation guide dan turunkan ke <code>TBC-*</code> register.</p>
+<h2 id="status-tbc-round-1-round-2">Status TBC Round 1 → Round 2</h2>
+<table>
+<thead>
+<tr>
+<th>TBC</th>
+<th>Status Round 2</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>TBC-INTAKE-01</code></td>
+<td><strong>Diperbarui</strong>: usia 18–40 confirmed, 16–17 guardian route, field intake minimum (<code>Nama, Email, Nomor HP</code>) <strong>belum final</strong> di JSON.</td>
+</tr>
+<tr>
+<td><code>TBC-MINOR-01</code></td>
+<td><strong>Diperbarui</strong>: booking_minor JSON sudah punya teks guardian consent. Belum punya field operational implementation.</td>
+</tr>
+<tr>
+<td><code>TBC-ELIGIBILITY-01</code></td>
+<td><strong>Diperbarui</strong>: aud_needs dan aud_exclusion sudah final di JSON; crisis referral text sudah ada; <code>referrals</code> masih kosong.</td>
+</tr>
+<tr>
+<td><code>TBC-BOOKING-CUTOFF-01</code></td>
+<td><strong>Terbuka</strong>: <code>1 jam</code> di JSON vs <code>10 menit</code> hold di guide vs <code>60 menit</code> sesi.</td>
+</tr>
+<tr>
+<td><code>TBC-PAY-01</code></td>
+<td><strong>Konflik baru</strong> dari R2-03 (<code>wallet</code>), R2-02 (hold 15 vs 10).</td>
+</tr>
+<tr>
+<td><code>TBC-COUPLE-01</code></td>
+<td><strong>Diperbarui</strong>: Matrix §4C eksplisit participant/consent/notification/withdrawal decisions required sebelum couple live bookable.</td>
+</tr>
+<tr>
+<td><code>TBC-POLICY-01</code></td>
+<td><strong>Closed by Round 3</strong>: launch refund policy = <code>full_refund</code>/<code>no_refund</code> only; tiered amounts live in Admin WhatsApp log; no public cancellation/refund UI.</td>
+</tr>
+<tr>
+<td><code>TBC-NOTIFY-01</code></td>
+<td><strong>Diperbarui</strong>: reminders <code>24 jam &amp; 2 jam</code> di JSON cocok dengan ADR 0052; copy confirmation template masih placeholder.</td>
+</tr>
+<tr>
+<td><code>TBC-REC-01</code></td>
+<td>Tetap terbuka.</td>
+</tr>
+<tr>
+<td><code>TBC-PRIVACY-01</code></td>
+<td><strong>Diperbarui</strong>: retention text di JSON sudah match ADR 0083/0086, consents panjang di JSON, crisis text ada. Implementasi field map tetap TBC.</td>
+</tr>
+<tr>
+<td><code>TBC-ACCESS-01</code></td>
+<td>Tetap terbuka.</td>
+</tr>
+<tr>
+<td><code>TBC-ADMIN-01</code></td>
+<td>Tetap terbuka.</td>
+</tr>
+<tr>
+<td><code>TBC-API-01</code></td>
+<td>Tetap terbuka.</td>
+</tr>
+<tr>
+<td><code>TBC-SCHEDULE-01</code></td>
+<td><strong>Konflik baru</strong> dari R2-12.</td>
+</tr>
+<tr>
+<td><code>TBC-CONSENT-01</code></td>
+<td><strong>Resolved sebagian</strong>: consent JSON lengkap, tetapi <code>TBC-CONSENT-01</code> masih perlu sign-off sebelum production publish.</td>
+</tr>
+<tr>
+<td><code>TBC-LIVE-PRD-01</code></td>
+<td>Tetap terbuka.</td>
+</tr>
+</tbody>
+</table>
+<h2 id="tbc-baru-dari-round-2">TBC baru dari Round 2</h2>
+<ol>
+<li><code>TBC-POLICY-RECONCILE-01</code> — <strong>Closed by Round 3</strong> (Mode A selected): full/no-refund only; admin WhatsApp; no public UI. PRD Non-Teknis <code>booking_policy</code> text becomes admin-conversation reference, not implementation source.</li>
+<li><code>TBC-CHANNELS-MODEL-01</code> — representasi <code>channels</code> JSON vs ADR 0066 opsional manual support boundary (R2-06).</li>
+<li><code>TBC-COUPLE-LAUNCH-01</code> — putuskan couple launch-deferred atau launch-ready; saat ini dokumen bertentangan (R2-07).</li>
+<li><code>TBC-PERSONA-FIELDS-01</code> — isi ulang <code>persona_*_trigger</code> agar berbeda dari <code>goal</code> (R2-09).</li>
+<li><code>TBC-PROFILE-EXPORT-01</code> — psychologist_2/3/4 license asli bocor di export; tetapkan redaction policy untuk non-launch profiles (R2-08).</li>
+<li><code>TBC-STORY-VOICE-01</code> — biz_story framing <code>kami berlima</code> vs only Fuja launch (R2-10).
+| <code>TBC-LAUNCH-GATE-DETAIL-01</code> | <strong>Closed by Round 7 (<code>ADR 0096-launch-gate-checklist.md</code>)</strong> | Matrix §7 adopted as executable launch checklist; G-1..G-14 owner-by-owner (business owner + clinical/ethics + operations + finance + technical) with blocking stage (<code>before slice</code> / <code>before UAT</code> / <code>production only</code>) and concrete acceptance evidence (artifact path, URL, signed record, or test run-id). Split into PRD/design handoff checklist (§16.1) and production-launch checklist (§16.2); gate-to-TBC dependency map (§16.3); release sign-off template (§16.4). Live launch requires G-14 consolidated sign-off at <code>docs/launch/release-sign-off-v1.md</code>. Patched into <code>IMPLEMENTATION-GUIDE.md §16</code>. |</li>
+</ol>
+<h2 id="verdict-round-2">Verdict Round 2</h2>
+<p>Foundation bisnis sudah <strong>jauh lebih kuat</strong>: usia 18–40, Fuja confirmed launch, full/no-refund only, Editor deferred, Google SSO, two-Admin, WhatsApp optional manual support, crisis boundary, 12-month retention, consent 8-section sudah align dengan ADR-ADR kunci.</p>
+<p>Round 2 <strong>memperkenalkan 13 konflik baru</strong> yang sebagian berat: booking_policy partial refund bertingkat vs ADR 0077, couple day-one claim vs Matrix deferral, hold 15 vs 10, payment wallet vs DEFERRED, profile 2–4 bocor license.</p>
+<p>Round 2 <strong>tidak menyelesaikan</strong> blocker arsitektur (stack Worker+D1 vs Supabase+Docker), couple participant model, capacity overlap, no-show timing, settlement uniqueness, atau PackagePurchase <code>paid_late</code>.</p>
+<p>Round 2 <strong>memperkuat</strong> rekomendasi Round 1: belum implementation-ready end-to-end; PRD/design handoff boleh dengan catatan; production launch tetap gated.</p>
+<h2 id="rekomendasi-prioritas-gabungan-round-1-round-2">Rekomendasi prioritas gabungan (Round 1 + Round 2)</h2>
+<ol>
+<li><strong>Putuskan R2-01</strong> (partial refund bertingkat vs ADR 0077) sebelum Slice 6. Mode A atau B.</li>
+<li><strong>Selesaikan R2-07</strong> (couple launch-deferred atau launch-ready) sebelum implementasi couple slice.</li>
+<li><strong>Rekonsiliasi R2-02 dan R2-03</strong> (hold TTL, payment methods) — cukup edit JSON untuk kembali ke baseline guide.</li>
+<li><strong>Redact psychologist_2/3/4 license</strong> (R2-08) sebelum export shared artifact apa pun.</li>
+<li><strong>Refactor <code>channels</code> field</strong> (R2-06) sesuai ADR 0066.</li>
+<li><strong>Patch CONTEXT.md dan ADR lama</strong> (Round 1 P1-04) untuk konsistensi current-state.</li>
+<li><strong>Architecture ADR</strong> (Round 1 P0-01) — masih tertinggi karena menyentuh D1 migrations.</li>
+<li><strong>Couple participant/consent model</strong> (Round 1 P0-03) — tetap penting walau couple launch-deferred.</li>
+<li><strong>Booking intake/minor/eligibility/cutoff final</strong> (Round 1 P0-04) — Round 2 mengisi banyak tapi belum final.</li>
+<li><strong>Tutup Round 1 P1-12 dan P1-13</strong> (no-show timing, package-wide cancellation matrix).</li>
+</ol>
+<hr />
+<h1 id="round-3-business-owner-decision-on-non-technical-conflict-2026-08-31">Round 3: business owner decision on non-technical conflict (2026-08-31)</h1>
+<p>The business owner has resolved the non-technical conflict between PRD Non-Teknis <code>booking_policy §C</code> (tiered partial refund, late-no-show, admin/transfer fees) and ADR 0077 + ADR 0076 (full/no-refund only, case-by-case). The resolution is Mode A:</p>
+<ul>
+<li>Booking and refund handling is <strong>not exposed in the public website</strong>.</li>
+<li>Requests come in through <strong>Admin WhatsApp</strong> only.</li>
+<li>Launch refund outcomes stay <code>full_refund</code> or <code>no_refund</code>; tiered amounts are conversation-only and never drive canonical state.</li>
+<li>Third-party admin/transfer fees are internal Seraya costs, never debited to the client.</li>
+<li>Public-website copy shows a short statement: "Cancellation and refund are handled by Admin via WhatsApp; review is case-by-case."</li>
+</ul>
+<p>The owner also confirmed: when a conflict exists between non-technical/business artifacts and technical artifacts (PRD/ADR/guide/domain model) about business decisions, <strong>the non-technical source wins</strong>. This is now the authority rule for business scope.</p>
+<h2 id="what-changed-in-artifacts-round-3">What changed in artifacts (Round 3)</h2>
+<ul>
+<li><strong>ADR 0064</strong> status updated to clarify cancellation/refund stays on Admin WhatsApp and is not surfaced in the public website.</li>
+<li><strong>ADR 0076</strong> + <strong>ADR 0077</strong> added a "Source-of-truth clarification (2026-08-31 round)" section that documents the business-owner resolution.</li>
+<li><strong><code>CONTEXT.md</code></strong> updated: WhatsApp number is <strong>optional</strong>, CancellationPolicy description no longer mentions partial refund, CancellationRequest/CancellationDecision/RefundAction vocabulary restricted to <code>full_refund</code>/<code>no_refund</code>.</li>
+<li><strong><code>DOMAIN-MODEL.md</code></strong> updated: RefundAction description clarifies tiered amounts live in Admin WhatsApp log; notifications/support clarifies Admin WhatsApp is the public channel for cancellation/refund and the public website does not host a cancellation/refund UI.</li>
+<li><strong><code>IMPLEMENTATION-GUIDE.md</code></strong> updated: §6.3 cancellation starts at "Admin WhatsApp (public channel)"; §6.4 refund adds the WhatsApp routing and the short-statement public copy; §10.2 WhatsApp boundary names Admin WhatsApp as the public channel and confirms no public cancellation/refund UI.</li>
+<li><strong><code>PRD-GUIDELINE-REVIEW.md</code></strong> TBC register adds <code>TBC-CANCELLATION-PUBLIC-01</code> with the resolution baked in.</li>
+</ul>
+<h2 id="status-update-of-round-2-conflicts">Status update of Round 2 conflicts</h2>
+<table>
+<thead>
+<tr>
+<th>Conflict</th>
+<th>Round 3 status</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>R2-01 partial refund bertingkat</td>
+<td><strong>Closed</strong>: ADR 0077 + ADR 0076 + guide now explicitly state <code>full_refund</code>/<code>no_refund</code> only; PRD Non-Teknis <code>booking_policy</code> text becomes admin-conversation reference, not launch implementation source. Public website has no cancellation/refund UI.</td>
+</tr>
+<tr>
+<td>R2-02 <code>booking_hold</code> 15 vs 10</td>
+<td>Still open (guide default 10 menit). JSON edit recommended.</td>
+</tr>
+<tr>
+<td>R2-03 <code>pay_methods</code> wallet</td>
+<td>Still open. JSON edit recommended (<code>wallet</code> → DEFERRED).</td>
+</tr>
+<tr>
+<td>R2-04 <code>booking_intake</code> minim</td>
+<td>Still open. Recommended JSON edit (<code>Nama, Email wajib, Nomor HP opsional, Consent version</code>).</td>
+</tr>
+<tr>
+<td>R2-05 <code>booking_access</code> <code>account</code></td>
+<td>Still open. Rename to ClientAccess-scoped; default remains guest-primary.</td>
+</tr>
+<tr>
+<td>R2-06 <code>channels</code> JSON</td>
+<td>Still open. Refactor to <code>automated_channels</code> + <code>support_channels</code>.</td>
+</tr>
+<tr>
+<td>R2-07 couple day-one claim</td>
+<td>Still open. Recommendation: defer until participant model fix.</td>
+</tr>
+<tr>
+<td>R2-08 psychologist_2/3/4 license</td>
+<td>Still open. Redact license sebelum export shared.</td>
+</tr>
+<tr>
+<td>R2-09 persona trigger == goal</td>
+<td>Still open.</td>
+</tr>
+<tr>
+<td>R2-10 <code>biz_story</code> framing <code>kami berlima</code></td>
+<td>Still open.</td>
+</tr>
+<tr>
+<td>R2-11 couple fee reference copy</td>
+<td>Still open. Mark reference/not purchasable until participant model fix.</td>
+</tr>
+<tr>
+<td>R2-12 <code>biz_location = Online/09.00-19.00</code></td>
+<td>Still open.</td>
+</tr>
+<tr>
+<td>R2-13 <code>launch_gate</code> JSON high-level</td>
+<td><strong>Closed by Round 7 (<code>ADR 0096-launch-gate-checklist.md</code>)</strong>: Matrix §7 six gates adopted as executable checklist G-1..G-14 with named-role owner, blocking stage (<code>before slice</code> / <code>before UAT</code> / <code>production only</code>), and concrete acceptance evidence (artifact path, URL, signed record, or test run-id). Split into PRD/design handoff checklist (§16.1) vs production-launch checklist (§16.2). Gate-to-TBC dependency map (§16.3). Release sign-off template (§16.4) listing required signatures per role. Live launch requires G-14 consolidated sign-off at <code>docs/launch/release-sign-off-v1.md</code>. Patches: <code>IMPLEMENTATION-GUIDE.md §16</code>, <code>PRD-GUIDELINE-REVIEW.md</code> Round 5 register, Round 6 ticket matrix Ticket #7 row, Round 6 operational-TBC table.</td>
+</tr>
+</tbody>
+</table>
+<h2 id="round-1-conflicts-status-update">Round 1 conflicts status update</h2>
+<ul>
+<li><strong>P1-04</strong> (CONTEXT/ADR stale on WhatsApp + refund): <strong>Resolved</strong> by CONTEXT.md + ADR 0064/0066/0076/0077 patches.</li>
+<li><strong>P1-04</strong> (Editor status in old ADR): partial — ADR 0079 already says deferred; CONTEXT.md previously inconsistent. Re-check during UAT copy.</li>
+<li><strong>P0-04</strong> (intake/minor/eligibility/cutoff): partially resolved by Charter and JSON, still open on cut-off <code>1 jam</code> vs guide.</li>
+</ul>
+<h2 id="verdict-after-round-3">Verdict after Round 3</h2>
+<p>Foundation is more aligned with the business owner. The non-technical source now wins on business scope, and the cancellation/refund policy is officially "Admin WhatsApp, full/no-refund, no public UI."</p>
+<p>Implementation readiness <strong>does not move</strong> to fully ready — remaining Round 1 blockers (architecture, couple participant model, capacity overlap, no-show timing, settlement uniqueness) still need ADR-level resolution. PRD/design handoff remains allowed with explicit placeholders; production launch remains gated.</p>
+<h2 id="new-top-priority-items-post-round-3">New top-priority items (post Round 3)</h2>
+<ol>
+<li><strong>Architecture ADR</strong> (Round 1 P0-01) — touchpoint with D1 migrations.</li>
+<li><strong>Couple participant/consent model</strong> (Round 1 P0-03) — needed whether couple launches or not.</li>
+<li><strong>Capacity overlap + TransitionBuffer</strong> (Round 1 P1-02).</li>
+<li><strong>No-show timing</strong> (Round 1 P1-12).</li>
+<li><strong>Settlement uniqueness + paid-late effects</strong> (Round 1 P1-10, R2-04 hold + wallet).</li>
+<li><strong>JSON cleanup</strong> (R2-02 hold, R2-03 wallet, R2-04 intake, R2-05 access, R2-06 channels, R2-08 license redaction).</li>
+<li>Adopt Matrix §7 launch gate as executable checklist (R2-13) — <strong>Closed by Round 7 (<code>ADR 0096-launch-gate-checklist.md</code> + <code>IMPLEMENTATION-GUIDE.md §16.1–§16.4</code>)</strong>.</li>
+<li><strong>Persona trigger and biz_story framing</strong> (R2-09, R2-10).</li>
+</ol>
+<hr />
+<h1 id="round-4-ticket-6-json-cleanup-closure-2026-08-31">Round 4: Ticket #6 JSON cleanup closure (2026-08-31)</h1>
+<p>Ticket #6 ("JSON cleanup for launch") sub-tasks 06.1–06.7 closed by editing <code>seraya-psikologi-nonteknis-2026-08-31.json</code> directly. The JSON now aligns with the guide/ADR baseline; the TBC register is updated accordingly. Backup of the pre-edit file is preserved at <code>/home/jar/.hermes/cache/documents/backups/</code>.</p>
+<h2 id="sub-task-resolution">Sub-task resolution</h2>
+<table>
+<thead>
+<tr>
+<th>Sub-task</th>
+<th>Field</th>
+<th>Action</th>
+<th>Result</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>06.1</td>
+<td><code>booking_hold</code></td>
+<td><code>"15 menit"</code> → <code>"10 menit"</code></td>
+<td>Matches <code>IMPLEMENTATION-GUIDE.md:271</code></td>
+</tr>
+<tr>
+<td>06.2</td>
+<td><code>pay_methods</code></td>
+<td>Removed <code>"wallet"</code>; added <code>pay_methods_deferred = ["wallet","card","otc","bnpl","direct_debit"]</code></td>
+<td>Matches <code>IMPLEMENTATION-GUIDE.md:91,363</code></td>
+</tr>
+<tr>
+<td>06.3</td>
+<td><code>booking_intake</code></td>
+<td>Replaced <code>"Nama \nNO HP"</code> with full minimum (Nama lengkap, Email wajib, Nomor HP opsional, Consent version)</td>
+<td>Matches <code>IMPLEMENTATION-GUIDE.md:40–46</code></td>
+</tr>
+<tr>
+<td>06.4</td>
+<td><code>booking_access</code></td>
+<td>Renamed to <code>client_access = "guest_primary_with_optional_linking"</code>; original preserved under <code>booking_access_deprecated = "account"</code> for round-trip audit</td>
+<td>Matches <code>IMPLEMENTATION-GUIDE.md:119–128</code></td>
+</tr>
+<tr>
+<td>06.5</td>
+<td><code>channels</code></td>
+<td>Split into <code>automated_channels = ["email"]</code> + <code>support_channels = ["wa (optional manual support, non-lifecycle)", "calendar (admin-only)"]</code>; original preserved under <code>channels_deprecated</code></td>
+<td>Matches ADR 0066</td>
+</tr>
+<tr>
+<td>06.6</td>
+<td><code>psychologist_2/3/4_license</code></td>
+<td>All three redacted to <code>[REDACTED — non-launch profile; verify before publication]</code>; <code>psychologist_{1..4}_publish_status</code> set explicitly (<code>published</code> for Fuja, <code>not_published</code> for 2–4)</td>
+<td>Matches ADR 0075 + shared-artifact redaction policy</td>
+</tr>
+<tr>
+<td>06.7</td>
+<td><code>profile_proof</code>, <code>landing_sections</code></td>
+<td>Labelled as TBC placeholders (<code>TBC-PROOF-01</code>, <code>TBC-LANDING-SECTIONS-01</code>) with rationale; schema-mismatch deferred to form schema owner</td>
+<td>Does not pretend to render; preserves intent for design handoff</td>
+</tr>
+</tbody>
+</table>
+<h2 id="extra-fixes-applied-in-the-same-pass">Extra fixes applied in the same pass</h2>
+<ul>
+<li><strong><code>persona_{1,2,3}_trigger</code></strong> rewritten to be distinct from corresponding <code>goal</code> (R2-09). Each trigger now describes a concrete situation/moment (baru mulai kuliah, minggu terakhir skripsi, baru menikah / anak kecil / promosi) instead of restating the goal.</li>
+<li><strong><code>launch_facing_story</code></strong> added as a client-first brand narrative referencing only the launch psychologist (Fuja) — supports IA/landing copy per Ticket #8. Original <code>biz_story</code> (termasuk frasa <code>kami berlima</code>) <strong>dipertahankan</strong> karena dipakai IA/About page.</li>
+<li><strong><code>booking_help</code></strong> updated to reference Admin WhatsApp as the public support channel.</li>
+<li><strong><code>booking_policy</code></strong> prefixed with the R3 public statement: "Cancellation and refund are handled by Admin via WhatsApp; review is case-by-case." Body text preserved as admin-conversation reference, not launch implementation source.</li>
+</ul>
+<h2 id="tbc-register-update">TBC register update</h2>
+<table>
+<thead>
+<tr>
+<th>TBC</th>
+<th>Round 4 status</th>
+<th>Closure evidence</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>TBC-PAY-01</code> (hold TTL + wallet + pay_methods)</td>
+<td><strong>Closed for hold/wallet scope</strong></td>
+<td>JSON <code>booking_hold="10 menit"</code>; <code>pay_methods=["qris","va"]</code>; <code>pay_methods_deferred</code> enumerated. Exact provider expiry alignment remains open as <code>TBC-PAY-EXPIRY-01</code> (already in register).</td>
+</tr>
+<tr>
+<td><code>TBC-INTAKE-01</code></td>
+<td><strong>Closed for launch minimum fields</strong></td>
+<td>JSON <code>booking_intake</code> now lists <code>Nama lengkap, Email (wajib), Nomor HP (opsional), Consent version</code>. Validation rules and exact transactional field map remain open; carried forward.</td>
+</tr>
+<tr>
+<td><code>TBC-CHANNELS-MODEL-01</code></td>
+<td><strong>Closed</strong></td>
+<td>JSON now splits <code>automated_channels</code> and <code>support_channels</code> per ADR 0066 boundary; original preserved as <code>channels_deprecated</code> for round-trip traceability.</td>
+</tr>
+<tr>
+<td><code>TBC-PERSONA-FIELDS-01</code></td>
+<td><strong>Closed</strong></td>
+<td>All three <code>persona_*_trigger</code> values rewritten to differ from <code>goal</code> (verified programmatically).</td>
+</tr>
+<tr>
+<td><code>TBC-PROFILE-EXPORT-01</code></td>
+<td><strong>Closed</strong></td>
+<td>All non-launch psychologist licenses (<code>psychologist_2/3/4</code>) redacted; <code>publish_status = "not_published"</code> set on those slots.</td>
+</tr>
+<tr>
+<td><code>TBC-STORY-VOICE-01</code></td>
+<td><strong>Closed by addition, not removal</strong></td>
+<td><code>biz_story</code> framing <code>kami berlima</code> preserved for IA/About page; new <code>launch_facing_story</code> field provides client-first copy for landing (Ticket #8).</td>
+</tr>
+<tr>
+<td><code>TBC-PAY-EXPIRY-01</code></td>
+<td><strong>Still open</strong></td>
+<td>Provider expiry alignment remains blocking for Slice 3 payment adapter.</td>
+</tr>
+<tr>
+<td><code>TBC-COUPLE-01</code>, <code>TBC-STACK-01</code>, <code>TBC-CAPACITY-01</code>, <code>TBC-BUFFER-01</code>, <code>TBC-STAFF-SESSION-01</code>, <code>TBC-ACCESS-01</code>, <code>TBC-ADMIN-01</code>, <code>TBC-API-01</code>, <code>TBC-REC-01</code>, <code>TBC-LIVE-PRD-01</code></td>
+<td><strong>Still open</strong></td>
+<td>Unchanged; outside Ticket #6 scope.</td>
+</tr>
+</tbody>
+</table>
+<h2 id="verdict-after-round-4">Verdict after Round 4</h2>
+<p>JSON is now aligned with the guide, ADR 0066/0075/0077, and the Round 3 cancellation/refund resolution. Round 2 conflicts R2-02, R2-03, R2-04, R2-05, R2-06, R2-08, R2-09, R2-10 are closed. The remaining <code>TBC-PAY-EXPIRY-01</code> and architecture/couple/capacity blockers from Round 1 still gate production launch — implementation readiness does not move from <code>Boleh dengan catatan</code>. PRD/design handoff is now <strong>stronger</strong>: a form load → export → parse round-trip will not lose the launch-relevant fields.</p>
+<hr />
+<h1 id="round-5-ticket-5-settlement-uniqueness-closure-2026-08-31">Round 5: Ticket #5 settlement uniqueness closure (2026-08-31)</h1>
+<p>Ticket #5 ("Settlement uniqueness &amp; paid-late package") closed by writing <code>ADR 0093-payment-settlement-uniqueness.md</code> and patching three downstream artifacts (<code>IMPLEMENTATION-GUIDE.md §7</code>, <code>DOMAIN-MODEL.md</code> Payment/refund section, this review's TBC register). The ADR answers all six open questions from the ticket and defines the two acceptance criteria integration tests explicitly.</p>
+<h2 id="what-changed-in-artifacts-round-5">What changed in artifacts (Round 5)</h2>
+<ul>
+<li><strong><code>docs/adr/0093-payment-settlement-uniqueness.md</code></strong> (new) — accepted for MVP, closes <code>TBC-PAY-SETTLEMENT-01</code>. Defines the at-most-one successful settlement invariant, value-match requirement, lifetime idempotency with payload fingerprint, out-of-order/repeated-status/reversal mapping table, three-layer crash window strategy, and Option A for <code>paid_late</code> package creation. Includes Postgres SQL migration (§6) and D1/SQLite equivalent (§7), plus reference to integration tests for both acceptance criteria.</li>
+<li><strong><code>IMPLEMENTATION-GUIDE.md §7.3–§7.7</code></strong> — added: settlement uniqueness invariants (amount/currency/order/merchant match, idempotency lifetime scope, three-layer crash window); Midtrans adapter contract (<code>PaymentGatewayAdapter</code> interface with <code>CreateCheckoutInput</code>, <code>VerifiedPaymentEvent</code>, <code>FullRefundInput</code>, <code>RefundProviderResult</code>); <code>paid_late</code> package effects (slot reacquired vs first session pending); duplicate webhook integration test (§7.6); paid-late package integration test (§7.7).</li>
+<li><strong><code>DOMAIN-MODEL.md</code> Payment and refund</strong> — added two subsections: "Settlement uniqueness (ADR 0093)" summarizing the uniqueness invariant and value-match/idempotency rules, and "<code>paid_late</code> package creation (ADR 0093 §5)" explaining Option A behavior with the two slot-reacquire outcomes.</li>
+<li><strong><code>PRD-GUIDELINE-REVIEW.md</code> TBC register</strong> — <code>TBC-PAY-SETTLEMENT-01</code> row now carries closure evidence with pointer to <code>ADR 0093</code> and to <code>IMPLEMENTATION-GUIDE.md §7.6–§7.7</code>.</li>
+</ul>
+<h2 id="key-decisions">Key decisions</h2>
+<table>
+<thead>
+<tr>
+<th>Question</th>
+<th>Decision</th>
+<th>Reference</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>At-most-one successful settlement per Booking/purchase intent?</td>
+<td><strong>Unique partial index</strong> <code>payment(booking_id) WHERE status = 'paid' AND settled_at IS NOT NULL</code> + app-level precheck (defense-in-depth, same pattern as <code>ADR 0091</code>)</td>
+<td>ADR 0093 §1.2; guide §7.3</td>
+</tr>
+<tr>
+<td>Amount/currency/order/merchant verification?</td>
+<td><strong>Wajib</strong>, bukan hanya signature. Adapter + application second-verification against <code>OfferSnapshot</code> and <code>Booking.snapshotted_amount</code>. Mismatch → <code>payment_event_mismatch_log</code> + rollback.</td>
+<td>ADR 0093 §2; guide §7.4</td>
+</tr>
+<tr>
+<td>Idempotency key scope?</td>
+<td><strong>Lifetime</strong>, payload fingerprint. Same-key/same-hash → no-op. Same-key/different-hash → typed failure <code>idempotency_key_collision</code>. Different-key/same-payload → separate event, no-op transition.</td>
+<td>ADR 0093 §3; guide §7.3</td>
+</tr>
+<tr>
+<td>Out-of-order / repeated-status / reversal mapping?</td>
+<td>Full table in <code>ADR 0093 §4.1</code>. <code>capture</code>/<code>settlement</code> → state transition; <code>pending</code> → no-op; <code>deny</code>/<code>cancel</code>/<code>expire</code>/<code>failure</code> → <code>failed</code>; <code>refund</code>/<code>chargeback</code> → no-op di <code>Payment</code>; <code>challenge</code> → Admin review.</td>
+<td>ADR 0093 §4; guide §7.3</td>
+</tr>
+<tr>
+<td>Crash window strategy?</td>
+<td><strong>Three layers</strong>: (a) createCheckout → persistence (optimistic <code>Payment status=pending</code> + idempotency); (b) verified webhook → state transition (handler transaction); (c) transition → outbox delivery (transactional outbox + retry + dead-letter).</td>
+<td>ADR 0093 §1.2 + open-follow-up; guide §7.3</td>
+</tr>
+<tr>
+<td><code>paid_late</code> package creation?</td>
+<td><strong>Option A</strong>: <code>PackagePurchase</code> + ordered <code>SessionEntitlement</code> + <code>PackageValidity</code> dibuat <strong>tepat saat webhook verified</strong>. Jika reacquire berhasil → <code>paid_late_slot_reacquired</code> + entitlement #1 <code>scheduled</code>. Jika gagal → <code>paid_late_first_session_pending</code> + entitlement #1 <code>pending_schedule</code> + <code>PackagePurchase.requires_first_session_scheduling = true</code>; Admin resolves via existing flow (<code>ADR 0067</code>).</td>
+<td>ADR 0093 §5; guide §7.5; domain model "paid_late package creation"</td>
+</tr>
+<tr>
+<td>Refund effects on partial-used package + future Appointments?</td>
+<td>Out of scope for this ADR; explicitly carried forward to <strong>Ticket #10</strong> (Package cancellation matrix &amp; outcome race). Open follow-up listed in <code>ADR 0093</code>.</td>
+<td>ADR 0093 open follow-up</td>
+</tr>
+</tbody>
+</table>
+<h2 id="status-of-round-1-conflicts-after-round-5">Status of Round 1 conflicts after Round 5</h2>
+<ul>
+<li><strong>P1-10</strong> (Payment/Refund projection, uniqueness, package-refund effects): <strong>Substantially closed</strong>. Uniqueness invariant, value match, idempotency, crash window, and <code>paid_late</code> package creation all answered by <code>ADR 0093</code>. Remaining sub-finding (refund effects on partial-used package and future Appointments) is <strong>deferred to Ticket #10</strong> and not a payment-side blocker.</li>
+<li><strong>P1-03</strong> (SlotHold TTL vs payment expiry): still open. <code>TBC-PAY-EXPIRY-01</code> not closed by Round 5; ADR 0093 references the SlotHold TTL but does not redefine it.</li>
+</ul>
+<h2 id="tbc-register-update-round-5">TBC register update (Round 5)</h2>
+<table>
+<thead>
+<tr>
+<th></th>
+<th>TBC</th>
+<th>Round 5 status</th>
+<th>Closure evidence</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>TBC-PAY-SETTLEMENT-01</code></td>
+<td><strong>Closed</strong></td>
+<td><code>ADR 0093-payment-settlement-uniqueness.md</code>; guide §7.3–§7.7; domain model "Settlement uniqueness" + "<code>paid_late</code> package creation"; SQL migration in ADR §6 (Postgres) + §7 (D1/SQLite); integration tests in guide §7.6–§7.7.</td>
+<td></td>
+</tr>
+<tr>
+<td><code>TBC-PACKAGE-CANCEL-01</code></td>
+<td><strong>Closed by Round 6 (<code>ADR 0095-package-cancellation-matrix.md</code>)</strong></td>
+<td>Targets (<code>appointment</code>/<code>booking</code>/<code>package_purchase</code>), open-request invariant via unique partial index, pending-vs-outcome race R1–R4, atomic per-target effects, partial-package 1-of-N, repeat/correction, couple override, RescheduleAction table, D1/SQLite + Postgres migration triggers. Acceptance tests 1–15 in <code>ADR 0095 §7</code>. Implementation baseline patches: <code>IMPLEMENTATION-GUIDE.md §6.2</code>, §6.3, §13.1, §14 TBC register; <code>DOMAIN-MODEL.md</code> Lifecycle + Cancellation transition matrix; guide ADR range <code>0001–0095</code>.</td>
+<td></td>
+</tr>
+<tr>
+<td><code>TBC-RESCHEDULE-01</code></td>
+<td><strong>Closed by Round 6 (<code>ADR 0095-package-cancellation-matrix.md §5</code>)</strong></td>
+<td>RescheduleAction forbidden transitions enumerated; replacement capacity overlap via <code>ADR 0091</code>; couple-package rules via <code>BookingParticipant</code> (<code>ADR 0090</code>); cancellation-request rebound (R4).</td>
+<td></td>
+</tr>
+<tr>
+<td><code>TBC-NO-SHOW-01</code></td>
+<td><strong>Closed by Round 5 (<code>ADR 0092-appointment-outcome-timing.md</code>)</strong></td>
+<td>Early <code>no_show</code> checkpoint T+15m, late-arrival via <code>completed_partial</code>/<code>no_show_late</code>, <code>OutcomeCorrection</code> window 7×24 jam.</td>
+<td></td>
+</tr>
+<tr>
+<td><code>TBC-INTAKE-01</code>, <code>TBC-MINOR-01</code>, <code>TBC-ELIGIBILITY-01</code>, <code>TBC-BOOKING-CUTOFF-01</code></td>
+<td><strong>Closed by Round 5 (<code>ADR 0094-intake-eligibility-cutoff.md</code>)</strong></td>
+<td>Final intake field schema, minor 16–17 guardian route, eligibility boundary, 1-hour booking cutoff.</td>
+<td></td>
+</tr>
+<tr>
+<td><code>TBC-PAY-EXPIRY-01</code></td>
+<td><strong>Still open</strong></td>
+<td>Unchanged — outside Round 5/6 scope.</td>
+<td></td>
+</tr>
+<tr>
+<td><code>TBC-COUPLE-01</code></td>
+<td><strong>Closed by <code>ADR 0090</code></strong> (Round 2 finalization)</td>
+<td>Couple <code>BookingParticipant</code>/<code>AppointmentParticipant</code> model, consent per participant, visibility, ClientAccess scope.</td>
+<td></td>
+</tr>
+<tr>
+<td><code>TBC-STACK-01</code></td>
+<td><strong>Closed by <code>ADR 0089</code></strong> (Round 5)</td>
+<td>Cloudflare Worker + D1 architecture ratified.</td>
+<td></td>
+</tr>
+<tr>
+<td><code>TBC-CAPACITY-01</code>, <code>TBC-BUFFER-01</code></td>
+<td><strong>Closed by <code>ADR 0091</code></strong></td>
+<td>Capacity overlap + TransitionBuffer placement.</td>
+<td></td>
+</tr>
+<tr>
+<td><code>TBC-STAFF-SESSION-01</code>, <code>TBC-ACCESS-01</code>, <code>TBC-ADMIN-01</code>, <code>TBC-API-01</code>, <code>TBC-REC-01</code>, <code>TBC-LIVE-PRD-01</code>, <code>TBC-POLICY-RECONCILE-01</code>, <code>TBC-CHANNELS-MODEL-01</code>, <code>TBC-COUPLE-LAUNCH-01</code>, <code>TBC-PROFILE-EXPORT-01</code>, <code>TBC-PAY-01</code>, <code>TBC-NOTIFY-01</code>, <code>TBC-CONSENT-01</code></td>
+<td><strong>Still open</strong></td>
+<td>Unchanged.</td>
+<td></td>
+</tr>
+<tr>
+<td><code>TBC-LAUNCH-GATE-DETAIL-01</code></td>
+<td><strong>Closed by <code>ADR 0096-launch-gate-checklist.md</code> (Round 7 / Ticket #07)</strong></td>
+<td>Matrix §7 six gates adopted as executable launch checklist (G-1..G-14, owner-by-owner, blocking stage, concrete acceptance evidence). PRD/design handoff checklist separated from production-launch checklist. Patched into <code>IMPLEMENTATION-GUIDE.md §16.1–§16.4</code>. Per-gate evidence collection is operational follow-up tracked via §16.3 dependency map, not a TBC.</td>
+<td></td>
+</tr>
+<tr>
+<td><code>TBC-PERSONA-FIELDS-01</code>, <code>TBC-STORY-VOICE-01</code></td>
+<td><strong>Closed</strong> (carried forward — see Round 4 table above; Round 6 ticket matrix Ticket #8 confirms closure; Round 7 below records the <code>persona_3_barrier</code> catch-up)</td>
+<td>Round 4 table marked both Closed; Round 6 ticket #8 row marked both Closed; Round 7 caught the <code>persona_3_barrier == persona_3_goal</code> copy-paste bug introduced during the Ticket #6 cleanup pass and tightened <code>launch_facing_story</code> against IA §6 copy guardrails.</td>
+<td></td>
+</tr>
+</tbody>
+</table>
+<h2 id="verdict-after-round-5">Verdict after Round 5</h2>
+<p>Settlement uniqueness and <code>paid_late</code> package effects are now ADR-level resolved. The at-most-one successful settlement invariant is testable, has a DB-level hard guarantee (unique partial index), an application-level soft guarantee (precheck + idempotency record), and an explicit integration test. <code>paid_late</code> package creation no longer leaks an undefined state to Admin: the package is created with a clear <code>requires_first_session_scheduling</code> flag and a one-state-resolution flow that reuses <code>ADR 0067</code>.</p>
+<p>Remaining Round 1 blockers (architecture <code>ADR 0089</code>, couple participant model <code>ADR 0090</code>, capacity overlap <code>ADR 0091</code>, no-show timing <code>ADR 0092</code>) are now ADR-resolved. Round 5/6 adds settlement uniqueness (<code>ADR 0093</code>), intake/eligibility/cutoff (<code>ADR 0094</code>), and the package cancellation matrix + outcome race (<code>ADR 0095</code>). Round 7 adds the executable launch-gate checklist (<code>ADR 0096-launch-gate-checklist.md</code>) which closes <code>TBC-LAUNCH-GATE-DETAIL-01</code>. The remaining open TBCs are operational/policy work: <code>TBC-PAY-EXPIRY-01</code> (provider TTL alignment), <code>TBC-STAFF-SESSION-01</code>, <code>TBC-ACCESS-01</code>, <code>TBC-ADMIN-01</code>, <code>TBC-API-01</code>, <code>TBC-REC-01</code>, <code>TBC-LIVE-PRD-01</code>, <code>TBC-POLICY-RECONCILE-01</code>, <code>TBC-CHANNELS-MODEL-01</code>, <code>TBC-COUPLE-LAUNCH-01</code>, <code>TBC-PROFILE-EXPORT-01</code>, <code>TBC-PAY-01</code>, <code>TBC-NOTIFY-01</code>, <code>TBC-CONSENT-01</code>, plus the new <code>TBC-EXTENSION-01</code>. <code>TBC-PAY-SETTLEMENT-01</code>, <code>TBC-PACKAGE-CANCEL-01</code>, <code>TBC-RESCHEDULE-01</code>, <code>TBC-NO-SHOW-01</code>, <code>TBC-PERSONA-FIELDS-01</code>, <code>TBC-LAUNCH-GATE-DETAIL-01</code>, and <code>TBC-STORY-VOICE-01</code> rows are preserved as closure evidence for future audits (see Round 7 for the Ticket #7 / Ticket #8 closure narratives and the <code>persona_3_barrier</code> catch-up).</p>
+<hr />
+<h1 id="round-6-ticket-inventory-closure-mvp-ready-summary-2026-08-31">Round 6: Ticket inventory closure &amp; MVP-ready summary (2026-08-31)</h1>
+<p>Round 6 formalizes closure of all ten substantive tickets that gated MVP skeleton coding, declares the conditions under which MVP skeleton code may begin (with <code>Authorization</code> placeholder per business-owner instruction), and enumerates the operational TBCs that are <strong>intentionally</strong> left open for post-MVP operational hardening.</p>
+<h2 id="ticket-closure-matrix-all-10-tickets">Ticket closure matrix (all 10 tickets)</h2>
+<table>
+<thead>
+<tr>
+<th>#</th>
+<th>Ticket</th>
+<th>Substantive finding (Round 1 / Round 2)</th>
+<th>Closure artifact</th>
+<th>Closes TBC</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td>Architecture selection</td>
+<td>P0-01 (PRD Teknis <code>database=supabase</code> + <code>architecture=docker</code> vs Guide Worker+D1)</td>
+<td><code>ADR 0089-architecture-worker-d1.md</code> (Cloudflare Worker + D1 + <code>PersistenceAdapter</code> seam)</td>
+<td><code>TBC-STACK-01</code></td>
+</tr>
+<tr>
+<td>2</td>
+<td>Couple participant model</td>
+<td>P0-03 (couple package bookable but no participant/consent/access model)</td>
+<td><code>ADR 0090-couple-participant-model.md</code> (<code>BookingParticipant</code>/<code>AppointmentParticipant</code>, consent per participant, visibility, ClientAccess scope)</td>
+<td><code>TBC-COUPLE-01</code></td>
+</tr>
+<tr>
+<td>3</td>
+<td>Capacity overlap &amp; buffer</td>
+<td>P1-02 (slot granularity + overlap strategy + buffer placement)</td>
+<td><code>ADR 0091-capacity-overlap-buffer.md</code> (CapacityReservation with unique partial index + TransitionBuffer placement; Postgres DDL §6, D1/SQLite §7)</td>
+<td><code>TBC-CAPACITY-01</code>, <code>TBC-BUFFER-01</code></td>
+</tr>
+<tr>
+<td>4</td>
+<td>No-show timing &amp; late-arrival</td>
+<td>P1-12 (15-minute no-show conflicted with "post-session outcome" + correction window)</td>
+<td><code>ADR 0092-appointment-outcome-timing.md</code> (early checkpoint <code>no_show</code> T+15m locked, 5-value outcome enum, late-arrival via <code>completed_partial</code>/<code>no_show_late</code>, 7×24h Admin correction via <code>OutcomeCorrection</code>, deterministic entitlement coupling)</td>
+<td><code>TBC-NO-SHOW-01</code></td>
+</tr>
+<tr>
+<td>5</td>
+<td>Settlement uniqueness &amp; <code>paid_late</code> package</td>
+<td>P1-10 + R2-04 (at-most-one settlement, value-match, idempotency, crash window, <code>paid_late</code> package creation)</td>
+<td><code>ADR 0093-payment-settlement-uniqueness.md</code> + guide §7.3–§7.7 + domain model "Settlement uniqueness" / "<code>paid_late</code> package creation" (see Round 5 above)</td>
+<td><code>TBC-PAY-SETTLEMENT-01</code></td>
+</tr>
+<tr>
+<td>6</td>
+<td>JSON cleanup for launch</td>
+<td>R2-02, R2-03, R2-04, R2-05, R2-06, R2-08, R2-09, R2-10</td>
+<td>Edit <code>seraya-psikologi-nonteknis-2026-08-31.json</code> directly (sub-tasks 06.1–06.7 + persona trigger rewrite + <code>launch_facing_story</code> addition + <code>booking_help</code> + <code>booking_policy</code> R3 prefix); see Round 4 above</td>
+<td><code>TBC-PAY-01</code> (hold/wallet scope), <code>TBC-INTAKE-01</code> (launch-minimum fields), <code>TBC-CHANNELS-MODEL-01</code>, <code>TBC-PERSONA-FIELDS-01</code>, <code>TBC-PROFILE-EXPORT-01</code>, <code>TBC-STORY-VOICE-01</code> (by addition)</td>
+</tr>
+<tr>
+<td>7</td>
+<td>Launch-gate checklist (executable)</td>
+<td>R2-13 (JSON <code>launch_gate</code> too high-level)</td>
+<td><code>ADR 0096-launch-gate-checklist.md</code> + <code>IMPLEMENTATION-GUIDE.md §16.1–§16.4</code> (G-1..G-14 owner-by-owner with blocking stage and concrete acceptance evidence; §16.1 PRD-handoff vs §16.2 production-launch; §16.3 gate-to-TBC dependency map; §16.4 release sign-off template)</td>
+<td><code>TBC-LAUNCH-GATE-DETAIL-01</code> (Closed by Round 7 / <code>ADR 0096</code>)</td>
+</tr>
+<tr>
+<td>8</td>
+<td>Persona &amp; biz_story framing</td>
+<td>R2-09, R2-10 (persona <code>trigger == goal</code>; biz_story <code>kami berlima</code> vs Fuja-only launch)</td>
+<td><code>launch_facing_story</code> field added in Ticket #6 pass; persona triggers rewritten; <code>biz_story</code> retained for IA/About page; copy guardrails from <code>INFORMATION-ARCHITECTURE-v0.1 §6</code> applied to landing; <strong>Ticket #8 closure pass</strong> (Round 7 below) caught and fixed the <code>persona_3_barrier == persona_3_goal</code> copy-paste residue from the Ticket #6 rewrite and tightened <code>launch_facing_story</code> against IA §6 (explicit anti-promise of diagnosis/cure/guaranteed outcomes; 16–17 guardian-nudge)</td>
+<td><code>TBC-PERSONA-FIELDS-01</code>, <code>TBC-STORY-VOICE-01</code></td>
+</tr>
+<tr>
+<td>9</td>
+<td>Intake schema, minor route, eligibility, cutoff</td>
+<td>P0-04 + R2-04 (intake minimum, age policy, eligibility, cutoff)</td>
+<td><code>ADR 0094-intake-eligibility-cutoff.md</code> (intake field schema: Nama lengkap + Email wajib + Nomor HP opsional + Consent version; minor 16–17 guardian route; eligibility/exclusion boundary; 1-hour booking cutoff)</td>
+<td><code>TBC-INTAKE-01</code>, <code>TBC-MINOR-01</code>, <code>TBC-ELIGIBILITY-01</code>, <code>TBC-BOOKING-CUTOFF-01</code></td>
+</tr>
+<tr>
+<td>10</td>
+<td>Package cancellation matrix &amp; outcome race</td>
+<td>P1-13 + R5 carry-forward (package-wide cancellation, pending-vs-outcome race, RescheduleAction transitions, couple override)</td>
+<td><code>ADR 0095-package-cancellation-matrix.md</code> + guide §6.2/§6.3/§13.1/§14 + domain model Lifecycle + cancellation transition matrix (15 acceptance tests; R1–R4 race resolution; atomic per-target effects; partial 1-of-N; repeat/correction; couple via <code>BookingParticipant</code>)</td>
+<td><code>TBC-PACKAGE-CANCEL-01</code>, <code>TBC-RESCHEDULE-01</code></td>
+</tr>
+</tbody>
+</table>
+<p><strong>Ticket closure summary: 10/10 closed.</strong> Every ticket produces either a new ADR (<code>0089</code>–<code>0095</code>), a JSON/artifact edit with backup, or a guide/domain-model patch with explicit closure evidence. Round 1 P0-01 through P1-13 are now either fully closed or have a defined deferral path (Ticket #6/7/8 are JSON/guide ops work rather than domain blockers).</p>
+<h2 id="mvp-ready-declaration-with-operational-caveats">MVP-ready declaration (with operational caveats)</h2>
+<p>Per business-owner instruction, <strong>MVP skeleton code may begin</strong> because all ten substantive domain blockers have been resolved to ADR-level detail. The conditions are:</p>
+<h3 id="what-is-mvp-ready-now">What is MVP-ready now</h3>
+<ul>
+<li><strong>Business scope</strong>: final — CancellationDecision (<code>approve</code>/<code>deny</code>), refund vocabulary (<code>full_refund</code>/<code>no_refund</code> only, no public UI, Admin WhatsApp routing), catalog (SERAYA PULANG only, Fuja only), channels (email auto + Admin WhatsApp optional manual support).</li>
+<li><strong>Architecture</strong>: final — Cloudflare Worker + D1 + <code>PersistenceAdapter</code> seam (<code>ADR 0089</code>); DDL syntax dual-tracked for Postgres family (<code>§6</code>) and D1/SQLite (<code>§7</code>).</li>
+<li><strong>Capacity overlap model</strong>: final — <code>CapacityReservation</code> with unique partial index + TransitionBuffer (<code>ADR 0091</code>).</li>
+<li><strong>Intake schema</strong>: final — minimum field set, validation rules, minor 16–17 guardian route, 1-hour cutoff (<code>ADR 0094</code>).</li>
+<li><strong>Settlement uniqueness invariant</strong>: final — at-most-one successful settlement, value-match, idempotency by <code>payload_hash</code>, three-layer crash window (<code>ADR 0093</code>).</li>
+<li><strong>Couple participant model</strong>: final — <code>BookingParticipant</code>/<code>AppointmentParticipant</code> + per-participant consent + visibility + ClientAccess scope (<code>ADR 0090</code>).</li>
+<li><strong>No-show timing</strong>: final — early checkpoint at T+15m, late-arrival via <code>completed_partial</code>/<code>no_show_late</code>, 7×24h Admin correction (<code>ADR 0092</code>).</li>
+<li><strong>Package cancellation matrix</strong>: final — target types (<code>appointment</code>/<code>booking</code>/<code>package_purchase</code>), at-most-one open request invariant, R1–R4 race resolution, atomic per-target effects, RescheduleAction table (<code>ADR 0095</code>).</li>
+<li><strong>Launch gate (design)</strong>: final — <code>SERVICE-POLICY-MATRIX-v0.1 §7</code> adopted as executable checklist; only evidence collection remains ops work.</li>
+<li><strong>JSON source</strong>: aligned — Ticket #6 cleanup applied; field round-trip preserved.</li>
+</ul>
+<h3 id="authorization-placeholder-per-business-owner-instruction"><code>Authorization</code> placeholder per business-owner instruction</h3>
+<p>Because <code>TBC-STAFF-SESSION-01</code>, <code>TBC-ACCESS-01</code>, and <code>TBC-ADMIN-01</code> are still open as <strong>operational</strong> work (not domain blockers), the skeleton's <code>Authorization</code> module may be implemented against a <strong>clearly-labelled placeholder interface</strong> with the following constraints:</p>
+<ol>
+<li>The placeholder must encode the <em>roles</em> that ADRs 0078/0079/0080/0081/0082 already commit to: <code>client</code>, <code>psychologist</code>, <code>admin</code>, with <code>admin</code> split into separate-action authority for cancellation/refund, two-Admin bootstrap, Google SSO as identity provider, and <code>BookingParticipant</code>-scoped couple access.</li>
+<li>The placeholder must reject any call from an unauthenticated principal except those routed through <code>ClientAccess</code> token verification (per <code>ADR 0020</code>/<code>0046</code>), with the verification path stubbed but typed.</li>
+<li>The placeholder must NOT hardcode a session policy (TTL, cookie flags, CSRF, re-auth, revocation). These remain the explicit deliverable of <code>TBC-STAFF-SESSION-01</code> and must be filled in before the staff slice moves from skeleton to wiring.</li>
+<li>Each call site that touches the placeholder must carry a <code>// TODO(staff-session):</code> marker linked to <code>TBC-STAFF-SESSION-01</code> so the gap is auditable.</li>
+</ol>
+<p>This is consistent with the Round 1 verdict row "Architecture-neutral foundation" (<code>Boleh mulai sebagian</code>) — the foundation is now no longer architecture-neutral but is MVP-stack-concrete; only the staff-session wiring is deferred.</p>
+<h3 id="operational-tbcs-that-remain-open-intentionally">Operational TBCs that remain open (intentionally)</h3>
+<p>These are <strong>not</strong> blockers for MVP skeleton coding because they are operational hardening, not domain semantics. They are listed here as the explicit caveat set:</p>
+<table>
+<thead>
+<tr>
+<th>TBC</th>
+<th>Concern</th>
+<th>Why intentionally deferred</th>
+<th>Required before</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>TBC-STAFF-SESSION-01</code></td>
+<td>Staff session lifecycle (OAuth state/nonce, cookie/CSRF, re-auth, revocation, recovery)</td>
+<td>Needs concrete IdP selection (Google SSO is decided but contract not finalized), last-Admin recovery invariant per <code>ADR 0081</code>, and threat model</td>
+<td>Staff slice wiring, before any staff login reaches production</td>
+</tr>
+<tr>
+<td><code>TBC-ACCESS-01</code></td>
+<td>ClientAccess token lifecycle edge cases</td>
+<td>Guest flow uses email magic link/OTP (<code>ADR 0020</code>/<code>0046</code>); token rotation, expiry edge cases, and revoke paths belong to ops hardening</td>
+<td>Production booking flow with real email provider</td>
+</tr>
+<tr>
+<td><code>TBC-ADMIN-01</code></td>
+<td>Admin workspace acceptance baseline</td>
+<td>Admin cancellation/refund workspace is specified (<code>ADR 0067</code>) but the full admin field matrix, RBAC acceptance, and audit-replay test plan are not</td>
+<td>Production admin access</td>
+</tr>
+<tr>
+<td><code>TBC-API-01</code></td>
+<td>Public/internal API surface contract</td>
+<td>Worker route surface exists; OpenAPI/types, rate-limit, idempotency-on-write contract are ops work</td>
+<td>Public API exposure (currently only Worker→Worker internal)</td>
+</tr>
+<tr>
+<td><code>TBC-REC-01</code></td>
+<td>Reconciliation runbook for late / orphan payment events</td>
+<td>Provider event idempotency is finalized (<code>ADR 0093</code>); runbook for operator action when an event is missed or out-of-order is ops work</td>
+<td>First production payment incident</td>
+</tr>
+<tr>
+<td><code>TBC-LIVE-PRD-01</code></td>
+<td>Live PRD ↔ guide reconciliation as canonical source-of-truth</td>
+<td>Form schema drift and revision-history work is required before collaborative editing is reliable</td>
+<td>Next PRD edit cycle</td>
+</tr>
+<tr>
+<td><code>TBC-CONSENT-01</code></td>
+<td>Consent copy sign-off</td>
+<td>8-section consent text exists in JSON; legal/clinical sign-off before publish is ops work</td>
+<td>Production publish</td>
+</tr>
+<tr>
+<td><code>TBC-NOTIFY-01</code></td>
+<td>Notification provider + copy + offsets + quiet hours</td>
+<td>Email is confirmed primary (<code>ADR 0021</code>); provider selection (Resend? SES? Postmark?), reminder copy (<code>ADR 0052</code>/<code>0053</code>), quiet hours, and bounce handling are ops work</td>
+<td>First transactional email in production</td>
+</tr>
+<tr>
+<td><code>TBC-PAY-EXPIRY-01</code></td>
+<td>SlotHold TTL ↔ provider expiry invariant</td>
+<td>Provider expiry behavior (QRIS vs VA) is the operational piece that decides exact TTL value and reconciliation path</td>
+<td>Payment adapter live with real provider</td>
+</tr>
+<tr>
+<td><code>TBC-PAY-01</code> (TTL alignment)</td>
+<td>(above)</td>
+<td>(above)</td>
+<td>(above)</td>
+</tr>
+<tr>
+<td><code>TBC-EXTENSION-01</code></td>
+<td>Package validity extension authority &amp; audit</td>
+<td>Calendar-period model is decided (<code>ADR 0055</code>); who can extend and under what audit signal is ops work</td>
+<td>First extension request</td>
+</tr>
+<tr>
+<td><code>TBC-COUPLE-LAUNCH-01</code></td>
+<td>Couple day-one bookable decision</td>
+<td>Model is final (<code>ADR 0090</code>); whether couple is bookable on day one is a business launch decision separate from the model</td>
+<td>Launch day</td>
+</tr>
+<tr>
+<td><code>TBC-LAUNCH-GATE-DETAIL-01</code></td>
+<td><strong>Closed by <code>ADR 0096-launch-gate-checklist.md</code> (Round 7)</strong></td>
+<td>Matrix §7 adopted as executable checklist with owner/blocking-stage/evidence per gate (<code>IMPLEMENTATION-GUIDE.md §16.1–§16.4</code>). Per-gate evidence collection is tracked via §16.3 dependency map and §16.4 sign-off template — not a TBC</td>
+<td>Production launch</td>
+</tr>
+</tbody>
+</table>
+<h3 id="what-is-not-mvp-ready-and-was-not-before">What is <strong>not</strong> MVP-ready (and was not before)</h3>
+<ul>
+<li>Production launch itself — gated by operational TBCs above, by evidence collection on the launch gate, and by live PRD reconciliation.</li>
+<li>Public-facing content module / CMS — <code>IMPLEMENTATION-GUIDE.md</code> does not yet define <code>ContentModule</code>, <code>CrisisNotice</code>, or measurable accessibility / performance / SEO acceptance. R2-13's content-side items remain.</li>
+<li>End-to-end feature wiring for staff and admin — depends on <code>TBC-STAFF-SESSION-01</code> and <code>TBC-ADMIN-01</code> being closed.</li>
+</ul>
+<h2 id="recommended-coding-order-given-mvp-ready-declaration">Recommended coding order, given MVP-ready declaration</h2>
+<ol>
+<li><strong>Foundation slice (was Slice 0)</strong> — vocabulary, typed errors, fake clock, fixtures, idempotency/correlation primitives, <code>PersistenceAdapter</code> seam against <code>ADR 0089</code>. <em>Now stack-concrete, not architecture-neutral.</em></li>
+<li><strong>Catalog/availability (Slice 1)</strong> — catalog types, pricing snapshot model, public shell. Use <code>ADR 0091</code> for overlap semantics.</li>
+<li><strong>Booking/hold (Slice 2)</strong> — use <code>ADR 0094</code> intake schema, <code>ADR 0090</code> couple participant, <code>ADR 0091</code> capacity overlap, <code>ADR 0089</code> Worker+D1 persistence.</li>
+<li><strong>Payment adapter (Slice 3)</strong> — <code>ADR 0093</code> settlement uniqueness, value-match, idempotency, three-layer crash window. <em>Note: production live requires <code>TBC-PAY-EXPIRY-01</code>.</em></li>
+<li><strong>Package (Slice 4)</strong> — <code>ADR 0094</code> intake, <code>ADR 0095</code> package cancellation matrix, <code>ADR 0090</code> couple.</li>
+<li><strong>Staff/ClientAccess (Slice 5)</strong> — <code>Authorization</code> placeholder per business-owner instruction; close <code>TBC-STAFF-SESSION-01</code>/<code>TBC-ACCESS-01</code> before wiring staff login to production.</li>
+<li><strong>Cancellation/refund (Slice 6)</strong> — <code>ADR 0095</code> matrix; <code>ADR 0077</code> <code>full_refund</code>/<code>no_refund</code> only; Admin WhatsApp as public channel per Round 3.</li>
+<li><strong>Notifications (Slice 7)</strong> — event intents and fake adapter against <code>ADR 0052</code>/<code>0053</code>; provider selection deferred (<code>TBC-NOTIFY-01</code>).</li>
+<li><strong>Privacy/retention (Slice 8)</strong> — policy schema and dry-run per <code>ADR 0083</code>/<code>0085</code>/<code>0086</code>/<code>0087</code>; no destructive production action until <code>TBC-REC-01</code> is closed.</li>
+<li><strong>CMS/UAT (Slice 9)</strong> — content, crisis, legal copy, a11y/perf/SEO acceptance. <em>Not yet ready — outside MVP skeleton scope.</em></li>
+</ol>
+<h2 id="verdict-after-round-6">Verdict after Round 6</h2>
+<p>All ten substantive tickets are closed. The MVP skeleton code can begin against <code>ADR 0089</code> (Worker + D1) with the <code>Authorization</code> placeholder per business-owner instruction. The skeleton is not the same as production launch: production launch remains gated by the operational TBCs listed above and by evidence collection on the <code>SERVICE-POLICY-MATRIX-v0.1 §7</code> release checklist. Each open operational TBC has a "required before" criterion that prevents it from becoming a silent regression risk; each ADR-deliverable ticket has a closure artifact with file path and pointer to acceptance tests, so future audits can trace requirement → ADR → test → gate.</p>
+<hr />
+<h1 id="round-7-ticket-8-closure-pass-2026-08-31">Round 7: Ticket #8 closure pass (2026-08-31)</h1>
+<p>Ticket #8 ("Persona &amp; biz_story framing") was already marked Closed in the Round 6 ticket matrix (line above), with the substantive edits — <code>launch_facing_story</code> addition, persona trigger rewrite, <code>biz_story</code> retention — performed during the Ticket #6 cleanup pass (Round 4). The dedicated Ticket #8 closure pass exists to:</p>
+<ol>
+<li>catch one copy-paste residue left over from the Ticket #6 trigger rewrite (<code>persona_3_barrier == persona_3_goal</code>),</li>
+<li>tighten <code>launch_facing_story</code> against the explicit <code>INFORMATION-ARCHITECTURE-v0.1 §6</code> copy guardrails (no promise of diagnosis/cure/guaranteed outcomes/emergency),</li>
+<li>reconcile two stale references to <code>TBC-PERSONA-FIELDS-01</code> and <code>TBC-STORY-VOICE-01</code> that lingered in the Round 5 inventory/verdict after Round 4 had already marked them Closed, and</li>
+<li>close the vault ticket at <code>Projects/Seraya Psikologi/Tickets/Ticket 08 — Persona &amp; biz_story framing.md</code>.</li>
+</ol>
+<h2 id="what-changed-in-artifacts">What changed in artifacts</h2>
+<h3 id="71-persona_3_barrier-catch-up">7.1 — <code>persona_3_barrier</code> catch-up</h3>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Before</th>
+<th>After</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>persona_3_barrier</code></td>
+<td>Identical to <code>persona_3_goal</code> (162 chars; copy-paste residue from the Ticket #6 trigger rewrite)</td>
+<td>"Waktu kerja panjang &amp; kelelahan sehingga konseling terasa 'nggak sempat', khawatir pasangan/anak tahu dan dianggap 'gak kuat', bingung cerita ke psikolog tanpa menambah beban pikiran setelah hari yang sudah berat" (212 chars; concrete obstacles matching the Ticket #8 08.1 definition: izin ortu, stigma, biaya)</td>
+</tr>
+</tbody>
+</table>
+<p>Programmatic re-check confirms the full 3×3 distinctness matrix now holds for <code>goal</code>/<code>trigger</code>/<code>barrier</code> across all three personas (<code>persona_1</code>/<code>_2</code>/<code>_3</code>). <code>persona_1_barrier</code> (izin ortu, stigma teman sebaya) and <code>persona_2_barrier</code> (harga, bingung pilih psikolog, stigma "lebay/gila") were already distinct from their goals and are preserved unchanged — they satisfied the Ticket #8 08.1 definition on the first pass.</p>
+<h3 id="72-launch_facing_story-tightening-per-ia-6">7.2 — <code>launch_facing_story</code> tightening per IA §6</h3>
+<table>
+<thead>
+<tr>
+<th>Concern (IA §6 guardrail)</th>
+<th>Before (Round 4)</th>
+<th>After (Round 7)</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Lead with client situation (not program names)</td>
+<td>✅ "Kalau kamu lagi di titik yang rasanya berat…" (already client-first)</td>
+<td>Preserved</td>
+</tr>
+<tr>
+<td>No promise of diagnosis</td>
+<td>Implicit (omitted)</td>
+<td><strong>Explicit</strong>: "Bukan tempat untuk diberi diagnosa, dijanjikan solusi instan, atau dipaksa untuk langsung 'sembuh' — hanya ruang untuk bercerita, dipahami, dan melanjutkan proses dengan lebih ringan."</td>
+</tr>
+<tr>
+<td>No promise of cure/guaranteed outcome</td>
+<td>Implicit (omitted)</td>
+<td><strong>Explicit</strong> (same sentence as above — addresses both diagnosis and cure in one clause)</td>
+</tr>
+<tr>
+<td>No promise of emergency support</td>
+<td>✅ (no emergency language in either version; <code>crisis</code> field carries the non-emergency boundary copy separately)</td>
+<td>Preserved</td>
+</tr>
+<tr>
+<td>No promise of availability that does not exist</td>
+<td>✅ ("satu psikolog launch, Fuja… seiring waktu, tim kami akan bertambah")</td>
+<td>Preserved</td>
+</tr>
+<tr>
+<td>Concise, non-clinical language</td>
+<td>✅</td>
+<td>Preserved</td>
+</tr>
+<tr>
+<td>16–17 guardian route (IA §6 final bullet)</td>
+<td>Omitted</td>
+<td><strong>Added</strong>: "Untuk usia 16–17, sesi dilakukan bersama orang tua/wali sesuai ketentuan yang berlaku."</td>
+</tr>
+<tr>
+<td>Names Fuja as the launch psychologist</td>
+<td>✅ ("Kami memulai dengan satu psikolog launch, Fuja")</td>
+<td>Preserved</td>
+</tr>
+</tbody>
+</table>
+<p><code>biz_story</code> (3650 chars) is <strong>preserved unchanged</strong> with the <code>kami berlima</code> framing intact for the IA/About page (per Round 4 / R2-10). The two fields coexist: <code>biz_story</code> for the brand-origin surface, <code>launch_facing_story</code> for the conversion-critical landing surface.</p>
+<h3 id="73-stale-inventory-reconciliation">7.3 — Stale-inventory reconciliation</h3>
+<p>The Round 5 inventory row at the previous line 974 and the Round 5 verdict at the previous line 980 both listed <code>TBC-PERSONA-FIELDS-01</code> and <code>TBC-STORY-VOICE-01</code> as "Still open" — a stale carry-over from before Round 4 marked them Closed. Both rows have been corrected:</p>
+<ul>
+<li>The Round 5 inventory now separates the two TBCs into a new "<strong>Closed</strong>" row pointing at Round 4 + Round 6 ticket #8 + Round 7 below.</li>
+<li>The Round 5 verdict enumeration drops both TBCs from the "remaining open" list and adds them to the "preserved as closure evidence" list alongside <code>TBC-PAY-SETTLEMENT-01</code>, <code>TBC-PACKAGE-CANCEL-01</code>, <code>TBC-RESCHEDULE-01</code>, and <code>TBC-NO-SHOW-01</code>.</li>
+</ul>
+<h3 id="74-vault-ticket-status-flip">7.4 — Vault ticket status flip</h3>
+<p><code>Projects/Seraya Psikologi/Tickets/Ticket 08 — Persona &amp; biz_story framing.md</code> status line flipped from <code>Status: **Open**</code> to <code>Status: **Closed (2026-08-31)**</code> with a closure-reference pointing at Round 7 (this section) and the JSON edits in <code>seraya-psikologi-nonteknis-2026-08-31.json</code>.</p>
+<h3 id="75-metadata-_metaticket_cleanup">7.5 — Metadata (<code>_meta.ticket_cleanup</code>)</h3>
+<p>The JSON <code>_meta.ticket_cleanup.extra_fixes</code> list gained two new entries (Ticket #8 08.1 and 08.2) and a new sibling <code>ticket_8_followup</code> block carrying the closed-at timestamp and sub-task list. The Ticket #6 metadata (originating pass) is preserved.</p>
+<h2 id="backup-validation">Backup &amp; validation</h2>
+<table>
+<thead>
+<tr>
+<th>Check</th>
+<th>Result</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Pre-edit backup created</td>
+<td><code>/home/jar/.hermes/cache/documents/backups/doc_15bf6007981d_seraya-psikologi-nonteknis-2026-08-31.json.20260831-151817.bak</code> (35539 bytes; matches Round 4 end-state)</td>
+</tr>
+<tr>
+<td><code>json.loads()</code> succeeds on edited file</td>
+<td>✅ (154 top-level keys; +0 net, only field values changed)</td>
+</tr>
+<tr>
+<td>Persona 3×3 distinctness matrix (<code>goal</code>/<code>trigger</code>/<code>barrier</code>)</td>
+<td>✅ all three personas have three pairwise-distinct values</td>
+</tr>
+<tr>
+<td><code>biz_story</code> contains <code>kami berlima</code></td>
+<td>✅ (preserved)</td>
+</tr>
+<tr>
+<td><code>launch_facing_story</code> present</td>
+<td>✅ (998 chars; was 786 chars — added IA §6 guardrail sentences)</td>
+</tr>
+<tr>
+<td><code>launch_facing_story</code> names Fuja</td>
+<td>✅</td>
+</tr>
+<tr>
+<td><code>launch_facing_story</code> contains explicit anti-promise of diagnosis/cure</td>
+<td>✅</td>
+</tr>
+<tr>
+<td><code>launch_facing_story</code> contains 16–17 guardian-nudge sentence</td>
+<td>✅</td>
+</tr>
+<tr>
+<td><code>_meta.ticket_cleanup.ticket_8_followup</code> present</td>
+<td>✅</td>
+</tr>
+<tr>
+<td>Round-trip (json.dumps → json.loads)</td>
+<td>✅ identical content</td>
+</tr>
+<tr>
+<td>Other TBC-relevant fields still intact</td>
+<td>✅ <code>booking_hold=10 menit</code>, <code>pay_methods=[qris,va]</code>, <code>pay_methods_deferred</code> enumerated, <code>client_access=guest_primary_with_optional_linking</code>, <code>automated_channels=[email]</code>, <code>support_channels</code> carries WA + calendar qualifiers, <code>channels_deprecated</code> preserved, <code>booking_access_deprecated="account"</code> preserved, <code>psychologist_{1..4}_publish_status</code> set, <code>profile_proof_tbc</code> and <code>landing_sections_tbc</code> carry schema-mismatch notes</td>
+</tr>
+</tbody>
+</table>
+<h2 id="tbc-register-update-round-7">TBC register update (Round 7)</h2>
+<table>
+<thead>
+<tr>
+<th>TBC</th>
+<th>Round 7 status</th>
+<th>Closure evidence</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>TBC-PERSONA-FIELDS-01</code></td>
+<td><strong>Closed (confirmed)</strong></td>
+<td>Round 4 (trigger rewrite distinct from goal, programmatic check passed) + Round 7 §7.1 (barrier fixed for persona_3; full 3×3 distinctness matrix verified). All three personas now have <code>goal</code> ≠ <code>trigger</code> ≠ <code>barrier</code> pairwise.</td>
+</tr>
+<tr>
+<td><code>TBC-STORY-VOICE-01</code></td>
+<td><strong>Closed (confirmed)</strong></td>
+<td>Round 4 (<code>launch_facing_story</code> added; <code>biz_story</code> <code>kami berlima</code> preserved) + Round 7 §7.2 (IA §6 copy-guardrail tightening: explicit anti-promise, 16–17 guardian route, Fuja named). Two-field coexistence model is final.</td>
+</tr>
+</tbody>
+</table>
+<h2 id="verdict-after-round-7">Verdict after Round 7</h2>
+<p>Ticket #8 is <strong>Closed</strong>. The two TBCs (<code>TBC-PERSONA-FIELDS-01</code>, <code>TBC-STORY-VOICE-01</code>) are confirmed Closed at every level: Round 4 table, Round 6 ticket matrix, and Round 7 reconciliation. The two-field coexistence model (<code>biz_story</code> for brand/About, <code>launch_facing_story</code> for landing) is the final framing. The <code>persona_3_barrier</code> catch-up is the kind of residue that Round 4 should have caught but did not — Round 7 is the audit pass that closed the loop. Future PRDs that touch persona fields should preserve the 3×3 distinctness invariant as part of the schema definition, not rely on copy-paste discipline.</p></main><footer>Seraya Psikologi · Documentation generated from the repository · <a href="../../reference/index.html">Long-form reference</a></footer></div></body></html>

@@ -1,0 +1,25 @@
+<!doctype html><html lang="id"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>ADR 0050 — Seraya Psikologi</title><link rel="stylesheet" href="../../assets/main.css"></head><body><div class="shell"><header class="site-header"><div><a class="brand" href="../../index.html">Seraya Psikologi</a><div class="subtitle">Project control center · MVP review</div></div><nav class="topnav"><a href="../../index.html">Overview</a><a href="../../workboard.html">Workboard</a><a href="../../prd/index.html">Focused PRDs</a><a href="../../reference/index.html">Reference</a></nav></header><div class="muted" style="font-size:.84rem;margin-bottom:18px"><a href="../../index.html">Home</a> / ADR</div><main><h1 id="50-record-refunds-as-separate-payment-actions">50. Record Refunds as Separate Payment Actions</h1>
+<h2 id="status">Status</h2>
+<p>Accepted for the MVP working model; refunds are append-only PaymentAction records. Package refunds are explicit Admin purchase-level decisions without automatic per-entitlement allocation under ADR 0063. Launch refund vocabulary is full_refund/no_refund under ADR 0077; partial monetary refunds, exact approval hierarchy, gateway capability, and reconciliation schedule remain open/deferred.</p>
+<h2 id="context">Context</h2>
+<p>A Payment represents the original client charge, while cancellation review, package unused/consumed units, admin exceptions, and gateway retries can produce refund actions. At launch, the action is full_refund or no_refund; partial refunds are deferred. Overwriting Payment with a single refund status loses financial history and makes retries/amounts ambiguous.</p>
+<h2 id="decision">Decision</h2>
+<p>Keep Payment as the original transaction and record each refund outcome as an append-only RefundAction/PaymentAction linked to it and to the relevant CancellationRequest/policy decision. At launch, a RefundAction is either <code>full_refund</code> for the captured amount or <code>no_refund</code> as an audited non-disbursement outcome; partial monetary refunds are deferred. Each action stores amount/currency where applicable, reason/category, actor/approval, gateway reference, status, idempotency key, timestamps, and redacted failure/retry metadata. The sum of successful actions cannot exceed the captured amount.</p>
+<p>Gateway refund callbacks/reconciliation update the action idempotently; the original Payment is not rewritten to erase its history. A summarized Payment financial status may be derived for UX/reporting.</p>
+<h2 id="consequences">Consequences</h2>
+<p>Positive:</p>
+<ul>
+<li>full/no-refund/package outcomes are representable; partial monetary refunds are deliberately deferred;</li>
+<li>duplicate refund commands can be deduplicated;</li>
+<li>finance/audit history is append-only;</li>
+<li>cancellation policy and gateway results remain distinguishable.</li>
+</ul>
+<p>Costs and constraints:</p>
+<ul>
+<li>refund authorization and reconciliation are required;</li>
+<li>package refund calculation needs entitlement/consumption policy;</li>
+<li>UI must distinguish requested, processing, succeeded, failed, and reversed states;</li>
+<li>sensitive gateway references must be redacted/access-controlled.</li>
+</ul>
+<h2 id="open-follow-up">Open follow-up</h2>
+<p>Define launch full/no-refund eligibility, one-Admin approval/execution authority under ADR 0078, gateway refund API/event behavior, reconciliation cadence, and failed/refund-retry semantics. Partial refunds require a future explicit policy decision.</p></main><footer>Seraya Psikologi · Documentation generated from the repository · <a href="../../reference/index.html">Long-form reference</a></footer></div></body></html>

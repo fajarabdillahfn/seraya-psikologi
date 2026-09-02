@@ -1,0 +1,24 @@
+<!doctype html><html lang="id"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>ADR 0021 — Seraya Psikologi</title><link rel="stylesheet" href="../../assets/main.css"></head><body><div class="shell"><header class="site-header"><div><a class="brand" href="../../index.html">Seraya Psikologi</a><div class="subtitle">Project control center · MVP review</div></div><nav class="topnav"><a href="../../index.html">Overview</a><a href="../../workboard.html">Workboard</a><a href="../../prd/index.html">Focused PRDs</a><a href="../../reference/index.html">Reference</a></nav></header><div class="muted" style="font-size:.84rem;margin-bottom:18px"><a href="../../index.html">Home</a> / ADR</div><main><h1 id="21-use-email-as-primary-transactional-channel">21. Use Email as Primary Transactional Channel</h1>
+<h2 id="status">Status</h2>
+<p>Accepted for the MVP working model; email is automated and Admin WhatsApp is optional flexible manual support while a client has active service (ADR 0066). No automated WhatsApp provider is required in MVP. Provider, sender identity, email retention, number verification, and optional support logging/guidance remain open.</p>
+<h2 id="context">Context</h2>
+<p>Guest ClientAccess and transactional booking/payment notifications need a low-cost channel that supports links/OTP and can be automated. The initial budget is limited, and automated WhatsApp/SMS adds provider and operational constraints. Notifications must not include clinical content or unnecessary sensitive detail.</p>
+<h2 id="decision">Decision</h2>
+<p>Use email as the automated channel for ClientAccess and durable transactional notification. Admin may use WhatsApp manually for human support while a client has an active Booking, Appointment, or PackagePurchase; there is no required post-confirmation follow-up task or frequency (ADR 0066). WhatsApp is not a source of Payment/Booking/Appointment truth. Cancellation/refund requests may be handled manually there and recorded internally.</p>
+<h2 id="consequences">Consequences</h2>
+<p>Positive:</p>
+<ul>
+<li>lower initial provider complexity/cost;</li>
+<li>email supports magic links and transactional templates;</li>
+<li>one automated channel simplifies retry/idempotency and observability;</li>
+<li>WhatsApp remains available for human support without coupling lifecycle to chat delivery.</li>
+</ul>
+<p>Costs and constraints:</p>
+<ul>
+<li>email deliverability and sender reputation matter;</li>
+<li>users may not monitor email immediately;</li>
+<li>fallback support must verify identity before revealing booking data;</li>
+<li>message content must stay minimal and privacy-safe.</li>
+</ul>
+<h2 id="open-follow-up">Open follow-up</h2>
+<p>Choose email provider/sender domain, link/OTP lifetime, retry/backoff, bounce handling, WhatsApp-capable number verification/retention, and optional support-contact logging/guidance. No automated WhatsApp provider or required follow-up task is planned in MVP.</p></main><footer>Seraya Psikologi · Documentation generated from the repository · <a href="../../reference/index.html">Long-form reference</a></footer></div></body></html>

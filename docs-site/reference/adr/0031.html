@@ -1,0 +1,30 @@
+<!doctype html><html lang="id"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>ADR 0031 — Seraya Psikologi</title><link rel="stylesheet" href="../../assets/main.css"></head><body><div class="shell"><header class="site-header"><div><a class="brand" href="../../index.html">Seraya Psikologi</a><div class="subtitle">Project control center · MVP review</div></div><nav class="topnav"><a href="../../index.html">Overview</a><a href="../../workboard.html">Workboard</a><a href="../../prd/index.html">Focused PRDs</a><a href="../../reference/index.html">Reference</a></nav></header><div class="muted" style="font-size:.84rem;margin-bottom:18px"><a href="../../index.html">Home</a> / ADR</div><main><h1 id="31-separate-editorial-profile-copy-from-protected-facts">31. Separate Editorial Profile Copy from Protected Facts</h1>
+<h2 id="status">Status</h2>
+<p>Accepted for the MVP working model; exact field matrix and approval/locking UI remain open.</p>
+<h2 id="context">Context</h2>
+<p>The Editor role may publish ContentEntry directly, while Psychologist has scoped self-service and Admin owns operational data. A psychologist profile combines narrative copy with credentials, professional facts, ServiceOffering, and availability; treating all fields as generic CMS content would let an editor unintentionally change booking/trust-critical data.</p>
+<h2 id="decision">Decision</h2>
+<p>Split profile ownership by field class:</p>
+<ul>
+<li><strong>Editor</strong> may manage narrative/public copy such as bio wording, article/FAQ content, and presentation text, and may publish those ContentEntry fields directly.</li>
+<li><strong>Psychologist</strong> may propose/edit allowed fields in their own profile and availability according to RBAC; they cannot alter protected credentials or bypass operational rules.</li>
+<li><strong>Admin</strong> controls credentials, approved professional facts, ServiceOffering, availability publication/locks, and protected profile field publication.</li>
+</ul>
+<p>Changes to protected fields are not ordinary editor CMS publishes; they are operational actions with audit metadata.</p>
+<h2 id="consequences">Consequences</h2>
+<p>Positive:</p>
+<ul>
+<li>direct editor publishing remains fast without weakening professional fact control;</li>
+<li>booking availability and service data have clear ownership;</li>
+<li>profile trust signals are protected from accidental copy edits;</li>
+<li>field-level authorization becomes explicit.</li>
+</ul>
+<p>Costs and constraints:</p>
+<ul>
+<li>UI/API needs a field matrix rather than one broad profile permission;</li>
+<li>some profile changes may need two-step proposal/approval;</li>
+<li>audit records must distinguish editorial vs protected changes;</li>
+<li>content and profile entities need clear boundaries.</li>
+</ul>
+<h2 id="open-follow-up">Open follow-up</h2>
+<p>List profile fields by class, decide psychologist self-edit fields, define admin approval/lock behavior, and specify whether narrative edits can mention protected facts without structured validation.</p></main><footer>Seraya Psikologi · Documentation generated from the repository · <a href="../../reference/index.html">Long-form reference</a></footer></div></body></html>

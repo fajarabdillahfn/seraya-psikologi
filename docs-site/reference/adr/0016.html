@@ -1,0 +1,30 @@
+<!doctype html><html lang="id"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>ADR 0016 — Seraya Psikologi</title><link rel="stylesheet" href="../../assets/main.css"></head><body><div class="shell"><header class="site-header"><div><a class="brand" href="../../index.html">Seraya Psikologi</a><div class="subtitle">Project control center · MVP review</div></div><nav class="topnav"><a href="../../index.html">Overview</a><a href="../../workboard.html">Workboard</a><a href="../../prd/index.html">Focused PRDs</a><a href="../../reference/index.html">Reference</a></nav></header><div class="muted" style="font-size:.84rem;margin-bottom:18px"><a href="../../index.html">Home</a> / ADR</div><main><h1 id="16-support-multi-session-packages-in-mvp">16. Support Multi-session Packages in MVP</h1>
+<h2 id="status">Status</h2>
+<p>Accepted for the MVP working model; package boundaries are resolved by ADR 0017/0018/0022/0034–0038: progressive later scheduling, one psychologist/offering binding, full-upfront purchase, PackagePurchase, ordered SessionEntitlement, validity, and outcome-based consumption. Exact refund/extension/transfer exceptions remain open.</p>
+<h2 id="context">Context</h2>
+<p>The product must support both a single-session purchase and a multi-session package in MVP. A package is not just a Booking with an arbitrary list of appointments: it carries session count/entitlement, usage, expiry, and refund implications.</p>
+<p>The base distinction remains important: each Appointment is one concrete scheduled session, while Booking represents the client-facing purchase/commitment.</p>
+<h2 id="decision">Decision</h2>
+<p>Allow a Booking to represent either:</p>
+<ul>
+<li>one single-session ServiceOffering and one Appointment; or</li>
+<li>one multi-session package concept with multiple Appointment instances over its entitlement.</li>
+</ul>
+<p>Introduce explicit <code>ServicePackage</code>, <code>PackagePurchase</code>, and <code>SessionEntitlement</code> concepts rather than hiding package metadata in Appointment rows. The package catalog defines session count, price, calendar validity, binding, and policy references; the purchase snapshots those terms and owns ordered entitlement units. First session is scheduled at checkout; later sessions are scheduled progressively. Outcome-based consumption, sequential scheduling with closed/expired skipping, and full-upfront settlement are defined by the linked ADRs. Exact partial-use cancellation/refund, extension/restoration, and transfer exceptions remain open.</p>
+<h2 id="consequences">Consequences</h2>
+<p>Positive:</p>
+<ul>
+<li>the MVP scope reflects the user's package requirement;</li>
+<li>Appointment remains a clean per-session schedule object;</li>
+<li>remaining sessions and package expiry have a place to live;</li>
+<li>single-session and package flows can share Booking/Payment foundations.</li>
+</ul>
+<p>Costs and constraints:</p>
+<ul>
+<li>payment success may confirm a package entitlement before all sessions have Appointment times;</li>
+<li>cancellation/refund must account for used and unused sessions;</li>
+<li>notification and access flows need session-level versus package-level messages;</li>
+<li>reporting must distinguish purchased, scheduled, completed, unused, and expired sessions.</li>
+</ul>
+<h2 id="open-follow-up">Open follow-up</h2>
+<p>Define exact refund/credit, extension/restoration, and transfer exception behavior.</p></main><footer>Seraya Psikologi · Documentation generated from the repository · <a href="../../reference/index.html">Long-form reference</a></footer></div></body></html>

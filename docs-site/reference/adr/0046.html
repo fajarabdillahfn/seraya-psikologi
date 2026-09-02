@@ -1,0 +1,25 @@
+<!doctype html><html lang="id"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>ADR 0046 — Seraya Psikologi</title><link rel="stylesheet" href="../../assets/main.css"></head><body><div class="shell"><header class="site-header"><div><a class="brand" href="../../index.html">Seraya Psikologi</a><div class="subtitle">Project control center · MVP review</div></div><nav class="topnav"><a href="../../index.html">Overview</a><a href="../../workboard.html">Workboard</a><a href="../../prd/index.html">Focused PRDs</a><a href="../../reference/index.html">Reference</a></nav></header><div class="muted" style="font-size:.84rem;margin-bottom:18px"><a href="../../index.html">Home</a> / ADR</div><main><h1 id="46-use-short-lived-one-time-clientaccess-tokens">46. Use Short-lived One-time ClientAccess Tokens</h1>
+<h2 id="status">Status</h2>
+<p>Accepted for the MVP working model; exact rate limits, session revocation, recovery, and email provider behavior remain open.</p>
+<h2 id="context">Context</h2>
+<p>Guest package scheduling needs repeat access without a full account, but a permanent link or long-lived token would expose booking data if forwarded or leaked. Email is the primary automated channel.</p>
+<h2 id="decision">Decision</h2>
+<p>Issue a one-time magic link/OTP valid for 15 minutes. Successful verification creates a package/Booking-scoped session valid for 30 minutes. Resending invalidates prior unconsumed tokens. The session may expose only the authorized package actions, such as viewing status, scheduling the next valid SessionEntitlement, and receiving transactional updates. It cannot enumerate other Client records or Bookings.</p>
+<p>Token values are never stored or logged in plaintext; rate limits, replay protection, and audit context are required.</p>
+<h2 id="consequences">Consequences</h2>
+<p>Positive:</p>
+<ul>
+<li>guest access remains usable for later package scheduling;</li>
+<li>leaked links have bounded lifetime and one-use semantics;</li>
+<li>scope is narrower than a UserAccount;</li>
+<li>resend/recovery can be explicit.</li>
+</ul>
+<p>Costs and constraints:</p>
+<ul>
+<li>email delivery delay can cause expiry frustration;</li>
+<li>session/token revocation and support recovery are needed;</li>
+<li>rate limits must balance privacy and usability;</li>
+<li>URLs/OTP content must avoid clinical or sensitive details.</li>
+</ul>
+<h2 id="open-follow-up">Open follow-up</h2>
+<p>Define request/verification rate limits, session revocation/logout, changed-email recovery, duplicate-client handling, and exact audit fields.</p></main><footer>Seraya Psikologi · Documentation generated from the repository · <a href="../../reference/index.html">Long-form reference</a></footer></div></body></html>

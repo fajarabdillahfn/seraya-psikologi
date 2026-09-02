@@ -1,0 +1,30 @@
+<!doctype html><html lang="id"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>ADR 0025 — Seraya Psikologi</title><link rel="stylesheet" href="../../assets/main.css"></head><body><div class="shell"><header class="site-header"><div><a class="brand" href="../../index.html">Seraya Psikologi</a><div class="subtitle">Project control center · MVP review</div></div><nav class="topnav"><a href="../../index.html">Overview</a><a href="../../workboard.html">Workboard</a><a href="../../prd/index.html">Focused PRDs</a><a href="../../reference/index.html">Reference</a></nav></header><div class="muted" style="font-size:.84rem;margin-bottom:18px"><a href="../../index.html">Home</a> / ADR</div><main><h1 id="25-keep-slot-reserved-during-cancellation-review">25. Keep Slot Reserved During Cancellation Review</h1>
+<h2 id="status">Status</h2>
+<p>Accepted for the MVP working model.</p>
+<h2 id="context">Context</h2>
+<p>Cancellation requests arrive through manual/WhatsApp support and require admin review. Releasing a slot before the decision could allow another client to claim it, then leave the original request rejected or create an overlap if the cancellation is not approved.</p>
+<h2 id="decision">Decision</h2>
+<p>While a CancellationRequest is pending:</p>
+<ul>
+<li>the Appointment remains <code>confirmed</code>;</li>
+<li>the related capacity remains reserved and unavailable to new Booking flows;</li>
+<li>no refund or cancellation transition occurs yet.</li>
+</ul>
+<p>An admin approve action must atomically apply the cancellation decision, Appointment/slot outcome, Payment/refund instruction, and notifications. A reject action leaves the confirmed Appointment/reservation intact and records the reason.</p>
+<h2 id="consequences">Consequences</h2>
+<p>Positive:</p>
+<ul>
+<li>no ambiguous “maybe cancelled” capacity;</li>
+<li>rejection is safe and does not require restoring a slot;</li>
+<li>approval has one auditable transition boundary;</li>
+<li>payment and notification effects remain tied to the decision.</li>
+</ul>
+<p>Costs and constraints:</p>
+<ul>
+<li>a slow review temporarily reduces available capacity;</li>
+<li>admin SLA/escation matters;</li>
+<li>approval requires concurrency control and idempotency;</li>
+<li>client support copy must explain pending status.</li>
+</ul>
+<h2 id="open-follow-up">Open follow-up</h2>
+<p>Define review SLA/escalation and exact approve/reject/refund state transitions. There is no pre-decision or separate post-decision slot release action in MVP; approved cancellation and eligible release are one atomic operation under ADR 0067.</p></main><footer>Seraya Psikologi · Documentation generated from the repository · <a href="../../reference/index.html">Long-form reference</a></footer></div></body></html>

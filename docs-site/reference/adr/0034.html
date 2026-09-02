@@ -1,0 +1,30 @@
+<!doctype html><html lang="id"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>ADR 0034 — Seraya Psikologi</title><link rel="stylesheet" href="../../assets/main.css"></head><body><div class="shell"><header class="site-header"><div><a class="brand" href="../../index.html">Seraya Psikologi</a><div class="subtitle">Project control center · MVP review</div></div><nav class="topnav"><a href="../../index.html">Overview</a><a href="../../workboard.html">Workboard</a><a href="../../prd/index.html">Focused PRDs</a><a href="../../reference/index.html">Reference</a></nav></header><div class="muted" style="font-size:.84rem;margin-bottom:18px"><a href="../../index.html">Home</a> / ADR</div><main><h1 id="34-separate-package-catalog-from-purchased-package-instance">34. Separate Package Catalog from Purchased Package Instance</h1>
+<h2 id="status">Status</h2>
+<p>Accepted for the MVP working model.</p>
+<h2 id="context">Context</h2>
+<p>A ServicePackage catalog can change price, session count, validity, copy, or policy over time. A package already purchased by a client must retain the effective terms that were paid for and must own a stable remaining-session balance. Reusing one mutable entity for both creates historical and entitlement ambiguity.</p>
+<h2 id="decision">Decision</h2>
+<ul>
+<li><code>ServicePackage</code> is the editable/publishable catalog configuration.</li>
+<li><code>PackagePurchase</code> is created by a Booking after the package purchase is accepted/paid and owns the historical snapshot and SessionEntitlement units.</li>
+<li><code>PackagePayment</code> settles the PackagePurchase, not the mutable catalog directly.</li>
+<li>PackagePurchase snapshots at least catalog identity/version, psychologist/ServiceOffering binding, effective price, session count, validity/expiry, and policy references.</li>
+<li>SessionEntitlement belongs to PackagePurchase. An Appointment for a package session references the entitlement it schedules.</li>
+</ul>
+<h2 id="consequences">Consequences</h2>
+<p>Positive:</p>
+<ul>
+<li>catalog edits do not rewrite purchased history;</li>
+<li>package balance and expiry have a stable owner;</li>
+<li>payment/refund reconciliation has a concrete purchase target;</li>
+<li>first and later Appointment relationships become explicit.</li>
+</ul>
+<p>Costs and constraints:</p>
+<ul>
+<li>more entities and snapshot fields are required;</li>
+<li>catalog publication and purchase creation need version semantics;</li>
+<li>package migration/transfer needs explicit admin operations;</li>
+<li>launch refund outcomes are full/no-refund at PackagePurchase level; partial monetary refunds/credits need a future explicit policy;</li>
+</ul>
+<h2 id="open-follow-up">Open follow-up</h2>
+<p>Define exact snapshot fields, purchase creation timing around verified webhook, whether one Booking can contain one PackagePurchase only, package activation/expiry start, and amendment/transfer behavior.</p></main><footer>Seraya Psikologi · Documentation generated from the repository · <a href="../../reference/index.html">Long-form reference</a></footer></div></body></html>

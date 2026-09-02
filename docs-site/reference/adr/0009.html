@@ -1,0 +1,30 @@
+<!doctype html><html lang="id"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>ADR 0009 — Seraya Psikologi</title><link rel="stylesheet" href="../../assets/main.css"></head><body><div class="shell"><header class="site-header"><div><a class="brand" href="../../index.html">Seraya Psikologi</a><div class="subtitle">Project control center · MVP review</div></div><nav class="topnav"><a href="../../index.html">Overview</a><a href="../../workboard.html">Workboard</a><a href="../../prd/index.html">Focused PRDs</a><a href="../../reference/index.html">Reference</a></nav></header><div class="muted" style="font-size:.84rem;margin-bottom:18px"><a href="../../index.html">Home</a> / ADR</div><main><h1 id="9-include-minimal-transactional-notifications">9. Include Minimal Transactional Notifications</h1>
+<h2 id="status">Status</h2>
+<p>Accepted for the MVP working model; email is the automated channel, Admin WhatsApp is flexible manual support while the client has active service, and client acknowledgement is not a confirmation gate (ADR 0066). Appointment reminders default to 24 hours + 2 hours (ADR 0052/0053). Provider/sender identity, manual guidance, retry/failure, and opt-out details remain open.</p>
+<h2 id="context">Context</h2>
+<p>Guest booking and payment need a reliable way to communicate confirmation, expiry, cancellation, and relevant reminders. A browser success page is not a durable communication channel. Marketing campaigns are a different product concern and may require different consent and delivery controls.</p>
+<h2 id="decision">Decision</h2>
+<p>Include minimal transactional notifications in MVP. Model:</p>
+<ul>
+<li><strong>Notification</strong> as the intent/content contract tied to a business event or state change;</li>
+<li><strong>DeliveryAttempt</strong> as a channel-specific attempt/result with provider reference, retry state, and redacted failure reason.</li>
+</ul>
+<p>Initial notification categories should cover payment/booking confirmation by email, hold/payment expiry, cancellation or change, and Appointment reminders at 24 hours and 2 hours before start. Admin may additionally use manual WhatsApp support while the client has active service; this has no required trigger/frequency and no acknowledgement gate. Do not include marketing campaigns in this scope.</p>
+<p>The system should keep booking/payment truth independent from delivery success: a notification failure must not silently roll back a confirmed Appointment, but it must be observable and recoverable.</p>
+<h2 id="consequences">Consequences</h2>
+<p>Positive:</p>
+<ul>
+<li>guest clients receive durable status communication;</li>
+<li>delivery retries and provider changes have a clear model;</li>
+<li>notification failure does not corrupt booking/payment state;</li>
+<li>marketing and transactional consent remain separate.</li>
+</ul>
+<p>Costs and constraints:</p>
+<ul>
+<li>channel selection and provider outage handling need policy;</li>
+<li>notification content must avoid clinical detail;</li>
+<li>contact data and provider references need retention/redaction rules;</li>
+<li>reminder timing and timezone behavior need explicit decisions.</li>
+</ul>
+<h2 id="open-follow-up">Open follow-up</h2>
+<p>Choose sender identity, retry/fallback policy, package-expiry reminder offsets, opt-out/mandatory semantics, provider quotas/failure behavior, and optional manual WhatsApp support guidance. Email automation, flexible WhatsApp support, and Appointment offsets are resolved; no required task or acknowledgement gate exists.</p></main><footer>Seraya Psikologi · Documentation generated from the repository · <a href="../../reference/index.html">Long-form reference</a></footer></div></body></html>

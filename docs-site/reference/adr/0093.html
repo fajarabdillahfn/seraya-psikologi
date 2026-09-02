@@ -1,0 +1,541 @@
+<!doctype html><html lang="id"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>ADR 0093 — Seraya Psikologi</title><link rel="stylesheet" href="../../assets/main.css"></head><body><div class="shell"><header class="site-header"><div><a class="brand" href="../../index.html">Seraya Psikologi</a><div class="subtitle">Project control center · MVP review</div></div><nav class="topnav"><a href="../../index.html">Overview</a><a href="../../workboard.html">Workboard</a><a href="../../prd/index.html">Focused PRDs</a><a href="../../reference/index.html">Reference</a></nav></header><div class="muted" style="font-size:.84rem;margin-bottom:18px"><a href="../../index.html">Home</a> / ADR</div><main><h1 id="93-payment-settlement-uniqueness-and-paid_late-package-effects">93. Payment Settlement Uniqueness and <code>paid_late</code> Package Effects</h1>
+<h2 id="status">Status</h2>
+<p>Accepted for MVP. Closes <code>TBC-PAY-SETTLEMENT-01</code> from <code>PRD-GUIDELINE-REVIEW.md</code> (Round 1 P1-10 and Round 2 R2 follow-up). Implements the <code>at-most-one successful settlement per Booking/purchase intent</code> invariant that the existing idempotency-by-provider-event-id (mentioned in <code>ADR 0059</code> and <code>CONTEXT.md:41</code>) does not catch, and defines the <code>paid_late</code> package creation effects left open by <code>ADR 0059</code> lines 13–20. Production launch still requires <code>TBC-STACK-01</code> (Worker + D1 vs Supabase + Postgres) to be closed before any migration is executed; the SQL DDL in §6 is written for the Postgres family with the D1/SQLite equivalent in §7.</p>
+<h2 id="ringkasan-eksekutif-bahasa-indonesia">Ringkasan eksekutif (Bahasa Indonesia)</h2>
+<ul>
+<li><strong>At-most-one successful settlement per Booking/purchase intent.</strong> Sebuah <code>Booking</code> (atau <code>PackagePurchase</code> purchase intent) hanya boleh memiliki <strong>tepat satu</strong> <code>Payment</code> dengan <code>settled_at IS NOT NULL</code> dan <code>status = 'paid'</code>. Invariant ini ditegakkan oleh <strong>unique partial index</strong> pada <code>payment(booking_id) WHERE settled_at IS NOT NULL AND status = 'paid'</code> (Postgres) atau unique partial index di D1/SQLite. Dua <code>PaymentEvent</code> berbeda yang sama-sama status <code>capture</code>/<code>settlement</code> tidak boleh menghasilkan dua <code>Payment</code> settled.</li>
+<li><strong>Verifikasi amount/currency/order/merchant wajib</strong>, bukan hanya authenticity/signature. <code>PaymentEvent</code> yang verified oleh signature saja belum cukup; nilai <code>gross_amount</code>, <code>currency</code>, <code>order_id</code> (matching <code>Booking.id</code>), dan <code>merchant_id</code> (matching configured Midtrans merchant) harus sama dengan <code>OfferSnapshot</code> dan <code>Booking.snapshotted_amount</code>. Ketidakcocokan → <code>PaymentEvent</code> di-discard (logged sebagai <code>mismatch</code>), tidak menghasilkan <code>Payment</code> baru dan tidak menggerakkan Booking/Package state.</li>
+<li><strong>Idempotency key scope: lifetime, payload fingerprint.</strong> Idempotency record (<code>payment_event_idempotency</code>) keyed by <code>(provider_event_id, payment_intent_id)</code> adalah lifetime (tidak pernah di-purge selama <code>PaymentEvent</code> masih ada). Payload fingerprint (<code>sha256(canonical_payload)</code>) disimpan di side record: same-key/same-payload → return existing result; same-key/different-payload → typed failure <code>idempotency_key_collision</code>, tidak pernah diam-diam overwrite.</li>
+<li><strong>Out-of-order / repeated-status / reversal mapping.</strong> Adapter memetakan <code>capture</code>/<code>settlement</code> (final success), <code>pending</code> (transient), <code>deny</code>/<code>cancel</code>/<code>expire</code>/<code>failure</code> (terminal failure), <code>refund</code>/<code>chargeback</code>/<code>partial_refund</code> (reversal — ignored at <code>Payment</code> level karena refund adalah <code>RefundAction</code> terpisah), dan <code>challenge</code>/<code>fraud</code> (status investigasi, tidak menggerakkan state). Pengulangan <code>capture</code> untuk satu order yang sudah settled adalah no-op (Payment idempotent di level <code>settled_at</code>).</li>
+<li><strong>Crash window strategy.</strong> Tiga window berbeda ditangani eksplisit: (a) antara provider API call dan persistence (optimistic insert <code>Payment</code> <code>status=pending</code> + idempotency record atomic), (b) antara verified webhook dan state transition (webhook handler transaksi: insert idempotency record → insert <code>PaymentEvent</code> → apply state transition → emit outbox, semua dalam satu transaction), (c) antara state transition dan outbox delivery (transactional outbox pattern; outbox dispatcher best-effort retry dengan idempotency).</li>
+<li><strong><code>paid_late</code> package: Option A dipilih.</strong> <code>PackagePurchase</code> + ordered <code>SessionEntitlement</code> + <code>PackageValidity</code> dibuat <strong>saat webhook verified</strong> (tepat ketika <code>Payment</code> di-settle), dengan first session scheduled atau held mengikuti state booking asli. Jika slot asli tidak dapat direacquire (overlap), <code>PackagePurchase</code> tetap dibuat dengan <code>status = paid_late</code> dan first <code>SessionEntitlement</code> di-set <code>state = pending_schedule</code>; <code>Appointment</code> asli dimark <code>cancelled_replaced_by_paid_late</code> atau tetap <code>pending_payment</code> (existing). Admin resolution flow men-decide refund / reversal / client-approved alternative (lihat §5).</li>
+</ul>
+<h2 id="context">Context</h2>
+<p><code>CONTEXT.md:41</code> mengizinkan multiple payment attempts per Booking. <code>ADR 0059</code> dan praktik idempotency-by-provider-event-id (<code>IMPLEMENTATION-GUIDE.md §8.2</code>) menjamin webhook replay aman, namun <strong>tidak</strong> mencegah dua <code>Payment</code> berbeda (misal dua checkout attempt ke Snap yang masing-masing membuat <code>order_id</code> berbeda, atau duplicate routing path) sama-sama sukses untuk <code>Booking</code> yang sama. Risiko: double-paid capture, double-issued <code>PackagePurchase</code>, double-confirmed <code>Appointment</code>, atau financial truth mismatch yang harus direkonsiliasi manual.</p>
+<p>Untuk package, <code>ADR 0059</code> line 13–18 sudah memutuskan <code>paid_late</code>/reconciliation path untuk <strong>single-session Booking</strong>, dan line 17 menyebutkan "reacquire original slot atomically jika masih free". Untuk <strong>package Booking</strong>, <code>ADR 0059</code> tidak menjawab apakah <code>PackagePurchase</code> + ordered <code>SessionEntitlement</code> + <code>PackageValidity</code> dibuat pada saat webhook verified (Option A), ditunda sampai Admin resolution (Option B), atau dibuat dengan first session held sebagai <code>pending_schedule</code> (Option C — turunan dari A). Ticket #5 mengangkat keputusan ini dan meminta closure eksplisit.</p>
+<p>Ticket #5 acceptance criteria: (1) integration test dua webhook sukses berbeda ID untuk Booking sama → hanya satu yang settle, yang lain masuk reconciliation; (2) integration test paid-late package → Admin resolution flow menciptakan <code>PackagePurchase</code> dengan first session scheduled atau held untuk Admin manual scheduling. ADR ini menjawab kedua acceptance criteria dan menambahkan uniqueness untuk amount/currency/order/merchant, idempotency collision handling, dan crash-window safety.</p>
+<h2 id="diskusi-multi-perspektif">Diskusi multi-perspektif</h2>
+<h3 id="privacy-klinisetis">Privacy (klinis/etis)</h3>
+<ul>
+<li>Duplicate settlement tidak boleh bocor keluar sebagai "double-billed client"; hanyalah reconciliation record internal. Notifikasi konfirmasi pembayaran mengikuti existing rule: satu email konfirmasi per <code>Booking</code> (atau per <code>PackagePurchase</code>), dikirim setelah uniqueness check passed. Tidak ada email tambahan untuk duplicate-payment-as-noop.</li>
+<li>Late payment dan duplicate payment tidak boleh menunda <code>ConsentRecord</code> activation. Consent tetap mengikuti <code>Booking</code>/participant timeline, bukan payment timeline. Verified webhook menggerakkan state Booking/Appointment/PackagePurchase tanpa menunggu consent verifikasi ulang (consent sudah diverifikasi saat checkout).</li>
+<li><code>paid_late</code> package yang dibuat dengan <code>first_session_entitlement.state = pending_schedule</code> tidak terekspos ke klien sebelum Admin resolution; klien melihat "paket Anda sudah aktif, kami akan menghubungi untuk jadwal sesi pertama" (atau equivalent copy yang tidak menjanjikan slot spesifik). Klien tidak boleh melihat "kami akan re-acquire slot Anda".</li>
+</ul>
+<h3 id="operations-adminfinance">Operations (admin/finance)</h3>
+<ul>
+<li>Admin workspace perlu membedakan tiga status <code>paid_late</code>:
+  1. <code>paid_late_slot_reacquired</code> (Booking single-session atau package first session) → original slot berhasil di-claim atomically, Appointment confirmed normal.
+  2. <code>paid_late_slot_unavailable</code> (Booking single-session) → tidak ada Appointment; Payment tetap paid; Admin resolusi via refund atau hold.
+  3. <code>paid_late_first_session_pending</code> (package) → <code>PackagePurchase</code> paid, <code>SessionEntitlement #1</code> <code>state = pending_schedule</code>, Admin resolusi via scheduling alternative atau refund per kasus.</li>
+<li>Duplicate-payment reconciliation record (<code>payment_reconciliation</code>) membawa reason <code>duplicate_provider_event</code>, <code>payload_mismatch</code>, atau <code>idempotency_collision</code> agar Admin dapat review cepat. Tidak otomatis refund — Admin memutuskan setelah cek Midtrans dashboard dan Booking/Purchase context.</li>
+<li>Financial reporting membaca <code>Payment.settled_at</code> (bukan <code>PaymentEvent.status</code>); oleh karena itu uniqueness constraint pada <code>Payment.settled_at IS NOT NULL</code> adalah sumber kebenaran finansial.</li>
+</ul>
+<h3 id="engineering-aggregate-schema">Engineering (aggregate &amp; schema)</h3>
+<ul>
+<li><strong>Atomicity boundary</strong>: verifikasi webhook, insert <code>Payment</code> settled, insert <code>PaymentEvent</code>, state transition (Booking/Appointment/PackagePurchase/Entitlement), dan outbox event harus berada dalam satu application transaction. Crash window dipecah menjadi tiga dan ditangani di §4.</li>
+<li><strong>Payment vs PaymentEvent separation</strong>: <code>Payment</code> adalah current projection dengan <code>status</code>, <code>settled_at</code>, <code>booking_id</code>, <code>amount_cents</code>, <code>currency</code>, <code>provider</code>, <code>provider_payment_id</code>; <code>PaymentEvent</code> adalah append-only log dengan <code>provider_event_id</code>, <code>event_type</code>, <code>payload_hash</code>, <code>verified_at</code>, <code>raw_payload</code> (redacted). Duplicate event harus no-op insert (idempotency) atau insert new <code>PaymentEvent</code> row + no-op transition (jika sudah settled).</li>
+<li><strong>Idempotency record</strong> keyed by <code>(provider_event_id, payment_intent_id)</code> dan <code>payload_hash</code>. Lifetime scope karena <code>PaymentEvent</code> juga append-only. Tidak ada TTL expiry.</li>
+<li><strong>Crash window (a) — antara <code>createCheckout</code> API call dan persistence</strong>: optimistik insert <code>Payment</code> <code>status = 'pending'</code> + insert <code>payment_event_idempotency</code> keyed by <code>(provider_event_id = null, intent_key = createCheckout_correlation_id)</code> dalam satu transaction. Webhook datang kemudian, match by <code>order_id</code> (<code>Booking.id</code>); idempotency check prevents duplicate <code>Payment</code> inserts.</li>
+<li><strong>Crash window (b) — antara verified webhook dan state transition</strong>: webhook handler dalam satu transaction. Step: (1) <code>BEGIN</code>; (2) <code>INSERT INTO payment_event_idempotency ... ON CONFLICT DO NOTHING RETURNING id</code> — jika conflict, return existing event result; (3) <code>INSERT INTO payment_event ...</code>; (4) verifikasi amount/currency/order/merchant against <code>OfferSnapshot</code> dan <code>Booking</code> — jika mismatch, <code>ROLLBACK</code> dan log <code>payment_event_mismatch</code>; (5) apply state transition (<code>UPDATE payment SET status = 'paid', settled_at = ...</code> jika baru; atau no-op jika sudah settled); (6) emit outbox event; (7) <code>COMMIT</code>.</li>
+<li><strong>Crash window (c) — antara transition dan outbox delivery</strong>: transactional outbox pattern. Outbox row inserted dalam transaction yang sama; dispatcher best-effort dengan idempotency (event_id unique). Retry dengan exponential backoff; failure menjadi <code>outbox_dead_letter</code> setelah N retry yang akan direview Admin (bukan silent success).</li>
+<li><strong>Option A vs B vs C untuk <code>paid_late</code> package</strong>: lihat §5.2 — A dipilih karena (i) financial truth terjaga, (ii) Admin resolution dapat berupa reschedule/refund/alternative tanpa invent new lifecycle state, (iii) konsistensi dengan <code>ADR 0059</code> "no silent refund or silent slot substitution".</li>
+</ul>
+<h3 id="ux-checkout-admin">UX (checkout &amp; Admin)</h3>
+<ul>
+<li>Browser redirect tidak pernah menampilkan "pembayaran berhasil" yang final sebelum verified webhook. UI menampilkan "Verifying payment..." spinner sampai client polling endpoint mengembalikan status final (<code>paid</code>, <code>paid_late_*</code>, <code>failed</code>). Duplicate webhook tidak menggandakan email konfirmasi.</li>
+<li>Email konfirmasi untuk paid-late package menggunakan copy yang sama dengan paid-on-time package (satu template), tidak ada perbedaan copy yang membingungkan klien.</li>
+<li>Admin workspace untuk paid-late package menampilkan:</li>
+<li><code>PackagePurchase</code> paid;</li>
+<li><code>SessionEntitlement #1</code> state <code>pending_schedule</code> atau <code>scheduled</code> (jika slot asli dapat direacquire);</li>
+<li>remaining entitlements <code>state = available</code> dengan <code>validity_start = now()</code> (bukan dari original checkout);</li>
+<li>opsi Admin: (a) schedule alternative slot for #1, (b) refund full via RefundAction, (c) hold for client decision via WhatsApp.</li>
+</ul>
+<h2 id="decision">Decision</h2>
+<h3 id="1-invariant-at-most-one-successful-settlement-per-bookingpurchase-intent">1. Invariant: at-most-one successful settlement per Booking/purchase intent</h3>
+<h4 id="11-pernyataan-invariant">1.1 Pernyataan invariant</h4>
+<blockquote>
+<p>Untuk satu <code>Booking.id</code>, terdapat <strong>paling banyak satu</strong> <code>Payment</code> dengan <code>status = 'paid'</code> (yaitu <code>settled_at IS NOT NULL</code>). Untuk satu <code>PackagePurchase.id</code>, terdapat paling banyak satu <code>Payment</code> dengan <code>status = 'paid'</code> (refleksi dari Booking-level uniqueness melalui FK <code>Booking.id</code>).</p>
+</blockquote>
+<h4 id="12-mekanisme-enforcement">1.2 Mekanisme enforcement</h4>
+<ul>
+<li><strong>Unique partial index</strong> pada tabel <code>payment</code>:</li>
+<li>Postgres: <code>CREATE UNIQUE INDEX payment_one_settled_per_booking ON payment(booking_id) WHERE status = 'paid' AND settled_at IS NOT NULL;</code></li>
+<li>D1/SQLite: <code>CREATE UNIQUE INDEX payment_one_settled_per_booking ON payment(booking_id) WHERE status = 'paid' AND settled_at IS NOT NULL;</code> (SQLite supports partial unique index sejak 3.8.0).</li>
+<li><strong>Application-level precheck</strong> di webhook handler: <code>SELECT 1 FROM payment WHERE booking_id = ? AND status = 'paid' LIMIT 1</code> di dalam transaction sebelum insert. Jika ditemukan, return existing <code>Payment</code> (idempotency). Precheck + DB constraint = same pattern sebagai <code>ADR 0091</code> capacity overlap.</li>
+<li><strong>Forbidden state</strong>: dua <code>Payment</code> row dengan <code>booking_id = X</code> dan <code>status = 'paid'</code> keduanya ada. DB constraint menolak insert kedua. Application precheck menolak sebelum insert. Tested dengan integration test acceptance criteria #1.</li>
+</ul>
+<h4 id="13-status-enum-payment">1.3 Status enum Payment</h4>
+<table>
+<thead>
+<tr>
+<th>Status</th>
+<th>Settled_at</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>pending</code></td>
+<td>NULL</td>
+<td><code>Payment</code> created saat <code>createCheckout</code>, menunggu webhook</td>
+</tr>
+<tr>
+<td><code>paid</code></td>
+<td>NOT NULL</td>
+<td>Verified <code>capture</code>/<code>settlement</code> event applied</td>
+</tr>
+<tr>
+<td><code>paid_late_slot_reacquired</code></td>
+<td>NOT NULL</td>
+<td>Late verified success; original slot reacquired</td>
+</tr>
+<tr>
+<td><code>paid_late_slot_unavailable</code></td>
+<td>NOT NULL</td>
+<td>Late verified success; slot tidak dapat direacquire; Admin resolution required</td>
+</tr>
+<tr>
+<td><code>paid_late_first_session_pending</code></td>
+<td>NOT NULL</td>
+<td>Package late success; first entitlement held pending Admin scheduling</td>
+</tr>
+<tr>
+<td><code>failed</code></td>
+<td>NULL</td>
+<td>Verified <code>deny</code>/<code>cancel</code>/<code>expire</code>/<code>failure</code> event applied</td>
+</tr>
+<tr>
+<td><code>refunded_full</code></td>
+<td>NOT NULL → di-update via RefundAction summary</td>
+<td><code>full_refund</code> RefundAction completed</td>
+</tr>
+<tr>
+<td><code>refunded_no_disbursement</code></td>
+<td>NOT NULL</td>
+<td><code>no_refund</code> RefundAction recorded as audited non-disbursement (Payment tetap paid secara financial, summary menampilkan refunded di Admin UI)</td>
+</tr>
+</tbody>
+</table>
+<p><code>Payment.status</code> adalah <strong>derived current projection</strong>, tidak pernah di-overwrite historical — perubahan dari <code>paid → refunded_full</code> adalah update field summary (computed dari <code>RefundAction</code> aggregate), bukan rewrite history. <code>PaymentEvent</code> append-only; <code>Payment.settled_at</code> immutable setelah set.</p>
+<h3 id="2-verifikasi-amount-currency-order-merchant">2. Verifikasi amount / currency / order / merchant</h3>
+<h4 id="21-pernyataan-invariant">2.1 Pernyataan invariant</h4>
+<blockquote>
+<p>Sebuah verified <code>PaymentEvent</code> hanya menghasilkan <code>Payment</code> settled jika dan hanya jika <code>event.gross_amount == offer_snapshot.amount_cents AND event.currency == offer_snapshot.currency AND event.order_id == booking.id AND event.merchant_id == configured_merchant_id</code>.</p>
+</blockquote>
+<h4 id="22-mekanisme-enforcement">2.2 Mekanisme enforcement</h4>
+<ul>
+<li>Adapter <code>verifyNotification</code> mengembalikan <code>VerifiedPaymentEvent</code> setelah signature verification + value match check.</li>
+<li>Application handler melakukan <strong>second verification</strong> against <code>Booking.snapshotted_amount</code>, <code>OfferSnapshot.amount_cents</code>, <code>OfferSnapshot.currency</code>, dan <code>Booking.id</code>. Ini menjamin defense-in-depth: jika adapter bug atau compromised, value mismatch masih di-catch.</li>
+<li>Mismatch → <code>INSERT INTO payment_event_mismatch_log (...)</code> (append-only audit), <code>INSERT INTO payment_event (event_type='mismatch_log', ...)</code> (audit trail), <code>ROLLBACK</code> transaction, <strong>tidak ada</strong> state transition. Midtrans dashboard dirujuk manual untuk cross-check.</li>
+<li>Currency mismatch (<code>IDR</code> vs <code>USD</code>/other) → mismatch, karena launch hanya IDR.</li>
+</ul>
+<h4 id="23-field-verification-table">2.3 Field verification table</h4>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Source of truth</th>
+<th>Verification</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>gross_amount</code></td>
+<td><code>OfferSnapshot.amount_cents</code> (snapshotted at booking creation per <code>ADR 0042</code>)</td>
+<td>exact match (cents integer)</td>
+</tr>
+<tr>
+<td><code>currency</code></td>
+<td><code>OfferSnapshot.currency</code> (default <code>IDR</code>)</td>
+<td>exact match</td>
+</tr>
+<tr>
+<td><code>order_id</code></td>
+<td><code>Booking.id</code> (UUID string)</td>
+<td>exact match</td>
+</tr>
+<tr>
+<td><code>merchant_id</code></td>
+<td>Configured Midtrans merchant ID (env var)</td>
+<td>exact match</td>
+</tr>
+<tr>
+<td><code>signature_key</code></td>
+<td>Computed from payload + server key</td>
+<td>signature verification (existing)</td>
+</tr>
+</tbody>
+</table>
+<h3 id="3-idempotency-key-scope">3. Idempotency key scope</h3>
+<h4 id="31-lifetime-scope">3.1 Lifetime scope</h4>
+<blockquote>
+<p>Idempotency records (<code>payment_event_idempotency</code>) keyed by <code>(provider_event_id, payment_intent_id)</code> adalah <strong>lifetime</strong>: tidak ada TTL atau purge selama <code>PaymentEvent</code> masih ada. Karena <code>PaymentEvent</code> append-only dan retained per <code>TBC-PRIVACY-01</code> audit/legal policy, idempotency record seumur hidup retensi PaymentEvent.</p>
+</blockquote>
+<h4 id="32-same-keydifferent-payload-behavior">3.2 Same-key/different-payload behavior</h4>
+<ul>
+<li><strong>Same key + same payload hash</strong> → return existing event result (no-op transition, idempotency hit).</li>
+<li><strong>Same key + different payload hash</strong> → <strong>typed failure</strong> <code>idempotency_key_collision</code>, <strong>ROLLBACK</strong> transaction, log <code>payment_idempotency_collision</code> ke <code>payment_event_mismatch_log</code>. TIDAK diam-diam overwrite. Midtrans support contacted untuk investigate.</li>
+<li><strong>Different key + same payload</strong> → diperlakukan sebagai duplicate event terpisah; new <code>PaymentEvent</code> row inserted; existing <code>Payment</code> unaffected (no-op transition karena sudah settled, atau normal transition jika belum).</li>
+</ul>
+<h4 id="33-payload-fingerprint">3.3 Payload fingerprint</h4>
+<ul>
+<li><code>payment_event_idempotency.payload_hash = sha256(canonical_json(payload))</code> — canonical JSON serialization (sorted keys, no whitespace) untuk stabilitas.</li>
+<li>Stored sebagai <code>bytea</code> (Postgres) atau <code>BLOB</code> (D1/SQLite).</li>
+</ul>
+<h3 id="4-out-of-order-repeated-status-reversal-mapping">4. Out-of-order / repeated-status / reversal mapping</h3>
+<h4 id="41-status-mapping-table">4.1 Status mapping table</h4>
+<table>
+<thead>
+<tr>
+<th>Provider status</th>
+<th><code>PaymentEvent.event_type</code></th>
+<th>Effect on <code>Payment</code></th>
+<th>Effect on Booking/Appointment/Package</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>capture</code> / <code>settlement</code> (final)</td>
+<td><code>capture</code></td>
+<td>jika belum settled: <code>status = 'paid'</code>, <code>settled_at = now()</code></td>
+<td>state transition normal</td>
+</tr>
+<tr>
+<td><code>pending</code> (transient)</td>
+<td><code>pending</code></td>
+<td>no-op</td>
+<td>no-op (Booking tetap <code>pending_payment</code>)</td>
+</tr>
+<tr>
+<td><code>deny</code></td>
+<td><code>deny</code></td>
+<td><code>status = 'failed'</code> (jika belum terminal lain)</td>
+<td>Booking → <code>failed</code></td>
+</tr>
+<tr>
+<td><code>cancel</code></td>
+<td><code>cancel</code></td>
+<td><code>status = 'failed'</code></td>
+<td>Booking → <code>failed</code></td>
+</tr>
+<tr>
+<td><code>expire</code></td>
+<td><code>expire</code></td>
+<td><code>status = 'failed'</code></td>
+<td>Booking → <code>expired</code>, SlotHold released</td>
+</tr>
+<tr>
+<td><code>failure</code> / <code>failure_late</code></td>
+<td><code>failure</code></td>
+<td><code>status = 'failed'</code></td>
+<td>Booking → <code>failed</code></td>
+</tr>
+<tr>
+<td><code>refund</code> (full)</td>
+<td><code>refund</code></td>
+<td>no-op di <code>Payment</code> (refund adalah RefundAction terpisah)</td>
+<td>depends on RefundAction decision</td>
+</tr>
+<tr>
+<td><code>partial_refund</code></td>
+<td><code>partial_refund</code></td>
+<td>no-op di <code>Payment</code> (partial refund deferred; treat as <code>full_refund</code> atau <code>no_refund</code> action di RefundAction)</td>
+<td>depends on Admin decision</td>
+</tr>
+<tr>
+<td><code>chargeback</code></td>
+<td><code>chargeback</code></td>
+<td>no-op di <code>Payment</code> (financial reversal handled outside booking product)</td>
+<td>Admin alerted via reconciliation report</td>
+</tr>
+<tr>
+<td><code>challenge</code> / <code>fraud</code></td>
+<td><code>challenge</code></td>
+<td>no state change</td>
+<td>Admin review; Booking tetap <code>pending_payment</code></td>
+</tr>
+<tr>
+<td><code>recurring</code> / <code>subscription</code></td>
+<td>n/a</td>
+<td>not applicable — launch tidak ada subscription</td>
+<td>n/a</td>
+</tr>
+</tbody>
+</table>
+<h4 id="42-repeated-capture-settlement">4.2 Repeated <code>capture</code> / <code>settlement</code></h4>
+<ul>
+<li>Duplicate <code>capture</code> untuk <code>Booking</code> yang sudah settled → idempotency hit, return existing Payment status. Tidak insert <code>Payment</code> kedua. Email konfirmasi tambahan tidak dikirim (idempotency tracked via <code>notification_log</code>).</li>
+<li>Reverse order: <code>cancel</code> setelah <code>capture</code> → <code>cancel</code> di-apply jika <code>Payment.status</code> belum <code>paid</code> (artinya admin/expire membatalkan mid-flight); jika sudah <code>paid</code>, <code>cancel</code> di-ignore dan Admin alerted (karena settlement sudah final di Midtrans).</li>
+</ul>
+<h4 id="43-reversal-mapping">4.3 Reversal mapping</h4>
+<ul>
+<li><code>refund</code> event dari Midtrans <strong>tidak</strong> menggerakkan <code>Payment</code> state. Refund adalah <code>RefundAction</code> terpisah yang di-trigger oleh Admin (<code>ADR 0077</code> full/no-refund only). Webhook <code>refund</code> event hanya di-log untuk reconciliation.</li>
+<li><code>chargeback</code> event di-log ke <code>payment_chargeback_log</code> (append-only); Admin alerted; tidak mengubah <code>Payment</code> status otomatis.</li>
+</ul>
+<h3 id="5-paid_late-package-creation">5. <code>paid_late</code> package creation</h3>
+<h4 id="51-option-analysis">5.1 Option analysis</h4>
+<table>
+<thead>
+<tr>
+<th>Option</th>
+<th>Deskripsi</th>
+<th>Pro</th>
+<th>Kontra</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>A</strong></td>
+<td><code>PackagePurchase</code> + ordered <code>SessionEntitlement</code> + <code>PackageValidity</code> dibuat <strong>saat webhook verified</strong>; jika slot reacquire gagal, first <code>SessionEntitlement.state = 'pending_schedule'</code></td>
+<td>Financial truth terjaga; Admin resolution tanpa invent new state; konsistensi dengan <code>ADR 0059</code></td>
+<td>Butuh <code>pending_schedule</code> state untuk first entitlement</td>
+</tr>
+<tr>
+<td><strong>B</strong></td>
+<td>Tunda sampai Admin resolution</td>
+<td>Tidak ada state ambigu</td>
+<td>Kehilangan financial truth (Payment paid tapi PackagePurchase belum ada → reporting jadi susah); Admin jadi bottleneck untuk hal yang seharusnya otomatis</td>
+</tr>
+<tr>
+<td><strong>C</strong></td>
+<td>Buat dengan first session held sebagai <code>pending_schedule</code> (variant A)</td>
+<td>Sama dengan A</td>
+<td>Tidak ada perbedaan dengan A kecuali kalau diinterpretasikan sebagai "Admin must resolve before any entitlement visible" — tapi itu mereintroduce B</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Decision: Option A</strong> (eagle eye: identik dengan C, tapi C saya perjelas sebagai "Admin resolves ke real slot", sedangkan A adalah "first session held dengan pending_schedule atau scheduled jika reacquire berhasil, Admin resolves via existing reconciliation flow tanpa gate"). Rationale: financial truth, tidak ada new lifecycle state invented, Admin resolution flow sudah ada dari <code>ADR 0059</code> line 18.</p>
+<h4 id="52-paid_late-package-atomic-creation">5.2 <code>paid_late</code> package atomic creation</h4>
+<p>Pada saat verified webhook untuk <strong>late</strong> payment (hold sudah expired):</p>
+<ol>
+<li><code>Payment.status = 'paid_late_first_session_pending'</code> (atau <code>'paid_late_slot_reacquired'</code> jika reacquire berhasil — lihat §5.3).</li>
+<li><code>PackagePurchase</code> dibuat dengan <code>status = 'paid'</code> (atau <code>'paid_late'</code> — konsisten dengan Payment status enum).</li>
+<li><code>PackageValidity</code> dibuat dengan <code>validity_start = now()</code> (bukan original checkout time karena hold sudah expired — slot pertama tidak valid dari waktu itu).</li>
+<li>Ordered <code>SessionEntitlement</code> rows:
+   - <code>SessionEntitlement #1</code>: <code>state = 'pending_schedule'</code> (jika reacquire gagal) atau <code>'scheduled'</code> + linked ke Appointment reacquired (jika reacquire berhasil).
+   - <code>SessionEntitlement #2..N</code>: <code>state = 'available'</code>.</li>
+<li>Transactional effects: Booking original di-mark <code>paid_late_reconciled</code> (status terminal — bukan <code>confirmed</code> karena original slot tidak confirmed; bukan <code>failed</code> karena payment sukses). Booking adalah paid late, package adalah paid late, original slot released (jika reacquire gagal) atau tetap held (jika reacquire berhasil).</li>
+</ol>
+<h4 id="53-slot-reacquire-attempt">5.3 Slot reacquire attempt</h4>
+<p>Mengikuti <code>ADR 0059</code> line 17, <code>ADR 0091</code> capacity overlap detection:</p>
+<ol>
+<li>Di dalam transaction, query <code>CapacityReservation</code> existing untuk <code>(psychologist_id, original_starts_at, original_ends_at, state IN {hold_active, confirmed})</code> dengan <code>effective_range overlap</code> check.</li>
+<li>Jika tidak ada overlap dan original <code>AvailabilitySlot</code> masih <code>state = 'available'</code>:
+   - <code>INSERT INTO capacity_reservation (reservation_kind = 'confirmed', state = 'confirmed', ...)</code> — atomic claim.
+   - <code>INSERT INTO appointment (state = 'confirmed', ...)</code> — linked ke original slot.
+   - <code>SessionEntitlement #1.state = 'scheduled'</code>, linked ke Appointment ini.
+   - <code>Payment.status = 'paid_late_slot_reacquired'</code>.
+   - <code>Booking.status = 'paid_late_slot_reacquired'</code>.</li>
+<li>Jika ada overlap atau slot unavailable:
+   - Tidak insert <code>CapacityReservation</code>.
+   - Tidak insert <code>Appointment</code>.
+   - <code>SessionEntitlement #1.state = 'pending_schedule'</code>.
+   - <code>Payment.status = 'paid_late_first_session_pending'</code>.
+   - <code>Booking.status = 'paid_late_slot_unavailable'</code>.
+   - Original <code>Booking.snapshotted_slot_id</code> reference di-keep untuk audit (Admin perlu tahu slot mana yang awalnya dimaksud).</li>
+</ol>
+<h4 id="54-admin-resolution-flow-untuk-paid_late_first_session_pending">5.4 Admin resolution flow untuk <code>paid_late_first_session_pending</code></h4>
+<p>Admin workspace melihat <code>PackagePurchase</code> dengan flag <code>requires_first_session_scheduling = true</code>. Resolution options (existing Admin WhatsApp flow per <code>ADR 0067</code>):</p>
+<ul>
+<li><strong>Option X</strong>: Schedule alternative slot for <code>SessionEntitlement #1</code> → <code>ScheduleNextEntitlement</code> dengan slot baru (psikolog + klien agreed); <code>state</code> berubah dari <code>pending_schedule</code> ke <code>scheduled</code>.</li>
+<li><strong>Option Y</strong>: Full refund via <code>RefundAction.status = 'full_refund'</code> → <code>PackagePurchase.status = 'closed_refunded'</code>, semua remaining entitlements <code>state = 'cancelled'</code> (tidak consumed karena tidak dipakai), <code>Payment.status = 'refunded_full'</code>.</li>
+<li><strong>Option Z</strong>: Hold for client decision → <code>PackagePurchase.requires_first_session_scheduling</code> tetap true; Admin follow-up via WhatsApp. Tidak ada timeline otomatis; Admin decides based on client response.</li>
+</ul>
+<p>Admin tidak boleh otomatis melakukan refund tanpa eksplisit client/Admin decision (consistent dengan <code>ADR 0076</code> no auto-cutoff).</p>
+<h3 id="6-sql-migration-postgres-family">6. SQL migration (Postgres family)</h3>
+<pre><code class="language-sql">-- Migration 0093: payment settlement uniqueness and paid_late package effects
+
+-- 6.1 Unique partial index: at-most-one successful settlement per Booking
+CREATE UNIQUE INDEX IF NOT EXISTS payment_one_settled_per_booking
+  ON payment(booking_id)
+  WHERE status = 'paid' AND settled_at IS NOT NULL;
+
+-- 6.2 Idempotency record (lifetime, keyed by provider event id)
+CREATE TABLE IF NOT EXISTS payment_event_idempotency (
+  payment_intent_id     uuid NOT NULL,
+  provider_event_id     text NOT NULL,
+  payload_hash          bytea NOT NULL,
+  payment_event_id      uuid NOT NULL REFERENCES payment_event(id),
+  created_at            timestamptz NOT NULL DEFAULT now(),
+  PRIMARY KEY (provider_event_id, payment_intent_id)
+);
+
+-- 6.3 Payment status enum extension (additive, idempotent)
+ALTER TYPE payment_status ADD VALUE IF NOT EXISTS 'paid_late_slot_reacquired';
+ALTER TYPE payment_status ADD VALUE IF NOT EXISTS 'paid_late_slot_unavailable';
+ALTER TYPE payment_status ADD VALUE IF NOT EXISTS 'paid_late_first_session_pending';
+ALTER TYPE payment_status ADD VALUE IF NOT EXISTS 'refunded_no_disbursement';
+
+-- 6.4 SessionEntitlement state enum extension (additive)
+ALTER TYPE session_entitlement_state ADD VALUE IF NOT EXISTS 'pending_schedule';
+
+-- 6.5 PackagePurchase: requires_first_session_scheduling flag
+ALTER TABLE package_purchase
+  ADD COLUMN IF NOT EXISTS requires_first_session_scheduling boolean NOT NULL DEFAULT false;
+
+-- 6.6 Payment mismatch log (append-only audit)
+CREATE TABLE IF NOT EXISTS payment_event_mismatch_log (
+  id                   uuid PRIMARY KEY,
+  booking_id           uuid NOT NULL,
+  payment_intent_id    uuid,
+  provider_event_id    text,
+  mismatch_kind        enum NOT NULL,         -- 'amount' | 'currency' | 'order_id' | 'merchant_id' | 'idempotency_collision' | 'other'
+  expected_value       jsonb,
+  actual_value         jsonb,
+  payload_hash         bytea,
+  detected_at          timestamptz NOT NULL DEFAULT now(),
+  resolved_at          timestamptz,
+  resolved_by          uuid,                  -- staff_id
+  resolution_action    text
+);
+
+CREATE INDEX IF NOT EXISTS payment_mismatch_unresolved
+  ON payment_event_mismatch_log(booking_id)
+  WHERE resolved_at IS NULL;
+
+-- 6.7 Outbox table (transactional outbox for state transition events)
+CREATE TABLE IF NOT EXISTS application_outbox (
+  id                   uuid PRIMARY KEY,
+  aggregate_type       text NOT NULL,         -- 'payment' | 'booking' | 'package_purchase' | etc
+  aggregate_id         uuid NOT NULL,
+  event_type           text NOT NULL,
+  payload              jsonb NOT NULL,
+  created_at           timestamptz NOT NULL DEFAULT now(),
+  dispatched_at        timestamptz,
+  dispatch_attempts    int NOT NULL DEFAULT 0,
+  last_error           text
+);
+
+CREATE INDEX IF NOT EXISTS outbox_pending
+  ON application_outbox(created_at)
+  WHERE dispatched_at IS NULL;
+
+-- 6.8 Booking status enum extension (additive)
+ALTER TYPE booking_status ADD VALUE IF NOT EXISTS 'paid_late_slot_reacquired';
+ALTER TYPE booking_status ADD VALUE IF NOT EXISTS 'paid_late_slot_unavailable';
+ALTER TYPE booking_status ADD VALUE IF NOT EXISTS 'paid_late_reconciled';
+
+-- 6.9 PackagePurchase status enum extension (additive)
+ALTER TYPE package_purchase_status ADD VALUE IF NOT EXISTS 'paid_late';
+ALTER TYPE package_purchase_status ADD VALUE IF NOT EXISTS 'closed_refunded';
+</code></pre>
+<p>Rollback (Postgres): drop indexes, drop tables (idempotency, mismatch log, outbox), drop columns, drop enum values (tidak reversible di Postgres; alternative: leave enum values unused, document sebagai deprecated).</p>
+<h3 id="7-d1-sqlite-equivalent">7. D1 / SQLite equivalent</h3>
+<p>D1 (SQLite) tidak mendukung <code>ALTER TYPE ... ADD VALUE</code>. Solusi: enum values didefinisikan sebagai application-level CHECK constraint atau TEXT dengan application-level validation. <code>ADD COLUMN IF NOT EXISTS</code> supported sejak SQLite 3.35.0. Partial unique index supported sejak 3.8.0.</p>
+<pre><code class="language-sql">-- 7.1 Unique partial index (sama syntax, supported)
+CREATE UNIQUE INDEX IF NOT EXISTS payment_one_settled_per_booking
+  ON payment(booking_id)
+  WHERE status = 'paid' AND settled_at IS NOT NULL;
+
+-- 7.2 Idempotency record (sama DDL)
+CREATE TABLE IF NOT EXISTS payment_event_idempotency (
+  payment_intent_id     text NOT NULL,
+  provider_event_id     text NOT NULL,
+  payload_hash          blob NOT NULL,
+  payment_event_id      text NOT NULL REFERENCES payment_event(id),
+  created_at            text NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+  PRIMARY KEY (provider_event_id, payment_intent_id)
+);
+
+-- 7.3 SessionEntitlement state CHECK constraint (SQLite tidak punya enum ALTER)
+-- Pre-existing CHECK constraint di session_entitlement harus sudah include 'pending_schedule'.
+-- Jika belum, ALTER TABLE recreate:
+-- ALTER TABLE session_entitlement RENAME TO session_entitlement_old;
+-- CREATE TABLE session_entitlement (... new CHECK ...);
+-- INSERT INTO session_entitlement SELECT * FROM session_entitlement_old;
+-- DROP TABLE session_entitlement_old;
+
+-- 7.4 PackagePurchase column
+ALTER TABLE package_purchase
+  ADD COLUMN requires_first_session_scheduling integer NOT NULL DEFAULT 0;
+-- (0 = false, 1 = true; SQLite tidak punya boolean native)
+
+-- 7.5 Mismatch log (sama DDL dengan text/timestamp adjustments)
+CREATE TABLE IF NOT EXISTS payment_event_mismatch_log (
+  id                   text PRIMARY KEY,
+  booking_id           text NOT NULL,
+  payment_intent_id    text,
+  provider_event_id    text,
+  mismatch_kind        text NOT NULL CHECK (mismatch_kind IN
+                       ('amount','currency','order_id','merchant_id','idempotency_collision','other')),
+  expected_value       text,  -- JSON serialized
+  actual_value         text,
+  payload_hash         blob,
+  detected_at          text NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+  resolved_at          text,
+  resolved_by          text,
+  resolution_action    text
+);
+
+CREATE INDEX IF NOT EXISTS payment_mismatch_unresolved
+  ON payment_event_mismatch_log(booking_id)
+  WHERE resolved_at IS NULL;
+
+-- 7.6 Outbox (sama DDL)
+CREATE TABLE IF NOT EXISTS application_outbox (
+  id                   text PRIMARY KEY,
+  aggregate_type       text NOT NULL,
+  aggregate_id         text NOT NULL,
+  event_type           text NOT NULL,
+  payload              text NOT NULL,
+  created_at           text NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+  dispatched_at        text,
+  dispatch_attempts    integer NOT NULL DEFAULT 0,
+  last_error           text
+);
+
+CREATE INDEX IF NOT EXISTS outbox_pending
+  ON application_outbox(created_at)
+  WHERE dispatched_at IS NULL;
+</code></pre>
+<h3 id="8-konsekuensi">8. Konsekuensi</h3>
+<p><strong>Positif</strong>:</p>
+<ul>
+<li>Financial truth terjaga — at-most-one <code>Payment</code> settled per Booking, dengan amount/currency/order/merchant match.</li>
+<li>Duplicate webhook aman — idempotency hit returns existing result, no-op transition.</li>
+<li>Late payment untuk package tidak kehilangan PackagePurchase — <code>paid_late</code> path membuat PackagePurchase dengan first entitlement <code>pending_schedule</code>, Admin dapat resolve.</li>
+<li>Crash window eksplisit ditangani di tiga boundaries, dengan transactional outbox untuk delivery guarantee.</li>
+<li>Konsisten dengan <code>ADR 0059</code> (late payment reconciliation), <code>ADR 0091</code> (capacity overlap), <code>ADR 0023</code>-style idempotency primitives.</li>
+</ul>
+<p><strong>Biaya dan constraint</strong>:</p>
+<ul>
+<li>Tiga window berbeda menambah kompleksitas operational (Admin perlu membaca runbook).</li>
+<li>Unique partial index harus di-maintain di migration (rollback strategy: drop index, bukan drop data).</li>
+<li>Outbox dispatcher butuh monitoring; <code>outbox_pending</code> index membantu query untuk dead-letter detection.</li>
+<li><code>paid_late_first_session_pending</code> adalah new state yang Admin perlu pahami di workspace (admin UX impact).</li>
+<li><code>payment_event_mismatch_log</code> dan reconciliation entries butuh Admin review cadence.</li>
+</ul>
+<p><strong>Forbidden</strong>:</p>
+<ul>
+<li>Multiple <code>Payment</code> rows settled per <code>Booking.id</code>.</li>
+<li>Verifikasi signature saja tanpa amount/currency/order/merchant match.</li>
+<li>Idempotency record dengan TTL.</li>
+<li>Silent refund atau silent slot substitution setelah late payment.</li>
+<li>Outbox dispatcher yang menulis langsung ke external system tanpa idempotency.</li>
+<li>Payment status rewrite in-place untuk merepresentasikan perubahan historis (mengikuti <code>IMPLEMENTATION-GUIDE.md §8.1</code> append-only rule).</li>
+</ul>
+<h2 id="open-follow-up">Open follow-up</h2>
+<ul>
+<li><strong>Outbox dispatcher implementation</strong>: harus didefinisikan sebagai background worker dengan retry policy (exponential backoff, max attempts, dead-letter routing). Belum ada implementation ADR; in-scope untuk Slice 7 atau Slice 8 (notifications).</li>
+<li><strong>Reconciliation cadence</strong>: kapan Admin review <code>payment_event_mismatch_log</code> (unresolved entries)? Real-time alert via notification, atau daily digest? Tergantung operational policy.</li>
+<li><strong><code>requires_first_session_scheduling</code> UX di Admin workspace</strong>: layout dan CTA. Belum ada wireframe; in-scope untuk Slice 6 cancellation/refund atau Slice 5 staff/ClientAccess.</li>
+<li><strong><code>paid_late_first_session_pending</code> automatic expiry</strong>: jika Admin tidak resolve dalam N hari, apakah PackagePurchase auto-close atau tetap hold? Konsisten dengan <code>ADR 0076</code> no auto-cutoff — rekomendasi: tidak ada auto-expiry; Admin decides.</li>
+<li><strong>Chargeback handling</strong>: event <code>chargeback</code> di-log tapi tidak menggerakkan state; apakah perlu automatic RefundAction atau Admin-decide? Konsisten dengan <code>ADR 0077</code> full/no-refund Admin-decide — rekomendasi: Admin-decide.</li>
+<li><strong>Cross-aggregate transaction strategy</strong>: <code>Booking</code>/<code>Payment</code>/<code>PackagePurchase</code>/<code>SessionEntitlement</code> adalah aggregate berbeda; ADR ini mengasumsikan satu application transaction menyentuh semuanya (Postgres allows; D1 serial per DB). Pada Postgres production dengan cross-aggregate writes, pertimbangkan transactional outbox + saga atau 2PC. Belum ada ADR.</li>
+</ul>
+<h2 id="reference">Reference</h2>
+<ul>
+<li><code>ADR 0023</code> (idempotency primitives) — referenced untuk pattern, content tidak tersedia saat penulisan ADR ini</li>
+<li><code>ADR 0059-late-payment-reconciliation.md</code> — late payment untuk single-session Booking</li>
+<li><code>ADR 0076-case-by-case-cancellation.md</code> — no auto-cutoff</li>
+<li><code>ADR 0077-launch-full-or-no-refund.md</code> — refund vocabulary</li>
+<li><code>ADR 0042-offer-snapshot-immutable.md</code> — OfferSnapshot sebagai source of truth untuk amount/currency</li>
+<li><code>ADR 0090-couple-participant-model.md</code> — couple package participant (untuk paid-late couple handling)</li>
+<li><code>ADR 0091-capacity-overlap-buffer.md</code> — capacity reservation overlap detection</li>
+<li><code>IMPLEMENTATION-GUIDE.md §7 Payment implementation</code> — patched alongside this ADR</li>
+<li><code>IMPLEMENTATION-GUIDE.md §8 Persistence and data rules</code> — append-only, concurrency, idempotency key</li>
+<li><code>DOMAIN-MODEL.md</code> Payment and refund section — patched alongside this ADR</li>
+<li><code>PRD-GUIDELINE-REVIEW.md</code> Round 1 P1-10 + Round 2 follow-up — TBC-PAY-SETTLEMENT-01 closed by this ADR</li>
+<li><code>CONTEXT.md:41</code> — multiple payment attempts context</li>
+<li>Ticket #5 — Settlement uniqueness &amp; paid-late package (closes this ticket)</li>
+</ul></main><footer>Seraya Psikologi · Documentation generated from the repository · <a href="../../reference/index.html">Long-form reference</a></footer></div></body></html>

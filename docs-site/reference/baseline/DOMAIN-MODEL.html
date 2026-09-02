@@ -1,0 +1,357 @@
+<!doctype html><html lang="id"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Seraya Psikologi — Technical Domain Model — Seraya Psikologi</title><link rel="stylesheet" href="../../assets/main.css"></head><body><div class="shell"><header class="site-header"><div><a class="brand" href="../../index.html">Seraya Psikologi</a><div class="subtitle">Project control center · MVP review</div></div><nav class="topnav"><a href="../../index.html">Overview</a><a href="../../workboard.html">Workboard</a><a href="../../prd/index.html">Focused PRDs</a><a href="../../reference/index.html">Reference</a></nav></header><div class="muted" style="font-size:.84rem;margin-bottom:18px"><a href="../../index.html">Home</a> / Baseline</div><main><h1 id="seraya-psikologi-technical-domain-model">Seraya Psikologi — Technical Domain Model</h1>
+<blockquote>
+<p>Generated from the live technical PRD at revision 168. The ADR set in <code>docs/adr/</code> is the decision history; this file is a review-friendly synchronized summary.</p>
+</blockquote>
+<h1 id="launch-scope">Launch scope</h1>
+<p>Launch scope: marketing, public program architecture, psychologist directory, SERAYA PULANG counseling catalog, online/offline availability, guest booking, <strong>WhatsApp manual payment (PDF + plain text invoice, Admin mark-as-paid per <code>ADR 0097</code>)</strong>, packages, email notifications, and Admin CMS. Midtrans and other payment gateways are <strong>deferred post-MVP</strong> (<code>ADR 0068</code> superseded).
+Only SERAYA PULANG is bookable/paid. Other program pillars are public content without booking/payment in launch. Psychological assessment, Editor role, extra payment methods, partial refunds, and client self-service cancellation/refund are deferred.</p>
+<h1 id="domain-and-catalog">Domain and catalog</h1>
+<p>MVP boundary: public marketing/program architecture, psychologist directory, CMS, scheduling, booking, payment, and operational support for psychology services. Clinical records are explicitly out of scope.</p>
+<p>Launch program scope:
+- SERAYA PULANG, SERAYA BERDAYA, SERAYA BERSAMA, and SERAYA BERBAGI are public program pillars.
+- Only SERAYA PULANG is bookable/paid in launch.
+- SERAYA PULANG launches psychological counseling; psychological assessment is deferred.
+- Counseling is bookable online and offline, 60 minutes per session.</p>
+<p>Launch catalog:
+- Individual counseling: online Rp125.000 single, Rp235.000/2 sessions, Rp345.000/3 sessions; offline Rp200.000 single, Rp380.000/2 sessions, Rp555.000/3 sessions.
+- Couple counseling: 3 meetings with explicit A/B/joint sequence; online Rp350.000, offline Rp550.000.
+- Packages are paid upfront in IDR. Catalog revisions are snapshotted; changing a future offering never mutates a purchased package.
+- Fuja Rahayu Kinanti is the only confirmed launch psychologist and is assigned to individual and couple counseling. Her recurring availability is <code>anytime/anyplace</code> for PRD/prototype only; production slots require a later operational schedule/location entry.</p>
+<p>Actors and identity:
+- Client may book as a guest; optional UserAccount/Google linking is separate.
+- Staff access requires Google SSO plus Admin invite/allowlist and explicit StaffMembership/RoleAssignment.
+- Active staff roles are Admin and Psychologist. Editor is defined as future-capable but deferred/unassigned at launch.
+- ClientAccess is Booking/PackagePurchase-scoped email magic link/OTP: one-time token 15 minutes, scoped session 30 minutes, resend invalidates older tokens.</p>
+<p>Core entities:
+- PsychologistProfile, Service, ServiceOffering, immutable ServiceOfferingRevision, ServicePackage, AvailabilityRule, AvailabilityException, AvailabilitySlot, SlotHold, Booking, BookingParticipant, OfferSnapshot, Appointment, AppointmentParticipant, PackagePurchase, SessionEntitlement, Payment, PaymentEvent, <strong>PaymentProof (per <code>ADR 0097</code>)</strong>, RefundAction, ConsentRecord, CancellationRequest, CancellationDecision, RescheduleAction, AppointmentOutcome, OutcomeCorrection, ReminderSchedule, Notification, DeliveryAttempt, PrivacyRequest, ClientMergeAction, StaffMembership, ContentEntry, ContentRevision, and AuditRecord.
+- ServiceOffering is the concrete bookable variant for one psychologist; published revisions drive future slots and new snapshots.
+- ServicePackage is a catalog template; PackagePurchase owns the purchased ordered entitlements after verified full payment.
+- <code>BookingParticipant</code> is a child of <code>Booking</code> and records one human party to a couple Booking with <code>party_role</code> ∈ {<code>participant_a</code>, <code>participant_b</code>} and <code>is_payer</code> flag. Exactly two participant rows exist for a couple Booking; exactly one carries <code>is_payer = true</code>. Field minimum: <code>display_name</code>, <code>contact_email</code> (verified, for ClientAccess), <code>contact_phone</code> (optional, for Admin WhatsApp support), <code>age_at_booking</code> (snapshot), <code>relationship_to_other</code> (snapshot, not mutated), and <code>consent_record_id</code> linking to <code>ConsentRecord</code>. Authority: <code>ADR 0090</code>.
+- <code>AppointmentParticipant</code> is a child of <code>Appointment</code> and records which <code>BookingParticipant</code> is bound to which concrete Appointment. For appointment A: one row with <code>attendance_mode = individual_a</code>; for B: one row with <code>individual_b</code>; for joint: two rows with <code>joint_both</code> (one per partner). <code>presence_status</code> ∈ {<code>expected</code>, <code>present</code>, <code>absent</code>, <code>withdrawn_pre_session</code>, <code>withdrawn_mid_session</code>}. Authority: <code>ADR 0090</code>.</p>
+<p>Domain boundaries:
+- Payment truth is a verified <code>payment_proof</code> record (per <code>ADR 0097</code>) signed/verified by Admin action in the Admin workspace (Mark-as-Paid), not a browser redirect or provider event. Midtrans signed-server-verified provider events are the launch-deferred alternative path (<code>ADR 0068</code> superseded).
+- CancellationDecision is append-only approve/deny; pending preserves confirmed Appointment and reservation; approval atomically cancels, releases eligible future capacity, and restores valid entitlement; pending-vs-outcome race is resolved deterministically per <code>ADR 0095 §2</code> (R1/R2 auto-resolve, R3 blocks late outcome marking, R4 rebinds to reschedule replacement); repeat/correction creates a new decision with <code>correction_of</code> linkage while the original remains immutable history (<code>ADR 0095 §4</code>); package-wide cancellation closes <code>PackagePurchase</code> atomically with no re-open (<code>ADR 0095 §3.2</code>).
+- RefundAction is separate and launch-limited to full_refund or no_refund. Partial monetary refunds are deferred; tiered or admin-defined amounts live in the Admin WhatsApp conversation log, not in the booking product.
+- Email is the automated channel. Admin WhatsApp is the only public-facing channel for cancellation/refund requests; it is not a lifecycle gate, fallback authority, task, SLA, acknowledgement gate, or source of truth.
+- No clinical notes, diagnosis, assessment results, session notes, crisis intake/triage, or crisis narrative are stored in MVP.</p>
+<h1 id="actors-and-authentication">Actors and authentication</h1>
+<p>Staff use Google SSO only after Admin invite/allowlist and explicit active StaffMembership/RoleAssignment for <code>admin</code> or <code>psychologist</code>. Google authentication, email-domain matching, self-signup, or self-selected role never grants staff access. Two Admin memberships are bootstrapped; either may invite/revoke staff. No shared account, password fallback, or undocumented bypass. Editor is not active at launch.</p>
+<p>Guest ClientAccess uses email-primary one-time magic link/OTP (15-minute token, 30-minute scoped session); resend invalidates older tokens and plaintext tokens are never stored/logged. Optional Google/UserAccount linking is not required. ClientAccess is scoped to verified Booking/PackagePurchase and cannot perform self-service cancellation/refund or enumerate other records.</p>
+<p>Active roles: visitor, client, psychologist, admin</p>
+<h1 id="relations">Relations</h1>
+<p>Client → Booking → OfferSnapshot + SlotHold → Payment/PaymentEvent → Appointment or PackagePurchase.
+Service → ServiceOffering → ServiceOfferingRevision → future AvailabilitySlot. PackagePurchase → ordered SessionEntitlement → Appointment.
+CancellationRequest → append-only CancellationDecision → atomic Appointment/slot/entitlement effect → optional separate RefundAction.
+RescheduleAction links original Appointment to replacement while preserving Booking/payment/package/entitlement. ConsentRecord, PrivacyRequest, StaffMembership, ContentRevision, Notification, and privileged actions are audited.
+Couple Booking (couple package per <code>ADR 0074</code> and <code>ADR 0090</code>) binds exactly two <code>BookingParticipant</code> rows (<code>participant_a</code>, <code>participant_b</code>), one with <code>is_payer = true</code>. Each <code>Appointment</code> links 1–2 <code>AppointmentParticipant</code> rows referencing the corresponding <code>BookingParticipant</code>. <code>BookingParticipant.consent_record_id</code> references an immutable <code>ConsentRecord</code>. <code>SessionEntitlement</code> is owned by <code>PackagePurchase</code> (not by participant); joint session cancellation may restore the joint entitlement through an explicit CancellationDecision. Refund is purchase-level decision (<code>ADR 0063</code>); per-participant refund allocation is never assumed.</p>
+<h1 id="lifecycle">Lifecycle</h1>
+<p>Single session: select published counseling offering/mode/slot → Booking + snapshot + hold → invoice generated (PDF + plain text) → client receives via WhatsApp → client pays manually (bank transfer / VA / QRIS) → client sends payment proof to Admin WhatsApp → Admin Mark-as-Paid in workspace (<code>ADR 0097 MarkAsPaid</code> command) → <code>payment_proof</code> verified → <code>Booking.status = 'confirmed'</code> → <code>Appointment</code> confirmed.
+Package: select package/first slot → full upfront payment → PackagePurchase + ordered entitlements + first Appointment; later valid units are scheduled sequentially; completed/no_show consumes; approved valid cancellation restores original sequence/expiry.
+Cancellation: manual support → Admin CancellationRequest (at most one open per target) → pending preserves state → outcome race resolution (R1/R2 auto-resolve on completed/no_show, R3 blocks late outcome marking, R4 rebinds to reschedule replacement) → approve/deny → approval atomically cancels/releases/restores per target matrix (target = appointment / booking / package_purchase); separate full_refund/no_refund action. WhatsApp discussion is not domain truth. Canonical transition matrix for Booking, Appointment, PackagePurchase, and SessionEntitlement is in <code>ADR 0095-package-cancellation-matrix.md</code> §3 (per-target atomic effects), §4 (repeat/correction), §5 (RescheduleAction), and §6 (couple-package rules via BookingParticipant).
+Couple package (<code>ADR 0090</code>): checkout records partner A as payer and creates <code>BookingParticipant</code> rows for A and B; magic-link verifies partner B independently; first Appointment A scheduled with <code>AppointmentParticipant(individual_a)</code>; appointment B with <code>individual_b</code>; joint session with two <code>AppointmentParticipant(joint_both)</code> rows after <code>joint_session_consent</code> verified for both partners. Withdrawal/no-show follows <code>ADR 0027</code>; joint session cancellation before start may restore entitlement #3 through explicit CancellationDecision. Refund remains purchase-level decision (<code>ADR 0063</code>/<code>0077</code>).</p>
+<h2 id="appointment-outcome-transition-matrix-adr-0092">Appointment outcome transition matrix (<code>ADR 0092</code>)</h2>
+<p><code>Appointment</code> (mode individual atau couple-joint) mengikuti state machine ini. Outcome enum final: <code>completed</code> | <code>completed_partial</code> | <code>no_show</code> | <code>no_show_late</code> | <code>cancelled</code>. Hanya <code>cancelled</code> yang tidak mengonsumsi entitlement.</p>
+<table>
+<thead>
+<tr>
+<th>From</th>
+<th>Event</th>
+<th>Precondition</th>
+<th>To</th>
+<th>Entitlement effect</th>
+<th>Actor</th>
+<th>Notification</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>confirmed</code></td>
+<td>system auto T+15m, <code>client_arrived_at IS NULL</code></td>
+<td>scheduled_start + 15m lewat</td>
+<td><code>no_show</code></td>
+<td>consumed (locked)</td>
+<td>system</td>
+<td>email <code>no_show_recorded</code> + admin alert</td>
+</tr>
+<tr>
+<td><code>confirmed</code></td>
+<td><code>RecordClientArrived</code> ≤ T+15m</td>
+<td>server timestamp valid</td>
+<td><code>in_progress</code></td>
+<td>(none yet)</td>
+<td>psikolog/Admin</td>
+<td>admin in-app <code>client_arrived_admin</code></td>
+</tr>
+<tr>
+<td><code>confirmed</code></td>
+<td><code>RecordClientArrived</code> &gt; T+15m</td>
+<td>server timestamp valid</td>
+<td><code>in_progress</code> (info: <code>no_show</code> checkpoint sudah locked)</td>
+<td>(none yet)</td>
+<td>psikolog/Admin</td>
+<td>admin in-app <code>client_arrived_admin</code></td>
+</tr>
+<tr>
+<td><code>confirmed</code> / <code>in_progress</code></td>
+<td>CancellationDecision approve</td>
+<td><code>ADR 0051</code> satisfied</td>
+<td><code>cancelled</code></td>
+<td>restored jika entitlement valid</td>
+<td>admin via CancellationDecision</td>
+<td>sesuai cancellation flow</td>
+</tr>
+<tr>
+<td><code>in_progress</code></td>
+<td><code>MarkAppointmentOutcome</code> end-of-session, attended ≥60m</td>
+<td><code>session_ended_at</code> dicatat, <code>effective_attended_minutes ≥ 60</code></td>
+<td><code>completed</code></td>
+<td>consumed</td>
+<td>psikolog assigned / Admin override</td>
+<td>email <code>outcome_finalized</code></td>
+</tr>
+<tr>
+<td><code>in_progress</code></td>
+<td><code>MarkAppointmentOutcome</code> end-of-session, attended 1–59m</td>
+<td><code>effective_attended_minutes</code> dalam [1, 59]</td>
+<td><code>completed_partial</code></td>
+<td>consumed + compensation token eligibility flag</td>
+<td>psikolog assigned / Admin override</td>
+<td>email <code>outcome_finalized</code></td>
+</tr>
+<tr>
+<td><code>in_progress</code> (after late arrival)</td>
+<td><code>MarkAppointmentOutcome</code>, attended ≥1m, <code>client_arrived_at &gt; T+15m</code></td>
+<td>checkpoint <code>no_show</code> sudah locked</td>
+<td><code>no_show_late</code></td>
+<td>consumed (tetap; checkpoint sudah lock)</td>
+<td>psikolog assigned / Admin override</td>
+<td>email <code>outcome_finalized</code></td>
+</tr>
+<tr>
+<td><code>no_show</code> / <code>completed*</code> / <code>no_show_late</code></td>
+<td><code>CorrectAppointmentOutcome</code> dalam window 7 hari kalender</td>
+<td><code>now ≤ marked_at + 7×24h</code></td>
+<td>(outcome baru sesuai koreksi)</td>
+<td>delta ±1 sesuai arah koreksi</td>
+<td>admin only</td>
+<td>email <code>outcome_corrected</code></td>
+</tr>
+</tbody>
+</table>
+<p><code>SessionEntitlement.status</code> transisi:</p>
+<pre><code>available → scheduled → consumed         # completed / completed_partial / no_show / no_show_late
+available → scheduled → available        # cancelled approved (restore jika valid)
+consumed → available                     # OutcomeCorrection yang me-restore entitlement dalam window 7 hari
+</code></pre>
+<p>Correction window: <strong>7×24 jam (7 hari kalender)</strong> Asia/Jakarta dari <code>marked_at</code>. Lewat window, <code>OutcomeCorrection</code> ditolak dengan error <code>correction_window_expired</code>; perubahan hanya via <code>CancellationDecision</code> baru atau explicit Admin extension/exception (di luar scope, <code>TBC-EXTENSION-01</code>).</p>
+<h2 id="cancellation-transition-matrix-adr-0095">Cancellation transition matrix (<code>ADR 0095</code>)</h2>
+<p>Target types: <code>appointment</code>, <code>booking</code> (single-session single-Appointment), <code>package_purchase</code>. At-most-one open <code>CancellationRequest</code> per target (unique partial index). Pending preserves state per <code>ADR 0025</code>; no pre-decision slot release. Approval atomic in one DB transaction per <code>ADR 0089</code> D1 batch semantics.</p>
+<table>
+<thead>
+<tr>
+<th>From</th>
+<th>Event</th>
+<th>To</th>
+<th>Atomic effects</th>
+<th>Actor</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>CancellationRequest.state = open</code> (target = appointment / booking)</td>
+<td><code>completed</code> lands first (R1)</td>
+<td><code>CancellationRequest → auto_resolved</code>; Appointment stays <code>completed</code></td>
+<td>none; consumed per <code>ADR 0027</code>/<code>ADR 0092</code></td>
+<td>system</td>
+</tr>
+<tr>
+<td><code>CancellationRequest.state = open</code> (target = appointment / booking)</td>
+<td><code>no_show</code> lands first (R2)</td>
+<td><code>CancellationRequest → auto_resolved</code>; Appointment stays <code>no_show</code></td>
+<td>none; consumed per <code>ADR 0027</code></td>
+<td>system</td>
+</tr>
+<tr>
+<td><code>CancellationRequest.state = open</code> (target = appointment / booking)</td>
+<td>RescheduleAction (R4)</td>
+<td><code>CancellationRequest.target_appointment_id</code> rebinds to replacement; original Appointment → <code>rescheduled</code></td>
+<td>replacement inherits request</td>
+<td>admin / psychologist</td>
+</tr>
+<tr>
+<td><code>CancellationRequest.state = open</code> (any target)</td>
+<td>DecideCancellation approve</td>
+<td><code>CancellationRequest → approved</code>; target-specific atomic effects (see §3.1–§3.2 in <code>ADR 0095</code>)</td>
+<td>per target matrix</td>
+<td>admin</td>
+</tr>
+<tr>
+<td><code>CancellationRequest.state = open</code> (any target)</td>
+<td>DecideCancellation deny</td>
+<td><code>CancellationRequest → denied</code></td>
+<td>none</td>
+<td>admin</td>
+</tr>
+<tr>
+<td><code>CancellationRequest.state = approved/denied</code></td>
+<td>new RequestCancellation on same target</td>
+<td>new <code>CancellationRequest</code> opens with <code>correction_of</code>; old decision marked <code>superseded_by</code></td>
+<td>depends on new decision; original immutable</td>
+<td>admin</td>
+</tr>
+<tr>
+<td><code>CancellationRequest.state = approved</code> (target = package_purchase)</td>
+<td>atomic transaction</td>
+<td><code>PackagePurchase.state → closed_by_cancellation</code> (terminal); all future non-terminal Appointments → <code>cancelled</code>; their <code>CapacityReservation</code> → <code>cancelled</code>; unused <code>SessionEntitlement</code> with <code>valid_until &gt;= now</code> → <code>closed_restored_by_cancellation</code>; other unused → <code>closed_cancelled_with_package</code>; consumed/expired untouched; <code>PackageValidity.valid_until</code> unchanged; no re-open</td>
+<td>full sweep atomic</td>
+<td>admin</td>
+</tr>
+<tr>
+<td><code>CancellationRequest.state = approved</code> (target = appointment / booking)</td>
+<td>atomic transaction</td>
+<td>Appointment → <code>cancelled</code>; <code>CapacityReservation</code> → <code>cancelled</code> (<code>release_reason = appointment_cancelled</code>); linked <code>SessionEntitlement</code> → restored if <code>valid_until &gt;= now</code>, else <code>closed_*</code>; eligible future slot → <code>available</code></td>
+<td>atomic single-target</td>
+<td>admin</td>
+</tr>
+<tr>
+<td><code>Appointment.state ∈ {cancelled, rescheduled}</code></td>
+<td>late outcome marking attempt</td>
+<td>rejected</td>
+<td><code>E-APPOINTMENT-ALREADY-CANCELLED</code></td>
+<td>(reject)</td>
+</tr>
+<tr>
+<td><code>Appointment.state ∈ {completed, completed_partial, no_show, no_show_late, cancelled, rescheduled}</code></td>
+<td>RescheduleAction attempt</td>
+<td>rejected</td>
+<td>per <code>ADR 0095 §5.1</code> typed failure</td>
+<td>(reject)</td>
+</tr>
+<tr>
+<td><code>PackagePurchase.state = closed_by_cancellation</code></td>
+<td>any state change attempt</td>
+<td>rejected</td>
+<td><code>E-PACKAGE-CLOSED-BY-CANCELLATION</code>; recovery = new PackagePurchase + new payment</td>
+<td>(reject)</td>
+</tr>
+</tbody>
+</table>
+<p><code>SessionEntitlement.status</code> extended values per <code>ADR 0095</code>: <code>closed_restored_by_cancellation</code>, <code>closed_cancelled_with_package</code>. <code>RescheduleAction</code> forbidden transitions enumerated in <code>ADR 0095 §5.1</code>; couple-package rules in <code>ADR 0095 §6</code> (joint pre-start cancellation restores entitlement #3; mid-session withdrawal is <strong>not</strong> a cancellation path and lives in <code>OutcomeCorrection</code>/<code>AppointmentOutcome</code>).</p>
+<h1 id="booking-and-availability">Booking and availability</h1>
+<p>Single-session: pending_payment with active SlotHold → confirmed only after verified PaymentEvent → completed/no_show/cancelled/rescheduled through explicit actions. Hold/payment failure → expired/failed. Package Booking additionally creates PackagePurchase and ordered entitlement states available/scheduled/consumed/expired/closed.
+Cancellation policy has no automatic cutoff. Admin records and reviews requests case-by-case. Pending preserves confirmed Appointment and slot reservation. <code>CancellationDecision</code> is approve/deny; approval atomically cancels Appointment, releases an eligible future slot, and restores a valid entitlement; ineligible/past/withdrawn capacity remains recorded but unavailable. No separate Release Slot command exists. Historical Appointment is retained. Reschedule preserves original Appointment as rescheduled and creates a replacement.</p>
+<p>AvailabilityRule/Exception changes affect only future unheld/unbooked slots. Held/booked/historical records are preserved; invalid future unheld slots are withdrawn, not silently migrated. Booking horizon is rolling 90 days, timezone Asia/Jakarta, TransitionBuffer 15 minutes, SlotHold TTL 10 minutes. Psychologist may manage own future inputs; Admin may override/lock/audit.
+Design placeholder: Fuja recurring availability is <code>anytime/anyplace</code> and is non-blocking for PRD/design. No production slot is inferred from it; real schedule/location must be entered before live slot publication.</p>
+<h1 id="couple-package-participant-model-adr-0090">Couple package participant model (<code>ADR 0090</code>)</h1>
+<p>The couple package is a single Booking that purchases three Sessions (A, B, joint) for two partners. The model uses <code>BookingParticipant</code> and <code>AppointmentParticipant</code> as child entities, and reserves three party roles: <code>participant_a</code>, <code>participant_b</code>, and <code>payer</code> (label, currently always one of A or B; MVP default <code>participant_a</code>). The relational label <code>joint_attendees</code> is not a role but a derived attendance pattern on the joint Appointment.</p>
+<p>Consent is per participant. A couple Booking creates at least three <code>ConsentRecord</code> instances:</p>
+<ol>
+<li><code>couple_consent</code> (payer-accepted at checkout, covers package-level purpose/confidentiality/data/limits);</li>
+<li><code>participant_consent_a</code> / <code>participant_consent_b</code> (per-partner individual consent, verified independently via email magic link — partner B does not wait on partner A);</li>
+<li><code>joint_session_consent</code> (explicit two-party consent before the joint Appointment is confirmed, with wording that names the joint attendance, the administrative-only scope of any retained record, and the right to withdraw without affecting completed individual Sessions).</li>
+</ol>
+<p>Visibility is restricted: a partner sees only their own individual Appointment schedule and the joint Appointment schedule, plus the partner's display name for joint preparation. A partner does not see the other partner's contact details, individual-Appointment outcome, or ConsentRecord content. Admin sees the full <code>BookingParticipant</code> and <code>AppointmentParticipant</code> set for the Booking. Psychologist sees display names for assigned Appointments but does not see contact details outside operational necessity (<code>AssignedClientView</code>).</p>
+<p>Withdrawal/no-show semantics:</p>
+<ul>
+<li>One partner absent on their individual Appointment → that Appointment becomes <code>no_show</code>; the corresponding entitlement unit (#1 or #2) is consumed per <code>ADR 0027</code>; the joint Session entitlement (#3) is not yet affected and the package can continue.</li>
+<li>One partner withdraws from the joint Session before start → joint Appointment is cancelled via <code>CancellationDecision</code>; entitlement #3 may be restored by Admin while the package remains valid; the other partner is notified but no penalty is applied to them.</li>
+<li>Both partners absent on the joint Session → joint Appointment becomes <code>no_show</code>; entitlement #3 is consumed.</li>
+<li>One partner withdraws mid-session → psychologist marks <code>completed</code> and records <code>withdrawn_mid_session</code> on the withdrawing partner's <code>AppointmentParticipant.presence_status</code>; entitlement #3 is consumed (session was held).</li>
+</ul>
+<p>Reschedule authority is Admin or Psychologist only; clients/partners cannot self-reschedule couple Appointments (<code>ADR 0090</code>).</p>
+<p>ClientAccess for couples is per-participant: each partner receives a <code>couple_access</code> token scoped to their own <code>BookingParticipant</code> and to Appointments in which they appear. There is no shared partner token and no cross-participant enumeration. The payer additionally receives a <code>couple_billing_access</code> scope (read-only) over the Booking's Payment/Refund records. <code>PrivacyRequest</code> from one partner processes only that partner's data; it does not delete the other partner or the joint Appointment. <code>TBC-COUPLE-01</code> (participant model) is closed by <code>ADR 0090</code>; <code>TBC-COUPLE-LAUNCH-01</code> (day-one bookable vs deferred) and <code>TBC-CONSENT-01</code> (final joint wording) remain open and gate live couple booking.</p>
+<h1 id="payment-and-refund">Payment and refund</h1>
+<p>Launch gateway-of-record: Midtrans with Snap hosted checkout behind a provider-neutral PaymentGatewayAdapter. Browser redirect is informational; only signed, server-verified provider notification/webhook becomes PaymentEvent authority. Launch payment categories are QRIS and bank transfer/Virtual Account only. E-wallet, card, OTC, BNPL, direct debit, and other methods are deferred. Merchant onboarding, exact method codes, fees, limits, refund coverage, webhook payloads, and sandbox evidence remain pre-production verification items. Second gateway/failover is deferred.</p>
+<p>Create Booking + OfferSnapshot + 10-minute SlotHold → create Midtrans Snap intent from snapshot amount → client completes hosted checkout → verify signed provider notification/webhook idempotently → settle Payment. Single-session success confirms Appointment; package success creates PackagePurchase + ordered SessionEntitlement and confirms first Appointment. Browser redirect never settles Payment. RefundAction is separate from Payment settlement and cancellation effects.
+Late verified success after hold expiry becomes paid_late/reconciliation-required; reacquire only the original slot atomically if free. If unavailable, create no Appointment or alternate slot automatically; Admin resolves explicitly.</p>
+<h2 id="settlement-uniqueness-adr-0093">Settlement uniqueness (ADR 0093)</h2>
+<p>For each <code>Booking.id</code> (and therefore each purchase intent), at most one <code>Payment</code> row is allowed to transition to <code>status = 'paid'</code> with <code>settled_at IS NOT NULL</code>. The invariant is enforced by a unique partial index <code>payment(booking_id) WHERE status = 'paid' AND settled_at IS NOT NULL</code> plus an application-level precheck inside the webhook handler transaction (defense-in-depth, following the same pattern as <code>ADR 0091</code> capacity overlap detection). Duplicate <code>PaymentEvent</code>s with distinct <code>provider_event_id</code> for the same <code>order_id</code> are absorbed by the idempotency record: the first event applies the state transition, subsequent events insert new <code>PaymentEvent</code> rows but perform a no-op transition and never insert a second <code>Payment</code>.</p>
+<p>Verified <code>PaymentEvent</code> requires value match, not just signature. <code>gross_amount</code>, <code>currency</code>, <code>order_id</code> (must equal <code>Booking.id</code>), and <code>merchant_id</code> (must equal configured Midtrans merchant) must match <code>OfferSnapshot</code> and <code>Booking.snapshotted_amount</code>. Mismatch is logged to <code>payment_event_mismatch_log</code> and the transaction is rolled back; no state transition occurs and Midtrans is contacted for investigation.</p>
+<p>Idempotency keys (<code>payment_event_idempotency</code> keyed by <code>(provider_event_id, payment_intent_id)</code>) are lifetime-scoped — no TTL — with a <code>payload_hash = sha256(canonical_json(payload))</code> fingerprint. Same key + same hash returns the existing event result; same key + different hash raises <code>idempotency_key_collision</code> and rolls back (no silent overwrite); different key + same payload is treated as a separate duplicate event with a no-op transition.</p>
+<p>Out-of-order and repeated-status mapping (full table in <code>ADR 0093 §4.1</code>): <code>capture</code>/<code>settlement</code> final → state transition; <code>pending</code> → no-op; <code>deny</code>/<code>cancel</code>/<code>expire</code>/<code>failure</code> → <code>Payment.status = 'failed'</code>; <code>refund</code>/<code>chargeback</code> → no-op on <code>Payment</code> (handled via <code>RefundAction</code>); <code>challenge</code> → admin review, no state change. <code>Payment.status</code> is a derived current projection and is never rewritten in place to represent historical changes.</p>
+<p>Crash window is split into three layers (see <code>ADR 0093 §1.2</code> and <code>IMPLEMENTATION-GUIDE.md §7.3</code>): (a) between provider API call and persistence — optimistic <code>Payment</code> insert + idempotency record in one transaction; (b) between verified webhook and state transition — webhook handler transaction wraps idempotency, <code>PaymentEvent</code>, value match, state transition, and outbox; (c) between transition and outbox delivery — transactional outbox pattern (<code>application_outbox</code>) with best-effort retry and dead-letter routing. Verified event + state transition + outbox must commit atomically.</p>
+<h2 id="paid_late-package-creation-adr-0093-5"><code>paid_late</code> package creation (ADR 0093 §5)</h2>
+<p>For late verified success (hold expired before webhook), <code>PackagePurchase</code> + ordered <code>SessionEntitlement</code> + <code>PackageValidity</code> are created at the moment the webhook is verified, not deferred. Two outcomes are possible:</p>
+<ul>
+<li><strong>Slot reacquire succeeds</strong> (atomic <code>CapacityReservation</code> claim per <code>ADR 0091</code>): <code>Payment.status = 'paid_late_slot_reacquired'</code>; <code>Booking.status = 'paid_late_slot_reacquired'</code>; <code>PackagePurchase.status = 'paid'</code>; <code>SessionEntitlement #1.state = 'scheduled'</code> linked to the reacquired Appointment; <code>SessionEntitlement #2..N.state = 'available'</code>; <code>PackageValidity.validity_start = now()</code>.</li>
+<li><strong>Slot reacquire fails</strong> (overlap or slot unavailable): <code>Payment.status = 'paid_late_first_session_pending'</code>; <code>Booking.status = 'paid_late_slot_unavailable'</code>; <code>PackagePurchase.status = 'paid_late'</code> with <code>requires_first_session_scheduling = true</code>; <code>SessionEntitlement #1.state = 'pending_schedule'</code>; <code>SessionEntitlement #2..N.state = 'available'</code>; <code>PackageValidity.validity_start = now()</code>. Admin resolves via the existing reconciliation flow (<code>ADR 0067</code>): schedule an alternative slot for entitlement #1, execute <code>full_refund</code> (which closes the package and cancels remaining entitlements), or hold for client decision via WhatsApp.</li>
+</ul>
+<p>The original <code>Booking.snapshotted_slot_id</code> is preserved for audit even when reacquire fails. <code>requires_first_session_scheduling</code> flags the package for Admin attention and is cleared once Admin resolves. No automatic refund or silent slot substitution occurs (consistent with <code>ADR 0059</code> and <code>ADR 0076</code> no-auto-cutoff).</p>
+<p>Payment is the append-only original transaction correlated with verified PaymentEvent records. Browser redirect never confirms it. States distinguish paid_late/reconciliation-required from failed. Refund financial status is summarized from append-only RefundAction records without overwriting Payment history. Launch RefundAction is full_refund for captured amount or no_refund as an audited non-disbursement outcome; partial monetary refund is deferred and never derived from entitlement count.</p>
+<p>Every refund outcome is an idempotent append-only RefundAction linked to original Payment and approved CancellationDecision or explicit Admin policy exception. Launch supports <code>full_refund</code> or <code>no_refund</code> only; partial monetary refunds are deferred. Record reason, policy/version, actor, approval, currency/amount where applicable, provider reference/status redacted, and reconciliation result. Full refund cannot exceed captured amount. One Admin may approve cancellation and execute the separate refund action; no second approval or threshold exists in MVP. Refund failure does not rewrite Payment or CancellationDecision and is handled through retry/reconciliation.</p>
+<h1 id="cms-and-authorization">CMS and authorization</h1>
+<p>Admin CMS launch surfaces: public program/content management; psychologist profile and protected credential verification status; ServiceOffering/Package revisions; future availability; Booking/Appointment; Payment/PaymentEvent/RefundAction; CancellationRequest/Decision; reschedule/outcome correction; PrivacyRequest; StaffMembership; audit.
+Admin Cancellation &amp; Refund Workspace: manual support context → request → pending → approve/deny → atomic cancellation/capacity/entitlement effect → separate full_refund/no_refund action. No separate Release Slot button, client self-service cancellation/refund, full chat transcript, or required WhatsApp task.</p>
+<p>Active staff launch roles:
+- Admin: catalog/revisions, availability overrides, Booking/Appointment, package, payment/refund, cancellation/reschedule/outcome correction, privacy, StaffMembership, policy, and audit actions.
+- Psychologist: own profile/availability inputs, assigned Appointment/SessionEntitlement actions, minimum operational client projection, and initial completed/no_show mark. No payment/refund, cancellation approval, identity merge, clinical record, or PrivacyRequest access.
+- Editor: future-capable ContentEntry/ContentRevision role, explicitly deferred/unassigned at launch; Admin publishes narrative content.
+- Client/guest: scoped ClientAccess only; no direct cancellation/refund or access to other records. SSO alone never grants a role.</p>
+<h1 id="privacy-consent-and-retention">Privacy, consent, and retention</h1>
+<p>Collect minimum transactional data with versioned ConsentRecord and purpose limitation. No clinical records, notes, diagnosis, assessment results, treatment details, crisis narratives, or automated triage.
+Joint sign-off: clinical/ethical consent wording, crisis boundary, and professional/service claims by clinical lead; data inventory, access, retention implementation, redaction/anonymization, and security controls by technical owner. Cross-cutting changes require both. PrivacyRequest is identity-verified and category-aware.</p>
+<p>Allowed: minimal Client/contact identity, verified email/phone, selected offering/package, price/duration/mode snapshots, slot/Appointment times, package/entitlement state, Payment/Refund references, ConsentRecord, Notification delivery metadata, audit/security metadata, and bounded non-clinical support metadata. No clinical notes/results/diagnosis/crisis narrative/raw WhatsApp transcript.
+Retention categories are separate: Client/contact, Booking/Appointment, Payment/Refund, ConsentRecord, Notification/DeliveryAttempt, Audit/security.</p>
+<p>Versioned, category-specific RetentionPolicy with purpose, trigger, duration, action, exception, and owner.
+- Client/contact and optional WhatsApp contact: 12 months after last active service.
+- Payment/PaymentEvent/RefundAction: applicable audit/legal policy; exact duration is policy-owner controlled.
+- ConsentRecord: while related service/data records are retained plus applicable policy/legal requirement.
+- Audit/security metadata: applicable audit/legal policy.
+After Client/contact eligibility: redact direct identifiers/contact fields, preserve a non-reversible pseudonymous reference only when minimum transactional/audit integrity requires it, and record the outcome. No clinical data category is introduced. For couple Booking, redaction applies per <code>BookingParticipant</code>: one partner's retention clock does not automatically redact the other partner; the joint Appointment is preserved as a pseudonymous record referencing both pseudonymous participants.</p>
+<h1 id="notifications-and-support">Notifications and support</h1>
+<p>Automated email is the primary channel for payment/Booking state, Appointment confirmation, schedule change/reschedule/cancellation decision, and default reminders at 24h/2h in Asia/Jakarta. Delivery failure never rolls back domain truth. Package expiry/remaining-session reminders require future offsets. Admin WhatsApp is the public-facing channel for cancellation/refund requests on a case-by-case basis; no automated provider, required trigger/task/SLA/frequency, acknowledgement gate, or lifecycle mutation. The public website does not host a cancellation or refund UI.</p>
+<h1 id="invariants-and-tests">Invariants and tests</h1>
+<p>Server-side invariants: no overlapping active SlotHold/Appointment for one psychologist including TransitionBuffer; one active hold per slot; one entitlement per active scheduled Appointment; sequential package scheduling cannot skip valid units without Admin override; verified payment/refund/webhook events are idempotent; CancellationDecision/RescheduleAction/OutcomeCorrection are versioned and atomic; duplicate retries cannot double-confirm, release, consume, restore, or refund.
+Late payment reacquisition uses the same atomic slot/psychologist overlap invariant as normal booking. A race with another hold/Appointment produces paid_late without an automatic alternate Appointment.
+Regeneration must lock/classify slot state before update: unheld/unbooked may withdraw/update, active SlotHold is preserved, Appointment-linked slot is immutable history. Late payment handles a preserved hold through ADR 0059.
+Restoration/re-consumption/extension is idempotent and atomic with CancellationDecision or OutcomeCorrection; expired entitlement cannot be scheduled without an explicit extension state.
+Cancellation approval is atomic/idempotent across Appointment, slot availability, entitlement restoration, and decision record. A slot is re-exposed only if future, valid, not held/booked by another transaction, and compatible with active offering/revision; otherwise the cancellation remains recorded without re-exposing capacity.
+No pre-decision or separate post-decision slot release command exists in MVP; the approval command owns cancellation, eligible release, and valid entitlement restoration atomically/idempotently.</p>
+<p>Launch-critical tests: program scope (only SERAYA PULANG bookable); catalog/mode/price/package snapshots; guest booking + 10-minute hold; Midtrans Snap QRIS/VA verified webhook authority; failed/late payment; sequential package entitlement; cancellation pending/approve/deny atomic effects; separate full_refund/no_refund; Google SSO + StaffMembership/RBAC; no clinical data; retention redaction; email reminders; mobile accessibility; retry/idempotency; audit completeness.</p>
+<p>Unit/domain invariants; PaymentGatewayAdapter/webhook contract tests; Midtrans sandbox integration; permission/security tests; browser/mobile UAT; privacy/retention/redaction checks; failure/retry/idempotency tests; revision-conflict tests for PRD infrastructure.</p>
+<h1 id="uat-and-release-gate">UAT and release gate</h1>
+<p>UAT for handoff/launch:
+1. All four public programs render; only SERAYA PULANG offers booking/payment.
+2. Counseling catalog shows online/offline 60-minute single/package/couple prices and full-upfront package behavior.
+3. Guest booking creates OfferSnapshot + 10-minute SlotHold; snapshot is stable.
+4. Midtrans Snap shows only QRIS and bank transfer/VA; redirect alone does not confirm; verified webhook confirms idempotently.
+5. Hold/payment failure and late payment produce correct release/paid_late/reconciliation behavior with no alternate auto-assignment.
+6. Package purchase creates ordered entitlements; completion/no_show consumes; valid approved cancellation restores sequence/expiry.
+7. Cancellation pending retains reservation; approve/deny is audited; approval atomically cancels/releases/restores; RefundAction is separate full_refund/no_refund.
+8. Google SSO requires invite/allowlist + StaffMembership; two Admin bootstrap; Psychologist scope works; Editor is denied/deferred.
+9. No clinical data is stored; consent version, retention, redaction, and pseudonymous-link behavior are verifiable.
+10. Email confirmation/reminders, mobile keyboard/focus/contrast/error states, retries/idempotency, and audit records pass.</p>
+<p>PRD/design handoff acceptance:
+- Core domain boundaries/lifecycles and ADR decisions are recorded.
+- Launch program/catalog, prices/modes/packages, one confirmed psychologist, active roles, gateway/method scope, cancellation/refund vocabulary, privacy ownership/retention strategy, and anonymization outcome are explicit.
+- Placeholders and remaining operational verification items are labeled: Midtrans merchant/sandbox evidence and exact activated method capability; production schedule/location replacing placeholder; credential/publication verification; policy-controlled durations; notification provider; recovery/runbooks.
+- No clinical-record workflow, non-Pulang booking/payment, client self-service cancellation/refund, partial refund, or Editor launch access is hidden in MVP.
+PRD/design handoff may proceed with explicit placeholders. Production launch requires UAT pass plus operational verification evidence and release sign-off.</p>
+<p>PRD/design handoff may proceed with explicit placeholders. Production release requires UAT pass, Midtrans merchant/sandbox and method/refund verification, two Admin memberships, verified psychologist/publication data, production schedule/location replacing <code>anytime/anyplace</code>, approved Consent/RetentionPolicy values, notification/payment failure runbooks, and owner release sign-off.</p>
+<h1 id="non-goals">Non-goals</h1>
+<p>No clinical record/EMR, diagnosis, assessment results, treatment/session notes, crisis intake/triage/risk scoring/escalation case management, client self-service cancellation/reschedule/refund, marketing automation, automatic identity dedupe, package installments, or automatic multi-psychologist transfer.
+No multi-gateway launch/failover, extra payment methods beyond QRIS/VA, partial monetary refund, per-entitlement price ledger/equal-split refund, Editor launch access, or production slots inferred from placeholder availability.
+No hard-delete cascade that destroys Payment/Refund/Audit integrity; no silent slot migration, package binding rewrite, automatic validity reset, or automatic alternate-slot assignment after late payment.
+No automated WhatsApp provider/lifecycle, required WhatsApp task/SLA/frequency, acknowledgement gate, fallback authority, or cancellation caused solely by unanswered WhatsApp. Optional Admin WhatsApp is manual support only.</p>
+<h1 id="decision-log">Decision log</h1>
+<p>Confirmed launch decisions:
+- Four program pillars are public; only SERAYA PULANG is bookable/paid.
+- SERAYA PULANG launches counseling first; assessment is deferred.
+- Counseling is online/offline, 60 minutes.
+- Individual/couple catalog prices and package sequence are recorded; packages are paid upfront in IDR.
+- Fuja Rahayu Kinanti is the only confirmed psychologist, serves individual/couple; availability is PRD placeholder <code>anytime/anyplace</code> and non-blocking for design.
+- Midtrans Snap is the single launch gateway; QRIS + bank transfer/VA only; second gateway and other methods deferred.
+- Payment truth is verified webhook/PaymentEvent; late payment is paid_late reconciliation; no alternate auto-assignment.
+- Cancellation has no automatic cutoff and is Admin case-by-case; pending preserves reservation.
+- CancellationDecision is approve/deny; approval atomically cancels/releases/restores; no separate Release Slot action.
+- RefundAction is separate and launch-limited to full_refund/no_refund; partial refund deferred; one Admin may execute both separate actions.
+- Admin + Psychologist active; Editor deferred. Staff use Google SSO + invite/allowlist + explicit StaffMembership; two Admin bootstrap.
+- Clinical/ethical and technical/data owners jointly sign off privacy/consent/retention.
+- Client/contact retention is 12 months; Payment/Refund and Audit/security follow applicable policy; Consent follows related records/policy; expiry redacts direct identifiers and preserves minimum pseudonymous links.
+- PRD/design handoff is allowed with explicit placeholders; production remains gated by UAT and operational evidence.
+- Couple package uses <code>BookingParticipant</code> (child of <code>Booking</code>) and <code>AppointmentParticipant</code> (child of <code>Appointment</code>) with three party roles (<code>participant_a</code>, <code>participant_b</code>, <code>payer</code>) and one derived relational label (<code>joint_attendees</code>); per-participant <code>ConsentRecord</code>, restricted cross-partner visibility, per-participant ClientAccess token, and withdrawal/no-show semantics for A/B/joint Sessions (<code>ADR 0090</code>); couple-package cancellation target resolution and atomic effects per <code>ADR 0095 §6</code>.
+- Appointment outcome taxonomy is five-valued (<code>completed</code>, <code>completed_partial</code>, <code>no_show</code> early T+15m checkpoint, <code>no_show_late</code> late arrival with session held, <code>cancelled</code>) per <code>ADR 0092</code>; only <code>cancelled</code> does not consume entitlement; <code>OutcomeCorrection</code> window 7×24 jam.
+- Settlement uniqueness (at-most-one successful payment per Booking intent, value match, idempotency-keyed outbox, late-paid package creation) per <code>ADR 0093</code>.
+- Cancellation matrix (target types, open-request invariant, race R1–R4, atomic package-wide effects, partial-package 1-of-N, repeat/correction, <code>RescheduleAction</code> table, couple override) per <code>ADR 0095</code>.</p>
+<h1 id="adr-index">ADR index</h1>
+<p>Working ADR index: docs/adr/0001–0095. Closure decisions 0067–0095 cover Admin cancellation/refund workspace, Midtrans Snap launch gateway, QRIS+bank transfer/VA scope, program/bookable scope, counseling catalog, launch psychologist, cancellation/refund/approval, staff access/bootstrap, privacy/retention/anonymization, PRD handoff vs production gate, the couple package participant model (<code>ADR 0090</code>), capacity overlap + TransitionBuffer (<code>ADR 0091</code>), appointment outcome timing + late-arrival correction (<code>ADR 0092</code>), settlement uniqueness + paid-late package creation (<code>ADR 0093</code>), intake/minor/eligibility/cutoff (<code>ADR 0094</code>), and the package cancellation matrix + outcome race resolution (<code>ADR 0095</code>). ADR 0064 is historical/superseded for required WhatsApp timing/task semantics; ADR 0066 governs optional manual support; ADR 0089 ratifies the Cloudflare Worker + D1 architecture; ADR 0090 governs the couple package <code>BookingParticipant</code>/<code>AppointmentParticipant</code> model; ADR 0095 closes <code>TBC-PACKAGE-CANCEL-01</code> and <code>TBC-RESCHEDULE-01</code>.</p></main><footer>Seraya Psikologi · Documentation generated from the repository · <a href="../../reference/index.html">Long-form reference</a></footer></div></body></html>

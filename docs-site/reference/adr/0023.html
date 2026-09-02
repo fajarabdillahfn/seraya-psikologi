@@ -1,0 +1,25 @@
+<!doctype html><html lang="id"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>ADR 0023 — Seraya Psikologi</title><link rel="stylesheet" href="../../assets/main.css"></head><body><div class="shell"><header class="site-header"><div><a class="brand" href="../../index.html">Seraya Psikologi</a><div class="subtitle">Project control center · MVP review</div></div><nav class="topnav"><a href="../../index.html">Overview</a><a href="../../workboard.html">Workboard</a><a href="../../prd/index.html">Focused PRDs</a><a href="../../reference/index.html">Reference</a></nav></header><div class="muted" style="font-size:.84rem;margin-bottom:18px"><a href="../../index.html">Home</a> / ADR</div><main><h1 id="23-make-verified-gateway-webhook-the-payment-truth-source">23. Make Verified Gateway Webhook the Payment Truth Source</h1>
+<h2 id="status">Status</h2>
+<p>Accepted for launch planning; Midtrans + Snap is resolved by ADR 0068 and the initial QRIS + bank transfer/Virtual Account scope by ADR 0069. Exact Midtrans signature/API verification, event retention, retry/dead-letter handling, method-level refund behavior, and reconciliation cadence remain open.</p>
+<h2 id="context">Context</h2>
+<p>Browser redirects can be interrupted, replayed, spoofed, or arrive before/after gateway settlement. A payment-gated Booking must not confirm an Appointment based on client-side claims.</p>
+<h2 id="decision">Decision</h2>
+<p>Use the gateway's signed webhook, with server-side verification, as the source of truth for payment state transitions. Record a PaymentEvent with provider event ID, verification outcome, processing status, and correlation. Process events idempotently; duplicate events must not create duplicate Appointment/entitlement confirmations.</p>
+<p>Browser redirect is informational only. It may show a pending/success view and ask the server for current state, but it cannot directly mutate Payment, Booking, or Appointment truth.</p>
+<h2 id="consequences">Consequences</h2>
+<p>Positive:</p>
+<ul>
+<li>payment confirmation is server-authoritative;</li>
+<li>duplicate/late webhook handling has a first-class event record;</li>
+<li>client manipulation cannot confirm an appointment;</li>
+<li>reconciliation can compare Payment with gateway events.</li>
+</ul>
+<p>Costs and constraints:</p>
+<ul>
+<li>webhook endpoint security and signature verification are required;</li>
+<li>gateway outages/late events need pending states and recovery;</li>
+<li>raw payload retention/redaction must be defined;</li>
+<li>UAT must simulate duplicate, out-of-order, invalid, and late events.</li>
+</ul>
+<h2 id="open-follow-up">Open follow-up</h2>
+<p>Choose provider-specific signature/API verification, event retention, retry/dead-letter handling, and reconciliation cadence. Late success after SlotHold expiry is resolved by ADR 0059.</p></main><footer>Seraya Psikologi · Documentation generated from the repository · <a href="../../reference/index.html">Long-form reference</a></footer></div></body></html>

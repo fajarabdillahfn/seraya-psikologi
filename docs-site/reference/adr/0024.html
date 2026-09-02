@@ -1,0 +1,25 @@
+<!doctype html><html lang="id"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>ADR 0024 — Seraya Psikologi</title><link rel="stylesheet" href="../../assets/main.css"></head><body><div class="shell"><header class="site-header"><div><a class="brand" href="../../index.html">Seraya Psikologi</a><div class="subtitle">Project control center · MVP review</div></div><nav class="topnav"><a href="../../index.html">Overview</a><a href="../../workboard.html">Workboard</a><a href="../../prd/index.html">Focused PRDs</a><a href="../../reference/index.html">Reference</a></nav></header><div class="muted" style="font-size:.84rem;margin-bottom:18px"><a href="../../index.html">Home</a> / ADR</div><main><h1 id="24-require-admin-review-for-single-session-cancellation">24. Require Admin Review for Single-session Cancellation</h1>
+<h2 id="status">Status</h2>
+<p>Accepted for the MVP working model; client/manual initiator, pending slot reservation, CancellationDecision separation, and Admin CMS execution surface are resolved by ADR 0024/0025/0051/0067. Review SLA/escalation, decision criteria, exact refund/credit outcomes, approval hierarchy, and package cancellation accounting remain open.</p>
+<h2 id="context">Context</h2>
+<p>The practice wants every single-session cancellation to be reviewed by an admin rather than automatically applying a cutoff/refund rule. A mutable <code>cancelled</code> boolean would lose who requested it, who decided, which policy version applied, and what happened to payment/slot state.</p>
+<h2 id="decision">Decision</h2>
+<p>All single-session cancellation flows enter a CancellationRequest review lifecycle. In MVP, the client raises the request through WhatsApp/manual support; Admin records the minimum intake and executes the review in the Admin Cancellation &amp; Refund Workspace (ADR 0067). ClientAccess does not directly create or execute cancellation. No automatic refund is issued solely from a client action or cutoff calculation. An authorized admin reviews the request, records an approve/deny decision and operational reason, applies the relevant versioned CancellationPolicy, and records the resulting Booking/Appointment/Payment/slot effects.</p>
+<p>The request and decision must not become a place for clinical notes. Package cancellation/refund remains a separate branch accounting for used and unused entitlements.</p>
+<h2 id="consequences">Consequences</h2>
+<p>Positive:</p>
+<ul>
+<li>business judgment is explicit and auditable;</li>
+<li>payment/refund and slot release do not happen accidentally;</li>
+<li>exceptional cases have a first-class operational record;</li>
+<li>public copy can accurately say cancellation is subject to review.</li>
+</ul>
+<p>Costs and constraints:</p>
+<ul>
+<li>admin workload and response time become part of user experience;</li>
+<li>pending cancellation needs notifications and status visibility;</li>
+<li>Booking/Appointment may remain active while review is pending, so slot handling needs a policy;</li>
+<li>refund reconciliation happens after review decision.</li>
+</ul>
+<h2 id="open-follow-up">Open follow-up</h2>
+<p>Define review SLA/escalation, decision criteria/outcomes and refund amounts, and package cancellation/entitlement accounting.</p></main><footer>Seraya Psikologi · Documentation generated from the repository · <a href="../../reference/index.html">Long-form reference</a></footer></div></body></html>

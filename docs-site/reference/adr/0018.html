@@ -1,0 +1,25 @@
+<!doctype html><html lang="id"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>ADR 0018 — Seraya Psikologi</title><link rel="stylesheet" href="../../assets/main.css"></head><body><div class="shell"><header class="site-header"><div><a class="brand" href="../../index.html">Seraya Psikologi</a><div class="subtitle">Project control center · MVP review</div></div><nav class="topnav"><a href="../../index.html">Overview</a><a href="../../workboard.html">Workboard</a><a href="../../prd/index.html">Focused PRDs</a><a href="../../reference/index.html">Reference</a></nav></header><div class="muted" style="font-size:.84rem;margin-bottom:18px"><a href="../../index.html">Home</a> / ADR</div><main><h1 id="18-bind-a-package-to-one-psychologist-and-offering">18. Bind a Package to One Psychologist and Offering</h1>
+<h2 id="status">Status</h2>
+<p>Accepted for the MVP working model; package binding is single psychologist/offering. If that bound offering becomes unavailable, ADR 0060 requires same-offering resolution first and explicit client-approved refund/credit/transfer exception; automatic transfer remains prohibited.</p>
+<h2 id="context">Context</h2>
+<p>A multi-session package needs stable continuity, duration/price semantics, availability generation, and refund accounting. Allowing sessions to move freely across psychologists or offerings would turn one package into a cross-catalog entitlement with many policy branches.</p>
+<h2 id="decision">Decision</h2>
+<p>A ServicePackage is bound to exactly one psychologist and one ServiceOffering for its normal lifecycle. All SessionEntitlement units and resulting Appointments inherit that binding.</p>
+<p>Changing psychologist or ServiceOffering is not normal client behavior. If the practice later needs an exception, an authorized admin must perform an audited transfer/replacement operation with explicit policy and notification effects.</p>
+<h2 id="consequences">Consequences</h2>
+<p>Positive:</p>
+<ul>
+<li>continuity expectations are clear to client and psychologist;</li>
+<li>package duration, price, and service semantics remain stable;</li>
+<li>availability and entitlement checks are simpler;</li>
+<li>refund/expiry calculations have fewer branches.</li>
+</ul>
+<p>Costs and constraints:</p>
+<ul>
+<li>client cannot casually switch provider inside a package;</li>
+<li>provider unavailability needs an admin exception policy;</li>
+<li>package publication must display the binding clearly before purchase;</li>
+<li>future transfer support needs a separate audited operation.</li>
+</ul>
+<h2 id="open-follow-up">Open follow-up</h2>
+<p>Define package-unavailability resolution SLA, eligible events, client response timeout, refund/credit formula, extension behavior, and transfer terms/consent under ADR 0060.</p></main><footer>Seraya Psikologi · Documentation generated from the repository · <a href="../../reference/index.html">Long-form reference</a></footer></div></body></html>

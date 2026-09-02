@@ -1,0 +1,40 @@
+<!doctype html><html lang="id"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>ADR 0067 — Seraya Psikologi</title><link rel="stylesheet" href="../../assets/main.css"></head><body><div class="shell"><header class="site-header"><div><a class="brand" href="../../index.html">Seraya Psikologi</a><div class="subtitle">Project control center · MVP review</div></div><nav class="topnav"><a href="../../index.html">Overview</a><a href="../../workboard.html">Workboard</a><a href="../../prd/index.html">Focused PRDs</a><a href="../../reference/index.html">Reference</a></nav></header><div class="muted" style="font-size:.84rem;margin-bottom:18px"><a href="../../index.html">Home</a> / ADR</div><main><h1 id="67-execute-cancellation-and-refund-through-admin-cms">67. Execute Cancellation and Refund Through Admin CMS</h1>
+<h2 id="status">Status</h2>
+<p>Accepted; Admin CMS execution and automatic atomic release of eligible future capacity on approved cancellation are resolved. Exact Admin fields, decision vocabulary, approval hierarchy, and gateway reconciliation remain open.</p>
+<h2 id="context">Context</h2>
+<p>Cancellation/refund is discussed manually through WhatsApp, but the operational result must not live only in chat. Admin needs one back-office/CMS surface to find the transaction, record the decision, release future capacity, restore package entitlement when applicable, and record a separate financial action.</p>
+<h2 id="decision">Decision</h2>
+<p>Add an Admin-only Cancellation &amp; Refund Workspace to the CMS/backoffice. From a Booking/Appointment/PackagePurchase detail, Admin may:</p>
+<ol>
+<li>create or open the minimum <code>CancellationRequest</code> intake after the WhatsApp discussion;</li>
+<li>record an append-only <code>CancellationDecision</code> with outcome, reason/category, policy version, actor/time, and intended operational effects;</li>
+<li>approve or deny the request through an idempotent atomic command. Approval and release are one operation; MVP has no separate <code>Release Slot</code> command. If the slot is future and reusable, the same command returns it to availability; otherwise it records why capacity was not re-exposed;</li>
+<li>record or initiate a separate <code>RefundAction</code> when the decision/policy calls for it;</li>
+<li>view the resulting Appointment, slot, entitlement, Payment, and audit history.</li>
+</ol>
+<p>For an approved cancellation:</p>
+<ul>
+<li>the Appointment remains as historical record and moves to <code>cancelled</code>;</li>
+<li>if its future AvailabilitySlot is still a valid reusable capacity, the slot is released/returned to availability atomically; a past, expired, withdrawn, or otherwise invalid slot is not re-exposed;</li>
+<li>a package SessionEntitlement is restored to its original sequence and expiry if policy allows; expired entitlement remains closed unless a separate audited extension is granted;</li>
+<li>RefundAction is separate from the schedule effect. A refund can be pending, failed, reversed, or denied without rewriting the CancellationDecision or original Payment history.</li>
+</ul>
+<p>While the request is pending, Appointment and slot remain confirmed/reserved. Denial leaves the booking, Appointment, slot, entitlement, and Payment state intact. Approval, Appointment cancellation, eligible slot release, and valid entitlement restoration are one atomic/idempotent operation; there is no separate release step in MVP. Corrections create a new audited decision rather than editing history.</p>
+<p>WhatsApp remains the discussion/support channel, not the command authority. The workspace must not store clinical notes or require full chat transcript storage.</p>
+<h2 id="consequences">Consequences</h2>
+<p>Positive:</p>
+<ul>
+<li>Admin gets an explicit operational tool without exposing client self-service cancellation;</li>
+<li>released future capacity can be sold again safely;</li>
+<li>schedule, entitlement, and financial effects are separately traceable;</li>
+<li>WhatsApp conversation and system-of-record responsibilities stay separated.</li>
+</ul>
+<p>Costs and constraints:</p>
+<ul>
+<li>atomic/idempotent command and concurrency checks are required;</li>
+<li>Admin must enter a minimal reason/effect record;</li>
+<li>refund gateway/reconciliation remains separate operational work;</li>
+<li>past/invalid slots need a visible non-reusable outcome.</li>
+</ul>
+<h2 id="open-follow-up">Open follow-up</h2>
+<p>Define exact Admin form fields, decision vocabulary, approval hierarchy, refund initiation/retry behavior, client notification after the decision, and visible result handling for a slot that cannot be re-exposed. Do not add a separate pre/post-approval slot-release action unless a later policy explicitly supersedes this ADR.</p></main><footer>Seraya Psikologi · Documentation generated from the repository · <a href="../../reference/index.html">Long-form reference</a></footer></div></body></html>

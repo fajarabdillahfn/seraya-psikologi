@@ -1,0 +1,23 @@
+<!doctype html><html lang="id"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>ADR 0012 — Seraya Psikologi</title><link rel="stylesheet" href="../../assets/main.css"></head><body><div class="shell"><header class="site-header"><div><a class="brand" href="../../index.html">Seraya Psikologi</a><div class="subtitle">Project control center · MVP review</div></div><nav class="topnav"><a href="../../index.html">Overview</a><a href="../../workboard.html">Workboard</a><a href="../../prd/index.html">Focused PRDs</a><a href="../../reference/index.html">Reference</a></nav></header><div class="muted" style="font-size:.84rem;margin-bottom:18px"><a href="../../index.html">Home</a> / ADR</div><main><h1 id="12-use-asiajakarta-as-operational-timezone">12. Use Asia/Jakarta as Operational Timezone</h1>
+<h2 id="status">Status</h2>
+<p>Accepted for the MVP working model.</p>
+<h2 id="context">Context</h2>
+<p>Availability rules, appointment slots, cancellation cutoffs, reminders, and payment/booking expiry need one operational interpretation. Browser or client timezone must not silently change when a psychologist is available.</p>
+<h2 id="decision">Decision</h2>
+<p>Use <code>Asia/Jakarta</code> as Seraya's canonical operational timezone. Store unambiguous timestamps/instants for events and retain the timezone ID needed to render and audit rule-based times. Display may be localized for a client later, but the schedule source of truth remains Asia/Jakarta.</p>
+<h2 id="consequences">Consequences</h2>
+<p>Positive:</p>
+<ul>
+<li>one consistent schedule and policy interpretation;</li>
+<li>cutoff and reminder tests have a stable basis;</li>
+<li>browser locale cannot create accidental slot shifts;</li>
+<li>future multi-timezone display can be added without changing the business source of truth.</li>
+</ul>
+<p>Costs and constraints:</p>
+<ul>
+<li>timezone-aware libraries and DST/transition tests are still required even if Jakarta currently has no DST;</li>
+<li>APIs must define whether input is local operational time or an absolute instant;</li>
+<li>notifications need explicit formatting rules.</li>
+</ul>
+<h2 id="open-follow-up">Open follow-up</h2>
+<p>Define timestamp representation, slot boundary semantics, and whether any future remote psychologist/location can opt into another operational timezone.</p></main><footer>Seraya Psikologi · Documentation generated from the repository · <a href="../../reference/index.html">Long-form reference</a></footer></div></body></html>

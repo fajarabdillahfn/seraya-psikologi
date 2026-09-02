@@ -1,0 +1,23 @@
+<!doctype html><html lang="id"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>ADR 0084 — Seraya Psikologi</title><link rel="stylesheet" href="../../assets/main.css"></head><body><div class="shell"><header class="site-header"><div><a class="brand" href="../../index.html">Seraya Psikologi</a><div class="subtitle">Project control center · MVP review</div></div><nav class="topnav"><a href="../../index.html">Overview</a><a href="../../workboard.html">Workboard</a><a href="../../prd/index.html">Focused PRDs</a><a href="../../reference/index.html">Reference</a></nav></header><div class="muted" style="font-size:.84rem;margin-bottom:18px"><a href="../../index.html">Home</a> / ADR</div><main><h1 id="84-retain-payment-and-refund-records-by-auditlegal-policy">84. Retain Payment and Refund Records by Audit/Legal Policy</h1>
+<h2 id="status">Status</h2>
+<p>Accepted for launch planning; exact duration remains a policy-owner follow-up.</p>
+<h2 id="context">Context</h2>
+<p>Payment, PaymentEvent, and RefundAction records carry financial/audit integrity and cannot follow the 12-month Client/contact retention window. The team has not selected a fixed duration independent of applicable audit/legal requirements.</p>
+<h2 id="decision">Decision</h2>
+<p>Retain Payment/PaymentEvent/RefundAction records for the period required by the applicable audit/legal policy, with the final duration recorded in a versioned <code>RetentionPolicy</code> by the joint policy owners. Preserve the minimum redacted financial/reference data needed for reconciliation, audit, dispute handling, and domain integrity. Do not cascade-delete or anonymize away the original financial relationship merely because Client/contact data reaches its 12-month window.</p>
+<p>This decision does not claim a specific legal duration. Until the policy value is entered, the implementation must treat Payment/Refund retention as a protected category and fail closed against destructive deletion.</p>
+<h2 id="consequences">Consequences</h2>
+<p>Positive:</p>
+<ul>
+<li>avoids inventing a legal/accounting duration;</li>
+<li>separates financial integrity from Client/contact minimization;</li>
+<li>keeps retention policy versioned and auditable.</li>
+</ul>
+<p>Costs and constraints:</p>
+<ul>
+<li>launch still needs the policy owner to record the applicable duration/trigger;</li>
+<li>deletion/privacy workflows need category-specific exceptions;</li>
+<li>provider references and reports must be redacted/minimized without losing reconciliation ability.</li>
+</ul>
+<h2 id="open-follow-up">Open follow-up</h2>
+<p>Record the applicable audit/legal basis, duration, trigger, policy owner, redaction fields, dispute/chargeback exceptions, and operational reconciliation evidence.</p></main><footer>Seraya Psikologi · Documentation generated from the repository · <a href="../../reference/index.html">Long-form reference</a></footer></div></body></html>

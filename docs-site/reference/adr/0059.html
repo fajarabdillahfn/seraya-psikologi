@@ -1,0 +1,31 @@
+<!doctype html><html lang="id"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>ADR 0059 — Seraya Psikologi</title><link rel="stylesheet" href="../../assets/main.css"></head><body><div class="shell"><header class="site-header"><div><a class="brand" href="../../index.html">Seraya Psikologi</a><div class="subtitle">Project control center · MVP review</div></div><nav class="topnav"><a href="../../index.html">Overview</a><a href="../../workboard.html">Workboard</a><a href="../../prd/index.html">Focused PRDs</a><a href="../../reference/index.html">Reference</a></nav></header><div class="muted" style="font-size:.84rem;margin-bottom:18px"><a href="../../index.html">Home</a> / ADR</div><main><h1 id="59-reconcile-late-payment-after-slothold-expiry">59. Reconcile Late Payment After SlotHold Expiry</h1>
+<h2 id="status">Status</h2>
+<p>Accepted for the MVP working model; exact admin resolution options, SLA, refund timing, and gateway reversal behavior remain open.</p>
+<h2 id="context">Context</h2>
+<p>A signed/verified PaymentEvent can arrive after the 10-minute SlotHold has expired. Treating it as payment failure loses financial truth; automatically creating an Appointment risks double booking or assigning a different time without consent.</p>
+<h2 id="decision">Decision</h2>
+<p>When a verified payment success arrives after SlotHold expiry:</p>
+<ol>
+<li>record Payment as paid and the checkout/Booking attempt as <code>paid_late</code>/reconciliation-required;</li>
+<li>atomically check whether the original AvailabilitySlot is still free under current offering, buffer, and concurrency rules;</li>
+<li>if it is free, reacquire the original slot and confirm the intended Appointment;</li>
+<li>if it is not free, do not create or auto-assign another Appointment. Keep Payment paid-late and route it to an Admin resolution flow for refund, reversal, or a client-approved alternative.</li>
+</ol>
+<p>The late event is idempotent by provider event ID/payment correlation. A browser redirect never changes this outcome. No silent refund or silent slot substitution occurs.</p>
+<h2 id="consequences">Consequences</h2>
+<p>Positive:</p>
+<ul>
+<li>financial truth is preserved;</li>
+<li>the client's original intent is honored when safe;</li>
+<li>no accidental double booking or surprise reassignment;</li>
+<li>the unavailable-slot case is explicit and supportable.</li>
+</ul>
+<p>Costs and constraints:</p>
+<ul>
+<li><code>paid_late</code>/reconciliation state and Admin tooling are needed;</li>
+<li>atomic slot re-acquisition must share the normal overlap invariant;</li>
+<li>refund/reversal timing and communication need policy;</li>
+<li>gateway reconciliation must distinguish paid-late from failed payment.</li>
+</ul>
+<h2 id="open-follow-up">Open follow-up</h2>
+<p>Define Admin resolution SLA/options, client notification, refund/reversal timing, payment-method constraints, and whether a manually approved alternative requires a new Appointment or replacement action.</p></main><footer>Seraya Psikologi · Documentation generated from the repository · <a href="../../reference/index.html">Long-form reference</a></footer></div></body></html>
