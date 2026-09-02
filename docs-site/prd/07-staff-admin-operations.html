@@ -1,28 +1,262 @@
 <!doctype html><html lang="id"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>PRD 07 — Staff &amp; Admin Operations — Seraya Psikologi</title><link rel="stylesheet" href="../assets/main.css"></head><body><div class="shell"><header class="site-header"><div><a class="brand" href="../index.html">Seraya Psikologi</a><div class="subtitle">Project control center · MVP review</div></div><nav class="topnav"><a href="../index.html">Overview</a><a href="../workboard.html">Workboard</a><a href="../prd/index.html">Focused PRDs</a><a href="../reference/index.html">Reference</a></nav></header><div class="muted" style="font-size:.84rem;margin-bottom:18px"><a href="../index.html">Home</a> / Focused PRD</div><main><h1 id="prd-07-staff-admin-operations">PRD 07 — Staff &amp; Admin Operations</h1>
+<p>Status: <strong>Business review in progress</strong> (2026-09-02). Roles, bootstrap, and operational procedures are now defined.</p>
 <h2 id="goal">Goal</h2>
-<p>Give authorized staff the minimum workspace needed to verify payment and operate bookings safely.</p>
+<p>Give authorized staff the minimum workspace needed to verify payment, operate bookings, and maintain the schedule and holidays. The launch is single-tenant with a small staff: one Superadmin, at least one Admin, and one psychologist (Fuja Rahayu Kinanti). All operational work happens on the Admin dashboard, and staff identity is verified through Google SSO.</p>
 <h2 id="roles">Roles</h2>
 <ul>
-<li>Admin: operational review and privileged commands.</li>
-<li>Psychologist: scoped access to relevant appointments/clients only.</li>
-<li>Client: scoped booking access; no global account required for MVP.</li>
+<li><strong>Superadmin</strong>: single bootstrap account. Owns platform configuration, staff membership, role assignment, and the holiday/schedule exception calendar. The Superadmin is also able to perform any Admin action when needed.</li>
+<li><strong>Admin</strong>: verifies payments, records and verifies payment evidence, decides cancellation and refund, runs the cancellation/refund workflow, maintains the holiday calendar, and updates withdrawal notes. Admins are operational. The launch requires at least one Admin in addition to the Superadmin.</li>
+<li><strong>Psychologist</strong>: Fuja Rahayu Kinanti for launch. Has scoped access to confirmed appointments where the psychologist is the assigned provider. May not view other clients, other bookings, payment evidence, or full profile data outside the booking’s operational fields.</li>
 </ul>
-<h2 id="current-state">Current state</h2>
-<p>The live MVP uses a clearly labeled placeholder auth gate for development. It is not production staff authentication.</p>
-<h2 id="production-requirements">Production requirements</h2>
+<p>The Client role is covered in PRD 01 and PRD 06.</p>
+<h2 id="bootstrap">Bootstrap</h2>
 <ul>
-<li>Google SSO identity verification.</li>
-<li>Explicit StaffMembership record.</li>
-<li>Role assignment and two-Admin bootstrap.</li>
-<li>Session lifecycle: state/nonce, cookie, CSRF, re-authentication, revocation, and recovery.</li>
-<li>Audit trail for payment/cancellation/refund actions.</li>
+<li><strong>Superadmin</strong>: one. The Superadmin is created out-of-band by the operator who runs the platform, then logs in with Google SSO and is bound to a <code>StaffMembership</code> row. The Superadmin cannot be removed or demoted by any other role.</li>
+<li><strong>Admin</strong>: any number, with the launch requirement of at least one Admin besides the Superadmin. The two-Admin bootstrap is preserved: there is always at least one Admin besides the Superadmin, and the bootstrap procedure is owned by PRD 07.</li>
+<li><strong>Psychologist</strong>: one for launch. A new psychologist can be invited only by the Superadmin.</li>
+<li>No self-signup. All staff are invited; the invite flow uses a signed token sent to a verified Google account.</li>
 </ul>
-<h2 id="admin-payment-procedure">Admin payment procedure</h2>
-<p>Receive proof in WhatsApp → identify booking → record proof → verify/reject → confirm client through the approved channel → retain evidence per approved policy.</p>
+<h2 id="session-and-access">Session and access</h2>
+<ul>
+<li>All staff sign in with <strong>Google SSO</strong>. The Google account email is the staff identity.</li>
+<li>The staff session is bound to a <code>StaffMembership</code> row. The role (<code>superadmin</code>, <code>admin</code>, <code>psychologist</code>) is read from the membership, not from the SSO claim.</li>
+<li>Session is HTTP-only, secure, and short-lived, with refresh tokens handled by the platform session manager. The exact session lifetime is operational and is owned by PRD 07.</li>
+<li>Sessions, role checks, and audit events are recorded for every privileged action.</li>
+<li>Role changes and staff removals are recorded in the audit trail. Removing the last Admin (other than the Superadmin) is protected: the system refuses the action and prompts the operator to appoint a replacement first.</li>
+<li>Recovery: a lost Superadmin account is recovered through a documented out-of-band process, not a self-service reset. The process is owned by PRD 07.</li>
+</ul>
+<h2 id="access-matrix">Access matrix</h2>
+<table>
+<thead>
+<tr>
+<th>Capability</th>
+<th>Superadmin</th>
+<th>Admin</th>
+<th>Psychologist</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Verify or reject payment</td>
+<td>Yes</td>
+<td>Yes</td>
+<td>No</td>
+</tr>
+<tr>
+<td>Record or upload payment evidence</td>
+<td>Yes</td>
+<td>Yes</td>
+<td>No</td>
+</tr>
+<tr>
+<td>Approve or reject cancellation/refund</td>
+<td>Yes</td>
+<td>Yes</td>
+<td>No</td>
+</tr>
+<tr>
+<td>Refund execution and refund evidence</td>
+<td>Yes</td>
+<td>Yes</td>
+<td>No</td>
+</tr>
+<tr>
+<td>Mark a date or slot as withdrawn, with public reason</td>
+<td>Yes</td>
+<td>Yes</td>
+<td>No</td>
+</tr>
+<tr>
+<td>Maintain holiday and recurring-exception calendar</td>
+<td>Yes</td>
+<td>Yes</td>
+<td>No</td>
+</tr>
+<tr>
+<td>Manage staff membership and roles</td>
+<td>Yes</td>
+<td>No</td>
+<td>No</td>
+</tr>
+<tr>
+<td>Read full client profile</td>
+<td>Yes</td>
+<td>Yes</td>
+<td>No (scoped to operational fields)</td>
+</tr>
+<tr>
+<td>Read psychologist-shared fields for a confirmed booking</td>
+<td>Yes</td>
+<td>Yes</td>
+<td>Yes (own bookings only)</td>
+</tr>
+<tr>
+<td>Read full payment evidence detail for any booking</td>
+<td>Yes</td>
+<td>Yes</td>
+<td>No</td>
+</tr>
+<tr>
+<td>Read audit log</td>
+<td>Yes</td>
+<td>Yes</td>
+<td>No (own action audit only)</td>
+</tr>
+</tbody>
+</table>
+<h2 id="admin-dashboard">Admin dashboard</h2>
+<p>All operational work happens on the Admin dashboard, surfaced as separate queues. Each queue shows the data Admin needs and a clear primary action.</p>
+<h3 id="payment-verification-queue">Payment verification queue</h3>
+<ul>
+<li>Lists bookings in <code>pending_manual_payment</code> with payment proof pending or submitted.</li>
+<li>For each booking, Admin can:</li>
+<li>Open the booking detail and the immutable OfferSnapshot.</li>
+<li>Open the payment evidence (file/URL) recorded by Admin from WhatsApp.</li>
+<li>Mark the booking as <strong>Verified</strong> or <strong>Rejected</strong>, with a short reason.</li>
+<li>Add a manual note (for example, the top-up conversation or the overpayment return).</li>
+</ul>
+<h3 id="cancellationrefund-queue">Cancellation/refund queue</h3>
+<ul>
+<li>Lists bookings by <code>cancellation_status</code>: <code>requested</code>, <code>approved</code>, <code>rejected</code>, <code>refund_pending</code>, <code>refund_completed</code>, <code>refund_failed</code>.</li>
+<li>For each booking, Admin can:</li>
+<li>Open the WhatsApp screenshot evidence and any previous notes.</li>
+<li>Move the booking from <code>requested</code> to <code>approved</code> or <code>rejected</code>.</li>
+<li>When approving, decide <code>full_refund</code> or <code>no_refund</code>.</li>
+<li>When <code>full_refund</code> is chosen, the queue shows the refund as <code>refund_pending</code> until Admin uploads the transfer proof, then moves to <code>refund_completed</code>.</li>
+<li>If the refund transfer fails, Admin can move the booking to <code>refund_failed</code> and retry.</li>
+</ul>
+<h3 id="schedule-and-holiday-calendar">Schedule and holiday calendar</h3>
+<ul>
+<li>Lists days for the next 90 days.</li>
+<li>For each day, Admin can:</li>
+<li>Mark it as a one-off closed day (with a short internal reason).</li>
+<li>Remove a one-off closed day.</li>
+<li>The recurring weekly closed-day pattern is configured in a separate <strong>Recurring Exception</strong> panel.</li>
+<li>Mark a specific slot as withdrawn, with a short internal reason that is not shown to the client.</li>
+</ul>
+<h3 id="booking-and-client-queue">Booking and client queue</h3>
+<ul>
+<li>Lists recent bookings with state, <code>cancellation_status</code>, and any open issues.</li>
+<li>Filter by state, by service, by psychologist, and by date.</li>
+<li>Open a booking to see the profile (full for Admin and Superadmin, scoped for Psychologist), the slot history, the payment evidence, and the cancellation/refund history.</li>
+</ul>
+<h3 id="staff-and-role-management">Staff and role management</h3>
+<ul>
+<li>Available to the Superadmin only.</li>
+<li>Lists the current staff, with role, status (active/disabled), and last-seen time.</li>
+<li>The Superadmin can invite, change role, or disable staff.</li>
+<li>The Superadmin cannot disable itself, and cannot remove the last active Admin.</li>
+</ul>
+<h2 id="operational-procedures">Operational procedures</h2>
+<h3 id="verify-or-reject-a-payment">Verify or reject a payment</h3>
+<ol>
+<li>Admin receives the proof through Admin WhatsApp from the client.</li>
+<li>Admin opens the payment verification queue and selects the booking.</li>
+<li>Admin records the proof metadata and uploads the screenshot or text reference.</li>
+<li>Admin checks the bank account or QRIS history for the matching transfer.</li>
+<li>Admin clicks <strong>Verify</strong> or <strong>Reject</strong>, with a short reason.</li>
+<li>The system updates the booking and the payment proof atomically. The verified invoice is generated by PRD 02 at this point.</li>
+<li>Admin contacts the client through Admin WhatsApp to confirm the outcome.</li>
+</ol>
+<h3 id="underpayment">Underpayment</h3>
+<ol>
+<li>Admin sees the difference between the booking amount and the transfer amount.</li>
+<li>Admin contacts the client through Admin WhatsApp and records the top-up request.</li>
+<li>The booking remains in <code>pending_manual_payment</code> (or a parallel admin state if added later). The slot hold may be extended at Admin’s discretion.</li>
+<li>When the top-up is received, Admin re-runs the verification step.</li>
+</ol>
+<h3 id="overpayment">Overpayment</h3>
+<ol>
+<li>Admin contacts the client through Admin WhatsApp to inform them of the overpayment and the returned amount.</li>
+<li>Admin returns the difference to the client through the agreed manual channel.</li>
+<li>Admin records the return in the payment proof notes and uploads the transfer proof.</li>
+<li>The booking can be <code>confirmed</code> for the full service price; the refund is logged as a separate <code>RefundAction</code> later.</li>
+</ol>
+<h3 id="cancellation">Cancellation</h3>
+<ol>
+<li>Admin receives the cancellation request through Admin WhatsApp.</li>
+<li>Admin uploads the WhatsApp screenshot evidence and records the request in the queue.</li>
+<li>Admin decides <code>approved</code> or <code>rejected</code>, with a short reason.</li>
+<li>On <code>approved</code>, the booking is closed and the slot/capacity is released or rolled back per the cancellation matrix. On <code>rejected</code>, the booking remains <code>confirmed</code> with a reason recorded.</li>
+</ol>
+<h3 id="refund-execution">Refund execution</h3>
+<ol>
+<li>Admin records the chosen refund outcome (<code>full_refund</code> or <code>no_refund</code>) in the queue.</li>
+<li>For <code>full_refund</code>, Admin returns the money through the agreed manual channel.</li>
+<li>Admin uploads the transfer proof and the booking moves to <code>refund_completed</code>. If the transfer fails, Admin moves the booking to <code>refund_failed</code> and retries.</li>
+</ol>
+<h3 id="holiday-and-exception-management">Holiday and exception management</h3>
+<ol>
+<li>Admin opens the schedule and holiday calendar.</li>
+<li>Admin marks closed days (one-off or recurring) and adds a short internal reason.</li>
+<li>Admin can mark individual slots as withdrawn.</li>
+<li>The same calendar view is exposed to the Superadmin, and the Superadmin can override.</li>
+</ol>
+<h3 id="staff-onboarding-and-offboarding">Staff onboarding and offboarding</h3>
+<ol>
+<li>Superadmin invites a new staff member by their verified Google account email.</li>
+<li>The new staff member signs in with Google SSO and is bound to a <code>StaffMembership</code> row.</li>
+<li>Offboarding is initiated by the Superadmin by disabling the staff membership. The disabled staff loses access immediately; their audit history is retained.</li>
+<li>The Superadmin cannot disable itself. The system refuses the last-Admin removal and prompts for a replacement.</li>
+</ol>
+<h2 id="service-level-targets">Service-level targets</h2>
+<p>The launch SLA for staff responses is:</p>
+<ul>
+<li><strong>Admin responds to client requests within 1 hour, between 08.00 and 20.00 WIB.</strong> Outside that window, the response is delayed to the next window. The Admin WhatsApp number is configured with an out-of-hours message that says the response is in the next window.</li>
+<li>The Superadmin responds within the same window for staff or platform-level issues.</li>
+<li>The psychologist responds to booking conversations through Admin WhatsApp, with the same window for the first response.</li>
+</ul>
+<p>The SLA is a target, not a hard contract. The system records the response timestamp in the audit trail; the operator uses the trail to review whether the SLA is being met.</p>
+<h2 id="audit-trail">Audit trail</h2>
+<p>Every privileged action records:</p>
+<ul>
+<li><code>actor_membership_id</code></li>
+<li><code>actor_role</code> at the time of action</li>
+<li><code>actor_at</code> (ISO 8601 timestamp)</li>
+<li><code>action</code> (for example, <code>payment.verify</code>, <code>payment.reject</code>, <code>cancellation.approve</code>, <code>refund.complete</code>, <code>schedule.withdraw_slot</code>, <code>holiday.set</code>, <code>staff.invite</code>, <code>staff.disable</code>, <code>staff.change_role</code>)</li>
+<li><code>subject_type</code> and <code>subject_id</code> (for example, the booking, the slot, the staff membership)</li>
+<li><code>decision_reason</code> (short free text)</li>
+<li><code>evidence_file_url</code> (when applicable)</li>
+<li><code>request_id</code> (a per-request id used to correlate with logs)</li>
+</ul>
+<p>The audit trail is append-only. It is the source of truth for the SLA, for the cancellation/refund history, and for any internal review.</p>
 <h2 id="acceptance-checks">Acceptance checks</h2>
 <ul>
-<li>Unauthenticated requests cannot reach privileged commands.</li>
-<li>Psychologist cannot see unrelated clients/bookings.</li>
-<li>Admin verification is atomic and idempotent.</li>
-<li>Last-Admin removal/recovery is protected.</li>
+<li>All staff sign in with Google SSO. There is no email/password fallback.</li>
+<li>Roles are read from the <code>StaffMembership</code> row, not from the SSO claim.</li>
+<li>Removing the last Admin (other than the Superadmin) is rejected.</li>
+<li>Removing or demoting the Superadmin is impossible through the dashboard.</li>
+<li>The psychologist cannot read other clients, other bookings, payment evidence, or full profile fields outside the scoped view.</li>
+<li>The payment queue shows the difference between the booking amount and the transfer amount.</li>
+<li>The cancellation/refund queue allows the status transitions defined in PRD 05 and writes the evidence required.</li>
+<li>The holiday and exception calendar is a single source of truth shared with the public slot list.</li>
+<li>Every privileged action is recorded in the audit trail with actor, role, timestamp, action, subject, reason, and evidence.</li>
+<li>Out-of-hours response SLA is configured as the default behavior, with the wording set in the Admin WhatsApp out-of-hours message.</li>
+<li>Operational procedures are documented and reachable from the Admin dashboard (for example, as a help link), not only from this PRD.</li>
+</ul>
+<h2 id="still-open-for-this-prd">Still open for this PRD</h2>
+<ul>
+<li>Exact session lifetime, refresh policy, and CSRF defenses. Operational defaults are recorded; the final values are owned by PRD 07.</li>
+<li>Out-of-hours Admin WhatsApp message wording. Placeholder is acceptable during development; the final wording is owned by PRD 03 and the launch review.</li>
+<li>Holiday calendar source. The Admin maintains the list in the dashboard. A future integration with a national-holiday API is out of scope for the launch.</li>
+<li>The exact list of withdrawal reasons and the wording shown to the client. The PRD records the requirement; the catalog is operational.</li>
+<li>The on-call rotation or the escalation path when the primary Admin is unavailable. The launch does not require a formal on-call; the Superadmin can perform Admin actions in the launch.</li>
+<li>The minimum evidence retention window for staff actions, aligned with PRD 06.</li>
+<li>The two-Admin bootstrap procedure when the platform goes live for the first time, including how the second Admin is invited and verified.</li>
+</ul>
+<h2 id="references">References</h2>
+<ul>
+<li><code>docs/prd/01-booking-flow.md</code></li>
+<li><code>docs/prd/02-payment-flow.md</code></li>
+<li><code>docs/prd/04-availability-scheduling.md</code></li>
+<li><code>docs/prd/05-cancellation-refund.md</code></li>
+<li><code>docs/prd/06-privacy-consent.md</code></li>
+<li><code>docs/adr/0079-launch-staff-roles.md</code></li>
+<li><code>docs/adr/0080-google-sso-staff-access.md</code></li>
+<li><code>docs/adr/0081-two-admin-bootstrap.md</code></li>
+</ul>
+<h2 id="change-log">Change log</h2>
+<ul>
+<li>2026-09-02: Initial role and bootstrap rules from the Round 2 review.</li>
+<li>2026-09-02: Recorded product-owner decisions: roles Superadmin/Admin/Psychologist; one Superadmin; free capacity for Admin and Psychologist; the Admin dashboard is the only place where payment verification, cancellation/refund, schedule exceptions, and staff onboarding are performed; Admin response SLA is 1 hour, between 08.00 and 20.00 WIB, with the rest of the day falling to the next window.</li>
 </ul></main><footer>Seraya Psikologi · generated from repository · <a href="../reference/index.html">Long-form reference</a></footer></div></body></html>
