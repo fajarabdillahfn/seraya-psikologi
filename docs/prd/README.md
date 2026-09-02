@@ -6,7 +6,7 @@ These are intentionally small and reviewable. Read them in this order:
 |---|---|---|---|
 | 1 | [[01-booking-flow]] | Login, profile, individual service, slot hold | **Updated; product-owner review now** |
 | 2 | [[02-payment-flow]] | Manual payment: client transfers, sends proof via WhatsApp, Admin verifies, official invoice is generated | **In business review** |
-| 3 | [[03-website-content]] | Public pages, copy, claims, CTA | Draft/placeholder copy |
+| 3 | [[03-website-content]] | Public pages, Layanan submenu, tone, claims, assets, language | **In business review** |
 | 4 | [[04-availability-scheduling]] | Schedule, slots, buffer, cutoff | Demo schedule; real schedule next |
 | 5 | [[05-cancellation-refund]] | WhatsApp support, approval, refund vocabulary | Domain rule decided; ops procedure next |
 | 6 | [[06-privacy-consent]] | Data boundary and consent | Copy/sign-off pending |
