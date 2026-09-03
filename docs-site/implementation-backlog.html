@@ -1,0 +1,133 @@
+<!doctype html><html lang="id"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>N10 — Implementation Backlog — Seraya Psikologi</title><link rel="stylesheet" href="../assets/main.css"></head><body><div class="shell"><header class="site-header"><div><a class="brand" href="../index.html">Seraya Psikologi</a><div class="subtitle">Project control center · MVP review</div></div><nav class="topnav"><a href="../index.html">Overview</a><a href="../workboard.html">Workboard</a><a href="../prd/index.html">Focused PRDs</a><a href="../reference/index.html">Reference</a></nav></header><div class="muted" style="font-size:.84rem;margin-bottom:18px"><a href="../index.html">Home</a> / Focused PRD</div><main><h1 id="n10-implementation-backlog">N10 — Implementation Backlog</h1>
+<blockquote>
+<p>PLANNING ONLY. No file modification, migration, deployment, or code execution is authorized before N11 approval and explicit user instruction to resume implementation.</p>
+</blockquote>
+<p><strong>Goal:</strong> Translate the closed business PRDs into small implementation slices with dependencies, UI/UX checkpoints, and acceptance tests.</p>
+<p><strong>Architecture:</strong> Keep Cloudflare Worker + Hono + D1 and the <code>PersistenceAdapter</code> seam. Work incrementally; do not replace the current MVP wholesale. Preserve manual WhatsApp payment and the approved customer-data boundary.</p>
+<p><strong>Tech stack:</strong> TypeScript, Hono, Cloudflare Worker, D1/SQLite, server-rendered views, existing tests and smoke tests.</p>
+<h2 id="non-negotiable-constraints">Non-negotiable constraints</h2>
+<ul>
+<li>Google SSO required; no guest booking.</li>
+<li>All approved profile/address and counseling-intake fields required.</li>
+<li>Individual counseling only.</li>
+<li>Online: Chat Rp99.000, Call Rp125.000.</li>
+<li>Offline: Rp200.000 at Havana Park, 09.00–12.00 and 16.00–20.00 WIB.</li>
+<li>Booking cutoff: 2 hours; session 60 minutes; 15-minute buffer.</li>
+<li>Buffer-aware slot starts; public holidays closed; Monday–Sunday schedule.</li>
+<li>Client cancellation/refund via Admin WhatsApp only.</li>
+<li>Official invoice only after Admin payment verification.</li>
+<li>Psychologist receives only scoped confirmed-booking operational context.</li>
+<li>Intake narratives never enter the financial invoice.</li>
+<li>No clinical notes, diagnosis, assessment results, transcripts, or treatment notes.</li>
+</ul>
+<h2 id="dependency-map">Dependency map</h2>
+<pre><code class="language-text">S01 baseline/test seams
+  → S02 client profile + S03 auth
+  → S04 public website/catalog
+  → S05 availability + staff foundation
+  → S06 booking/intake
+  → S07 payment/Admin
+  → S08 cancellation/refund/reschedule
+  → S09 psychologist scope + staff hardening
+  → S10 privacy/copy
+  → S11 UAT/checklist
+</code></pre>
+<p>The staff foundation is deliberately available before payment and cancellation actions because those actions require <code>StaffMembership</code>, role checks, and <code>actor_membership_id</code>.</p>
+<h2 id="slices">Slices</h2>
+<h3 id="s01-freeze-baseline-and-establish-test-seams">S01 — Freeze baseline and establish test seams</h3>
+<p><strong>Purpose:</strong> Record the actual baseline before behavior changes.</p>
+<p><strong>Files:</strong> inspect <code>mvp/app/src/</code>, <code>mvp/app/migrations/</code>, <code>mvp/tests/</code>, <code>mvp/package.json</code>, <code>mvp/scripts/smoke-test.sh</code>.</p>
+<p><strong>Acceptance:</strong> known typecheck/build/test commands; remote smoke baseline recorded without changing production data; demo fixtures distinguished from production.</p>
+<p><strong>Test seams:</strong> frozen clock/fake timer, mock D1 adapter, test auth injection, mock evidence storage. These seams must be agreed before tests are written.</p>
+<p><strong>Dependency:</strong> none.</p>
+<h3 id="s02-client-account-and-profile-data">S02 — Client account and profile data</h3>
+<p><strong>Purpose:</strong> Store Google identity separately from user-provided Nama Panggilan and persist all approved required profile/address fields.</p>
+<p><strong>Likely files:</strong> <code>mvp/app/migrations/0004_client_profile.sql</code>, <code>mvp/app/src/domain/types.ts</code>, <code>mvp/app/src/persistence/adapter.ts</code>, <code>mvp/app/src/persistence/d1-adapter.ts</code>, <code>mvp/app/src/modules/client.ts</code>.</p>
+<p><strong>Acceptance:</strong> incomplete profile blocks booking; client must be 18+ based on date of birth; Indonesian WhatsApp number is validated in E.164/approved local format; client can read/update only their own profile; fields have explicit purpose/privacy mapping; no extra fields added.</p>
+<p><strong>Test seam:</strong> <code>MockAuthProvider</code> identity + client ownership fixture.</p>
+<p><strong>Dependency:</strong> S01.</p>
+<h3 id="s03-google-sso-client-login-gate">S03 — Google SSO client login gate</h3>
+<p><strong>Purpose:</strong> Make authenticated identity mandatory for booking.</p>
+<p><strong>Likely files:</strong> <code>mvp/app/src/modules/auth.ts</code>, <code>mvp/app/src/worker/index.ts</code>, <code>mvp/app/src/views/index.ts</code>, <code>mvp/wrangler.toml</code>.</p>
+<p><strong>Acceptance:</strong> anonymous user sees Google login; callback binds identity; cancellation/replay/error cannot submit; no guest path; session ownership prevents cross-client access.</p>
+<p><strong>Test seam:</strong> local <code>MockAuthProvider</code>/session injection; no external Google OAuth in automated tests.</p>
+<p><strong>Dependency:</strong> S02.</p>
+<h3 id="s04-public-website-navigation-and-catalog">S04 — Public website, navigation, and catalog</h3>
+<p><strong>Purpose:</strong> Apply PRD-03 and catalog decisions to public pages.</p>
+<p><strong>Scope:</strong> Beranda, Layanan hover/focus submenu with four program briefs, List Psikolog, About, FAQ, placeholder assets, and catalog/pricing.</p>
+<p><strong>Likely files:</strong> <code>mvp/app/src/modules/catalog.ts</code>, <code>mvp/app/src/views/index.ts</code>, content/assets directories.</p>
+<p><strong>Acceptance:</strong> Beranda, Layanan, List Psikolog, About, FAQ; Layanan hover/focus submenu contains four programs; only individual counseling is bookable; Chat/Call/offline labels and prices correct; 100% Bahasa Indonesia; placeholders clearly marked; 360px mobile layout.</p>
+<p><strong>UI/UX checkpoint A:</strong> design public navigation, submenu, psychologist card, FAQ interaction, and placeholder asset treatment before implementation.</p>
+<p><strong>Dependency:</strong> S01; S02/S03 only if login CTA is included in this slice.</p>
+<h3 id="s05-availability-buffer-holidays-and-staff-foundation">S05 — Availability, buffer, holidays, and staff foundation</h3>
+<p><strong>Purpose:</strong> Generate valid slots and establish the minimum staff membership foundation required by Admin actions.</p>
+<p><strong>Boundary:</strong> Keep slot generation separate from staff authorization. The staff foundation here is only the membership schema, role enum, and test identity needed by later Admin commands; full staff security hardening is S09.</p>
+<p><strong>Likely files:</strong> <code>mvp/app/src/modules/availability.ts</code>, <code>mvp/app/src/modules/auth.ts</code>, <code>mvp/app/src/persistence/*</code>, <code>mvp/app/migrations/0005_staff_membership_availability.sql</code>, <code>mvp/app/src/views/index.ts</code>.</p>
+<p><strong>Acceptance:</strong> Monday–Sunday; public holidays and exceptions closed; windows 09.00–12.00 and 16.00–20.00 WIB; 60-minute sessions; 15-minute buffer-aware starts; 2-hour cutoff; same grid online/offline; overlap/expiry safe. Morning starts are exactly 09.00 and 10.30; evening starts are exactly 16.00, 17.30, and 18.45. <code>StaffMembership</code> foundation supports one Superadmin, Admin, and Psychologist.</p>
+<p><strong>Admin schedule capability:</strong> Admin can set public holidays, recurring closed days, and one-off slot withdrawal with an internal reason; the public slot list uses the same source of truth.</p>
+<p><strong>UI/UX checkpoint B:</strong> design slot list, closed-day state, empty state, cutoff message, and Admin holiday/withdrawal calendar.</p>
+<p><strong>Test seam:</strong> frozen clock, deterministic holiday calendar, concurrency fixture.</p>
+<p><strong>Dependency:</strong> S01, S03.</p>
+<h3 id="s06-required-booking-and-intake-form">S06 — Required booking and intake form</h3>
+<p><strong>Purpose:</strong> Enforce PRD-01 profile/intake contract in the booking flow.</p>
+<p><strong>Likely files:</strong> <code>mvp/app/src/modules/booking.ts</code>, <code>mvp/app/src/views/index.ts</code>, <code>mvp/app/src/domain/types.ts</code>, migration if needed.</p>
+<p><strong>Acceptance:</strong> all profile/address and intake fields required; client must be 18+; topics multi-select; problem description minimum 50 and max bounded; consent version stored; no clinical fields; OfferSnapshot/hold/reservation atomic.</p>
+<p><strong>UI/UX checkpoint C:</strong> design profile completion, grouped address fields, intake form, validation, consent, loading, error, and confirmation states.</p>
+<p><strong>Dependency:</strong> S02, S03, S04, S05.</p>
+<h3 id="s07-manual-payment-and-post-verification-invoice">S07 — Manual payment and post-verification invoice</h3>
+<p><strong>Purpose:</strong> Implement PRD-02 with correct invoice ordering.</p>
+<p><strong>Likely files:</strong> <code>mvp/app/src/modules/payment.ts</code>, <code>mvp/app/src/modules/admin.ts</code>, <code>mvp/app/src/views/index.ts</code>, payment migration.</p>
+<p><strong>Acceptance:</strong> pre-verification view has preliminary instructions + WhatsApp link only; Admin records proof and checks bank/QRIS; verify/reject in dashboard; official PDF/text invoice only after verification; invoice excludes intake narratives; underpayment top-up; overpayment return evidence; B04 legacy <code>payment</code>/<code>refund_action</code> queries removed or reconciled to current schema.</p>
+<p><strong>UI/UX checkpoint D:</strong> design preliminary payment, pending state, rejection, underpayment, overpayment, verified invoice, and client confirmation states.</p>
+<p><strong>Test seam:</strong> mock evidence storage, fake clock, payment proof fixtures.</p>
+<p><strong>Dependency:</strong> S05 staff foundation, S06, S04.</p>
+<h3 id="s08-cancellation-refund-and-admin-reschedule-workflow">S08 — Cancellation, refund, and Admin reschedule workflow</h3>
+<p><strong>Purpose:</strong> Implement PRD-05 and the PRD-04 online↔offline change rule.</p>
+<p><strong>Likely files:</strong> <code>mvp/app/src/modules/admin.ts</code>, <code>mvp/app/src/modules/booking.ts</code>, <code>mvp/app/src/views/index.ts</code>, cancellation/refund/reschedule migration.</p>
+<p><strong>Acceptance:</strong> no public mutation endpoint; trigger is <code>client_requested</code> or <code>psychologist_unavailable</code>; required evidence matches trigger; statuses and audit work; refund completion requires transfer proof; Admin-mediated mode change creates <code>RescheduleAction</code> and updated OfferSnapshot; slot/capacity release follows rules; idempotent transitions.</p>
+<p><strong>UI/UX checkpoint E:</strong> design cancellation/refund queue, evidence upload, status history, provider-unavailable action, and reschedule adjustment.</p>
+<p><strong>Test seam:</strong> mock evidence storage + state-machine fixtures.</p>
+<p><strong>Dependency:</strong> S05 staff foundation, S07, S06.</p>
+<h3 id="s09-staff-authorization-and-scoped-psychologist-view">S09 — Staff authorization and scoped psychologist view</h3>
+<p><strong>Purpose:</strong> Complete role enforcement and customer-data whitelist.</p>
+<p><strong>Likely files:</strong> <code>mvp/app/src/modules/auth.ts</code>, <code>mvp/app/src/modules/admin.ts</code>, <code>mvp/app/src/views/index.ts</code>, staff migration.</p>
+<p><strong>Acceptance:</strong> one Superadmin; Admin; Psychologist; Google SSO + StaffMembership; placeholder auth disabled in production; psychologist query is restricted to <code>booking.state = 'confirmed'</code> and the authenticated psychologist's assigned bookings; psychologist receives only display name, WhatsApp, mode, slot, topics, non-clinical description, expected outcome, returning-client flag; excludes full address, religion, occupation, education, payment evidence; sharing audit includes actor, timestamp, booking, fields shared; last-admin/superadmin protections.</p>
+<p><strong>UI/UX checkpoint F:</strong> design scoped psychologist view and visibly separate Admin/Superadmin capabilities.</p>
+<p><strong>Test seam:</strong> role matrix fixture, mock auth, audit assertion.</p>
+<p><strong>Dependency:</strong> S03, S05, S07, S08.</p>
+<h3 id="s10-privacy-rights-copy-and-operational-hardening">S10 — Privacy, rights, copy, and operational hardening</h3>
+<p><strong>Purpose:</strong> Apply PRD-06/07/08 to real routes and messages.</p>
+<p><strong>Likely files:</strong> <code>mvp/app/src/views/index.ts</code>, <code>mvp/app/src/worker/index.ts</code>, <code>mvp/README.md</code>, content assets.</p>
+<p><strong>Acceptance:</strong> Terms contains WhatsApp cancellation/refund rule; privacy/consent/safety placeholders clearly marked until replaced; client rights route to email; breach notice route exists; no marketing; error/log redaction; footer/FAQ/booking links work.</p>
+<p><strong>Dependency:</strong> S03, S06–S09.</p>
+<h3 id="s11-uat-and-lightweight-launch-checklist">S11 — UAT and lightweight launch checklist</h3>
+<p><strong>Purpose:</strong> Execute PRD-08 without enterprise ceremony.</p>
+<p><strong>Likely files:</strong> <code>docs/prd/08-launch-gates.md</code>, <code>mvp/scripts/smoke-test.sh</code>, <code>mvp/README.md</code>.</p>
+<p><strong>Acceptance:</strong> A–G checklist distinguishes demo from real; e2e covers login → profile → booking → transfer proof → Admin verify → invoice → confirmation; blockers remain unchecked without evidence; sign-off records date/maintainer/open items.</p>
+<p><strong>Dependency:</strong> S01–S10.</p>
+<h2 id="uiux-sequence">UI/UX sequence</h2>
+<p>UI/UX is not last. It happens at each checkpoint:</p>
+<ol>
+<li><strong>Before S02/S03:</strong> Google SSO login gate and Profile Completion (<code>Profil Saya</code> + <code>Alamat Saya</code>).</li>
+<li><strong>Before S04:</strong> Public navigation, Layanan hover/focus submenu, psychologist card, FAQ, and placeholder assets.</li>
+<li><strong>Before S05:</strong> Slot selection calendar, buffer-aware starts, closed-day states, cutoff notice, and Admin holiday/withdrawal calendar.</li>
+<li><strong>Before S06:</strong> Booking summary, intake form, multi-topic selector, 50-character counter, consent/safety states.</li>
+<li><strong>Before S07:</strong> Preliminary payment handoff and Admin Payment Verification Queue, including proof viewer and amount mismatch notes.</li>
+<li><strong>Before S08:</strong> Admin Cancellation/Refund Queue, trigger selector, evidence upload, refund proof, and reschedule adjustment.</li>
+<li><strong>Before S09:</strong> Scoped Psychologist View with the customer-data whitelist visibly enforced.</li>
+</ol>
+<p>Each checkpoint must include a small wireframe/prototype, mobile review, states, and mapping to PRD acceptance criteria. Do not design deferred features.</p>
+<h2 id="n11-approval-checklist">N11 approval checklist</h2>
+<p>Before implementation begins:</p>
+<ul>
+<li>[ ] Confirm this slice order and dependencies.</li>
+<li>[ ] Confirm S01–S03 auth/test seams.</li>
+<li>[x] Fixed buffer-aware start examples are embedded in S05: 09.00, 10.30, 16.00, 17.30, 18.45 WIB.</li>
+<li>[ ] Confirm invoice does not contain intake narratives.</li>
+<li>[ ] Confirm B04 legacy Admin query cleanup is part of S07/S08.</li>
+<li>[ ] Confirm evidence storage seam.</li>
+<li>[ ] Confirm provider-unavailable cancellation path.</li>
+<li>[ ] Confirm psychologist whitelist and sharing audit.</li>
+<li>[ ] Confirm which UI/UX checkpoint is designed first.
+Until all relevant items are reviewed, this remains a planning artifact only. Review of N11 does not authorize implementation; N12 requires a separate explicit user instruction.</li>
+</ul></main><footer>Seraya Psikologi · generated from repository · <a href="../reference/index.html">Long-form reference</a></footer></div></body></html>
