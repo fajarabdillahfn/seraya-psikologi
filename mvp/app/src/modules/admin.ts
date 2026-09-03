@@ -17,7 +17,7 @@
 
 import { randomUUID } from "node:crypto";
 import type { PersistenceAdapter } from "../persistence/adapter";
-import type { Booking, CancellationOutcome, PaymentProof, RefundOutcome } from "../domain/types";
+import type { Booking, CancellationOutcome, PaymentProof } from "../domain/types";
 import { WhatsAppManualPaymentModule } from "./payment";
 
 export class AdminWorkspaceModule {
@@ -243,56 +243,6 @@ export class AdminWorkspaceModule {
     return { refundActionId: null };
   }
 
-  /**
-   * Execute a refund action against the booking's settled Payment.
-   * ADR 0063/0077/0093.
-   *
-   * NOTE: Post-ADR 0097, settled Payment rows from the legacy Midtrans
-   * path are no longer created. This helper remains for read-side
-   * backwards compatibility (any pre-existing settled payments) but
-   * returns an error if no settled payment is found.
-   */
-  async executeRefundActionForBooking(args: {
-    bookingId: string;
-    outcome: RefundOutcome;
-    reasonCategory: string;
-    policyVersion: string;
-    actorMembershipId: string;
-    idempotencyKey: string;
-  }): Promise<{ refundActionId: string }> {
-    const { rows } = await this.db.query<{ id: string }>({
-      sql: `SELECT id FROM payment WHERE booking_id = ? AND status = 'settled'`,
-      params: [args.bookingId],
-    });
-    const payment = rows[0];
-    if (!payment) {
-      throw new Error(
-        "no settled payment for booking (ADR 0097: payments are tracked via payment_proof)"
-      );
-    }
-    // For the post-0097 manual flow, refunds are handled outside this
-    // command path (the legacy PaymentModule.executeRefundAction that
-    // depended on the Midtrans gateway has been removed).
-    const refundActionId = randomUUID();
-    await this.db.batch([
-      {
-        sql: `INSERT INTO refund_action
-              (id, payment_id, outcome, amount_idr, currency, reason_category,
-               policy_version, actor_membership_id, status, idempotency_key)
-              VALUES (?, ?, ?, 0, 'IDR', ?, ?, ?, 'succeeded', ?)`,
-        params: [
-          refundActionId,
-          payment.id,
-          args.outcome,
-          args.reasonCategory,
-          args.policyVersion,
-          args.actorMembershipId,
-          args.idempotencyKey,
-        ],
-      },
-    ]);
-    return { refundActionId };
-  }
 
   // ------------------- WhatsApp manual payment (ADR 0097) -------------------
 
