@@ -21,9 +21,9 @@ Last reviewed: 2026-09-02
 
 ## DOING — current focus
 
-- **W02 — PRD 04 Availability & Scheduling review** — confirm the availability surface, schedule windows, buffer, cutoff, and the remaining session-instruction details that affect the slot list.
+- **W03 — PRD 08 Launch Checklist review** — use the lightweight maintainer checklist to separate real launch blockers from later features.
 
-Implementation of PRD 01, 02, and 03 remains deferred while the PRD review sequence continues.
+Implementation of PRD 01–07 remains deferred while the PRD review sequence continues.
 
 The documentation refactor is complete: this board and the focused PRDs are now the default reading path.
 

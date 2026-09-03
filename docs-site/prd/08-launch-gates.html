@@ -1,28 +1,138 @@
-<!doctype html><html lang="id"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>PRD 08 — Launch Gates — Seraya Psikologi</title><link rel="stylesheet" href="../assets/main.css"></head><body><div class="shell"><header class="site-header"><div><a class="brand" href="../index.html">Seraya Psikologi</a><div class="subtitle">Project control center · MVP review</div></div><nav class="topnav"><a href="../index.html">Overview</a><a href="../workboard.html">Workboard</a><a href="../prd/index.html">Focused PRDs</a><a href="../reference/index.html">Reference</a></nav></header><div class="muted" style="font-size:.84rem;margin-bottom:18px"><a href="../index.html">Home</a> / Focused PRD</div><main><h1 id="prd-08-launch-gates">PRD 08 — Launch Gates</h1>
-<h2 id="goal">Goal</h2>
-<p>Separate “the MVP can be reviewed” from “real clients can use production”.</p>
-<h2 id="must-be-true-before-production">Must be true before production</h2>
-<ol>
-<li>Real Admin WhatsApp number, bank account, account holder, and QRIS asset configured.</li>
-<li>Real Fuja schedule, venue, and online-meeting instructions verified.</li>
-<li>Fuja profile credentials/publication consent verified.</li>
-<li>Google SSO + StaffMembership + role checks wired; placeholder auth disabled.</li>
-<li>Admin payment/cancellation workspace tested with real authorization boundaries.</li>
-<li>Consent, privacy, safety, cancellation, and payment copy signed off.</li>
-<li>Email provider and sender domain configured; confirmation/reminder delivery tested.</li>
-<li>D1 backup/export and restore drill recorded with RPO/RTO evidence.</li>
-<li>Rate limits, access-token lifecycle, and abuse response documented.</li>
-<li>UAT covers booking, overlap, hold expiry, manual payment, rejection, confirmation, cancellation, and recovery paths.</li>
-<li>No demo fixture or placeholder value is presented as production data.</li>
-<li>Release sign-off is recorded by business, clinical/ethics, operations, finance, and technical owners.</li>
-</ol>
-<h2 id="not-required-for-current-mvp-review">Not required for current MVP review</h2>
+<!doctype html><html lang="id"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>PRD 08 — Launch Checklist — Seraya Psikologi</title><link rel="stylesheet" href="../assets/main.css"></head><body><div class="shell"><header class="site-header"><div><a class="brand" href="../index.html">Seraya Psikologi</a><div class="subtitle">Project control center · MVP review</div></div><nav class="topnav"><a href="../index.html">Overview</a><a href="../workboard.html">Workboard</a><a href="../prd/index.html">Focused PRDs</a><a href="../reference/index.html">Reference</a></nav></header><div class="muted" style="font-size:.84rem;margin-bottom:18px"><a href="../index.html">Home</a> / Focused PRD</div><main><h1 id="prd-08-launch-checklist">PRD 08 — Launch Checklist</h1>
+<p>Status: <strong>Working checklist</strong> (2026-09-02). This is intentionally lightweight for one long-term maintainer.</p>
+<h2 id="how-to-use-this-checklist">How to use this checklist</h2>
+<p>There are only three statuses:</p>
 <ul>
-<li>Midtrans onboarding.</li>
-<li>Couple bookable launch.</li>
-<li>Clinical record/EMR.</li>
-<li>Automated WhatsApp provider.</li>
-<li>Full CMS/editor workflow.</li>
+<li><code>[ ]</code> <strong>Needs setup/check</strong> — must be completed before real clients use the site.</li>
+<li><code>[x]</code> <strong>Ready</strong> — checked with real information or a working test.</li>
+<li><code>[-]</code> <strong>Later</strong> — intentionally deferred; not a launch blocker for the current MVP.</li>
 </ul>
-<h2 id="evidence-format">Evidence format</h2>
-<p>For each gate, record: owner, date, environment, test/result link, and sign-off. Keep the detailed G-1..G-14 checklist in <code>docs/adr/0096-launch-gate-checklist.md</code> as reference.</p></main><footer>Seraya Psikologi · generated from repository · <a href="../reference/index.html">Long-form reference</a></footer></div></body></html>
+<p>Do not turn this into a recurring bureaucracy. Run it once before launch, and again only after a material change to payment, authentication, booking, or privacy.</p>
+<h2 id="a-real-information">A. Real information</h2>
+<ul>
+<li>[ ] Replace all demo payment instructions with the real bank/QRIS information.</li>
+<li>[ ] Confirm Admin WhatsApp number and test the link from a real phone.</li>
+<li>[ ] Confirm Fuja's published profile, credentials, and publication approval.</li>
+<li>[ ] Confirm the real availability calendar: Monday–Sunday, closed on public holidays, 09.00–12.00 and 16.00–20.00 WIB.</li>
+<li>[ ] Confirm Havana Park address and the client arrival/check-in instruction.</li>
+<li>[ ] Replace visual placeholders when the real logo/photos/assets are ready.</li>
+<li>[ ] Review all public copy once in Bahasa Indonesia, including prices and contact details.</li>
+</ul>
+<h2 id="b-client-booking-test">B. Client booking test</h2>
+<ul>
+<li>[ ] New client can log in with Google SSO.</li>
+<li>[ ] Guest cannot book.</li>
+<li>[ ] New client is required to complete all profile and address fields.</li>
+<li>[ ] Client must provide a valid WhatsApp number.</li>
+<li>[ ] Client can choose only Individual Counseling.</li>
+<li>[ ] Online options show Chat (Rp99.000) and Call (Rp125.000).</li>
+<li>[ ] Offline option shows Rp200.000, Havana Park, and the approved hours.</li>
+<li>[ ] All counseling intake fields are required.</li>
+<li>[ ] Slot cutoff rejects bookings less than 2 hours before start.</li>
+<li>[ ] Booking confirmation shows the correct service, time, amount, and WhatsApp payment handoff.</li>
+<li>[ ] Client cannot see an appointment as confirmed before Admin verification.</li>
+</ul>
+<h2 id="c-payment-and-admin-test">C. Payment and Admin test</h2>
+<ul>
+<li>[ ] Client sends transfer proof to Admin via WhatsApp.</li>
+<li>[ ] Admin can record the proof in the dashboard.</li>
+<li>[ ] Admin checks the incoming transfer in the bank/QRIS account.</li>
+<li>[ ] Admin can verify or reject the payment in the dashboard.</li>
+<li>[ ] Official PDF/text invoice is generated only after verification.</li>
+<li>[ ] Client receives confirmation after verification.</li>
+<li>[ ] Underpayment is recorded and the client is asked to top up.</li>
+<li>[ ] Overpayment is returned manually and the refund proof is recorded.</li>
+<li>[ ] A payment rejection has a reason and is visible in the booking history.</li>
+<li>[ ] Repeating a verification does not create duplicate records.</li>
+</ul>
+<h2 id="d-cancellationrefund-test">D. Cancellation/refund test</h2>
+<ul>
+<li>[ ] Client is directed to Admin WhatsApp; there is no public cancellation form.</li>
+<li>[ ] Admin can record a cancellation request and upload the WhatsApp screenshot.</li>
+<li>[ ] Cancellation status is visible in the dashboard.</li>
+<li>[ ] Admin can approve/reject with a reason.</li>
+<li>[ ] Approved cancellation releases the slot according to the cancellation rule.</li>
+<li>[ ] Refund transfer proof can be uploaded.</li>
+<li>[ ] Refund cannot be marked complete without refund evidence.</li>
+<li>[ ] Cancellation/refund history shows actor, time, reason, and evidence.</li>
+</ul>
+<h2 id="e-staff-access">E. Staff access</h2>
+<ul>
+<li>[ ] Superadmin account is configured and tested.</li>
+<li>[ ] At least one Admin account is configured and tested.</li>
+<li>[ ] Psychologist account can see only their own relevant appointments and shared fields.</li>
+<li>[ ] Psychologist cannot verify payments or manage refunds.</li>
+<li>[ ] Admin cannot manage staff roles unless explicitly granted Superadmin access.</li>
+<li>[ ] Placeholder authentication is disabled before real clients use the site.</li>
+<li>[ ] Removing the last Admin or Superadmin is protected.</li>
+</ul>
+<h2 id="f-privacy-and-safety">F. Privacy and safety</h2>
+<ul>
+<li>[ ] Informed Consent copy is reviewed and replaces the placeholder.</li>
+<li>[ ] Privacy Notice copy is reviewed and replaces the placeholder.</li>
+<li>[ ] Safety/Crisis copy is reviewed and replaces the placeholder.</li>
+<li>[ ] Terms and Conditions include the WhatsApp-only cancellation/refund policy.</li>
+<li>[ ] Client can request access, correction, or deletion by email.</li>
+<li>[ ] Client data is not visible to another client.</li>
+<li>[ ] No clinical notes, diagnosis, assessment results, transcripts, or treatment notes are collected.</li>
+<li>[ ] A test confirms that sensitive fields are not printed in logs.</li>
+</ul>
+<h2 id="g-basic-operational-readiness">G. Basic operational readiness</h2>
+<ul>
+<li>[ ] Admin knows where to find payment, cancellation/refund, booking, and schedule queues.</li>
+<li>[ ] Admin knows how to handle underpayment and overpayment.</li>
+<li>[ ] Admin knows the response target: within 1 hour during 08.00–20.00 WIB; outside that window, respond in the next window.</li>
+<li>[ ] Admin has a simple backup/export procedure for D1 data.</li>
+<li>[ ] One restore test has been performed or explicitly accepted as a post-launch task.</li>
+<li>[ ] Error pages do not expose stack traces, secrets, or internal database details.</li>
+<li>[ ] A real end-to-end booking has been completed with a test payment and then cleaned up.</li>
+</ul>
+<h2 id="later-not-a-current-launch-blocker">Later — not a current launch blocker</h2>
+<ul>
+<li>[-] Midtrans or another payment gateway.</li>
+<li>[-] Automated WhatsApp integration.</li>
+<li>[-] Couple counseling checkout.</li>
+<li>[-] Clinical record or EMR.</li>
+<li>[-] CMS/editor for public content.</li>
+<li>[-] Newsletter or marketing opt-in.</li>
+<li>[-] Guardian route for ages 16–17.</li>
+<li>[-] Advanced analytics, structured data, and a formal on-call rotation.</li>
+</ul>
+<h2 id="simple-sign-off">Simple sign-off</h2>
+<p>Before opening the site to real clients, the maintainer records one line:</p>
+<blockquote>
+<p><strong>Launch decision:</strong> Ready / Not ready
+<strong>Checked on:</strong> YYYY-MM-DD
+<strong>Checked by:</strong> name
+<strong>Open items accepted:</strong> short list</p>
+</blockquote>
+<p>The launch decision is not “production-ready forever”. Re-run sections B–G after a material change to booking, payment, authentication, privacy, or deployment.</p>
+<h2 id="references">References</h2>
+<ul>
+<li><code>docs/prd/01-booking-flow.md</code></li>
+<li><code>docs/prd/02-payment-flow.md</code></li>
+<li><code>docs/prd/05-cancellation-refund.md</code></li>
+<li><code>docs/prd/06-privacy-consent.md</code></li>
+<li><code>docs/prd/07-staff-admin-operations.md</code></li>
+<li><code>docs/adr/0096-launch-gate-checklist.md</code></li>
+</ul>
+<h2 id="change-log">Change log</h2>
+<ul>
+<li>2026-09-02: Replaced the long G-1..G-14 launch-gate list with a lightweight maintainer checklist covering real information, client booking, payment, cancellation/refund, staff access, privacy/safety, and basic operations.</li>
+<li>2026-09-02: Preserved deferred features as explicit Later items rather than launch blockers.</li>
+</ul>
+<h2 id="status">Status</h2>
+<p><strong>Ready for business review.</strong> This checklist is a practical release aid, not an enterprise governance process.</p>
+<h2 id="related">Related</h2>
+<ul>
+<li><code>docs/PROJECT-OVERVIEW.md</code></li>
+<li><code>docs/WORKBOARD.md</code></li>
+<li><code>docs/prd/README.md</code></li>
+<li><code>docs/prd/01-booking-flow.md</code></li>
+<li><code>docs/prd/02-payment-flow.md</code></li>
+<li><code>docs/prd/05-cancellation-refund.md</code></li>
+<li><code>docs/prd/06-privacy-consent.md</code></li>
+<li><code>docs/prd/07-staff-admin-operations.md</code></li>
+<li><code>docs/adr/0096-launch-gate.md</code></li>
+<li><code>docs/adr/0097-whatsapp-manual-payment.md</code></li>
+</ul></main><footer>Seraya Psikologi · generated from repository · <a href="../reference/index.html">Long-form reference</a></footer></div></body></html>
