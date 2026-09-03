@@ -15,6 +15,10 @@ database_name = "seraya-db"
 database_id = "8f193be1-59da-42ba-8ef7-9494cdd18f8c" # set via `wrangler d1 create seraya-db`
 migrations_dir = "app/migrations"
 
+[assets]
+directory = "app/public"
+binding = "ASSETS"
+
 # Placeholder variables for secrets used by the Worker at runtime.
 # These are illustrative; actual values live in CF Workers Secrets and
 # `.dev.vars` (gitignored). Documented in ADR 0089 §10.

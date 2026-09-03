@@ -6,24 +6,37 @@
  */
 
 const BASE_STYLES = `
-  :root { --brand: #315c57; --warm: #f3e9d2; --ink: #2a2a2a; --muted: #6b6b6b; }
-  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; color: var(--ink); max-width: 880px; margin: 0 auto; padding: 1.5rem; line-height: 1.6; }
-  header { padding: 1rem 0 2rem; }
-  header a { color: var(--brand); text-decoration: none; margin-right: 1rem; font-weight: 500; }
-  h1 { color: var(--brand); font-size: 1.8rem; }
-  h2 { color: var(--brand); font-size: 1.3rem; margin-top: 2rem; }
-  .hero { background: var(--warm); padding: 2rem; border-radius: 12px; margin-bottom: 2rem; }
-  .cta { display: inline-block; background: var(--brand); color: white; padding: 0.75rem 1.5rem; border-radius: 8px; text-decoration: none; font-weight: 600; }
-  .cta-secondary { display: inline-block; border: 2px solid var(--brand); color: var(--brand); padding: 0.5rem 1rem; border-radius: 8px; text-decoration: none; margin-right: 0.5rem; }
-  .card { border: 1px solid #e5e5e5; border-radius: 8px; padding: 1.25rem; margin-bottom: 1rem; }
-  .price { font-size: 1.2rem; font-weight: 600; color: var(--brand); }
-  .crisis { background: #fff5f0; border: 2px solid #b85b3a; padding: 1rem; border-radius: 8px; margin: 1rem 0; }
-  table { width: 100%; border-collapse: collapse; }
-  th, td { padding: 0.5rem; border-bottom: 1px solid #eee; text-align: left; }
-  footer { border-top: 1px solid #eee; margin-top: 3rem; padding-top: 1rem; font-size: 0.9rem; color: var(--muted); }
-  small.muted { color: var(--muted); }
-  .warning { background: #fff5f0; border-left: 4px solid #b85b3a; padding: 0.75rem 1rem; margin: 1rem 0; }
-  .success { background: #f0f7f4; border-left: 4px solid var(--brand); padding: 0.75rem 1rem; margin: 1rem 0; }
+  :root { --brand:#315c57; --brand-dark:#214542; --warm:#f3e9d2; --cream:#fcfaf5; --ink:#23302e; --muted:#66716f; --line:#dfe7e3; }
+  * { box-sizing:border-box; }
+  body { margin:0; font-family:ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif; color:var(--ink); background:var(--cream); line-height:1.65; }
+  .shell { max-width:1120px; margin:0 auto; padding:0 24px; }
+  header { padding:18px 0; border-bottom:1px solid var(--line); background:rgba(252,250,245,.96); position:sticky; top:0; z-index:2; }
+  .nav { display:flex; align-items:center; justify-content:space-between; gap:20px; }
+  .brand { display:flex; align-items:center; gap:10px; color:var(--brand-dark); text-decoration:none; font-weight:800; }
+  .brand img { width:42px; height:42px; object-fit:contain; border-radius:10px; background:white; }
+  nav { display:flex; align-items:center; flex-wrap:wrap; gap:4px; }
+  nav a { color:var(--brand-dark); text-decoration:none; padding:8px 10px; border-radius:8px; font-size:.95rem; }
+  nav a:hover,nav a:focus-visible { background:var(--warm); outline:none; }
+  main { padding:44px 0; min-height:65vh; }
+  h1,h2,h3 { color:var(--brand-dark); line-height:1.2; letter-spacing:-.025em; }
+  h1 { font-size:clamp(2.1rem,5vw,4.5rem); max-width:780px; margin:0 0 18px; }
+  h2 { font-size:clamp(1.35rem,3vw,2rem); margin-top:34px; }
+  .hero { background:linear-gradient(135deg,var(--warm),#fffdf8); padding:clamp(28px,6vw,72px); border-radius:24px; margin-bottom:44px; }
+  .hero p { max-width:650px; font-size:1.1rem; color:var(--muted); }
+  .cta { display:inline-block; background:var(--brand); color:#fff; padding:12px 18px; border-radius:10px; text-decoration:none; font-weight:750; box-shadow:0 5px 14px rgba(49,92,87,.18); }
+  .cta:hover,.cta:focus-visible { background:var(--brand-dark); }
+  .cta-secondary { display:inline-block; border:1px solid var(--brand); color:var(--brand-dark); padding:10px 15px; border-radius:10px; text-decoration:none; margin:4px 6px 4px 0; font-weight:650; }
+  .grid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:16px; }
+  .card { background:#fff; border:1px solid var(--line); border-radius:16px; padding:22px; margin-bottom:16px; box-shadow:0 8px 24px rgba(35,48,46,.04); }
+  .price { font-size:1.25rem; font-weight:800; color:var(--brand); }
+  .crisis { background:#fff5f0; border:2px solid #e6aa96; color:#5e3025; padding:18px; border-radius:14px; margin:18px 0; }
+  table { width:100%; border-collapse:collapse; background:#fff; border:1px solid var(--line); }
+  th,td { padding:11px; border-bottom:1px solid var(--line); text-align:left; vertical-align:top; }
+  footer { border-top:1px solid var(--line); padding:28px 0 40px; font-size:.9rem; color:var(--muted); }
+  small.muted { color:var(--muted); }
+  .warning { background:#fff8e8; border-left:4px solid #c48727; padding:12px 16px; margin:16px 0; border-radius:0 10px 10px 0; }
+  .success { background:#eef8f3; border-left:4px solid var(--brand); padding:12px 16px; margin:16px 0; border-radius:0 10px 10px 0; }
+  @media (max-width:720px) { .shell{padding:0 16px} header{position:static} .nav{align-items:flex-start; flex-direction:column; gap:10px} nav{width:100%} main{padding:28px 0}.grid{grid-template-columns:1fr}.hero{border-radius:16px;padding:28px 22px} table{display:block;overflow-x:auto;white-space:nowrap} }
 `;
 
 const base = (title: string, body: string) =>
@@ -32,19 +45,15 @@ const base = (title: string, body: string) =>
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>${title} — Seraya Psikologi</title>
     <style>${BASE_STYLES}</style>
-  </head><body>
-    <header>
-      <a href="/">Beranda</a>
-      <a href="/pulang">SERAYA PULANG</a>
-      <a href="/fuja">Fuja</a>
-      <a href="/faq">FAQ</a>
-      <a href="/admin">Admin</a>
-    </header>
-    <main>${body}</main>
-    <footer>
+  </head><body><header><div class="shell nav">
+      <a class="brand" href="/"><img src="/static/logo.jpeg" alt="Logo Seraya Psikologi"><span>Seraya Psikologi</span></a>
+      <nav aria-label="Navigasi utama"><a href="/">Beranda</a><a href="/pulang">Layanan</a><a href="/fuja">Psikolog</a><a href="/faq">FAQ</a><a href="/book">Booking</a></nav>
+    </div></header>
+    <main><div class="shell">${body}</div></main>
+    <footer><div class="shell">
       <p>Seraya Psikologi — bukan layanan kegawatdaruratan. <a href="/safety/crisis">Butuh bantuan segera?</a></p>
       <p><small class="muted"><a href="/privacy">Privasi</a> · <a href="/consent">Informed Consent</a> · <a href="/cancellation">Cancellation</a></small></p>
-    </footer>
+    </div></footer>
   </body></html>`;
 
 export function renderHome(p: {
@@ -90,7 +99,7 @@ export function renderHome(p: {
       <ol>
         <li>Pilih layanan dan slot yang tersedia</li>
         <li>Isi data minimum dan setujui informed consent</li>
-        <li>Bayar via QRIS atau transfer bank — verifikasi otomatis</li>
+        <li>Bayar via QRIS atau transfer bank, lalu kirim bukti ke Admin via WhatsApp</li>
         <li>Terima konfirmasi dan detail sesi lewat email</li>
       </ol>
     </section>`
@@ -105,12 +114,12 @@ export function renderPulang(p: { psychologistName: string }): string {
     <div class="card">
       <h2>Individual Online</h2>
       <p class="price">Rp125.000 / sesi (60 menit)</p>
-      <p><a class="cta" href="/book/individual-online-single/intake">Booking sesi online</a></p>
+      <p><a class="cta" href="/book/individual-online-single/slots">Booking sesi online</a></p>
     </div>
     <div class="card">
       <h2>Individual Offline</h2>
       <p class="price">Rp200.000 / sesi (60 menit)</p>
-      <p><a class="cta" href="/book/individual-offline-single/intake">Booking sesi offline</a></p>
+      <p><a class="cta" href="/book/individual-offline-single/slots">Booking sesi offline</a></p>
     </div>
     <div class="card">
       <h2>Paket hemat</h2>
@@ -144,7 +153,7 @@ export function renderFuja(p: {
       <p>${p.bio}</p>
     </section>
     <section class="card">
-      <h2>Bidang اهتمام</h2>
+      <h2>Bidang yang ditangani</h2>
       <ul>${p.expertise.map((e) => `<li>${e}</li>`).join("")}</ul>
     </section>
     <section class="card">
@@ -169,7 +178,7 @@ export function renderFaq(): string {
     </section>
     <section class="card">
       <h2>Berapa usia yang bisa melakukan booking?</h2>
-      <p>Usia 18–40 tahun untuk self-service booking. Untuk usia 16–17, diperlukan persetujuan orang tua atau wali — hubungi Admin WhatsApp.</p>
+      <p>Layanan launch hanya untuk klien berusia 18 tahun atau lebih. Jalur minor belum tersedia.</p>
     </section>
     <section class="card">
       <h2>Bagaimana cara pembayaran?</h2>
@@ -218,7 +227,8 @@ export function renderPrivacyNotice(): string {
     <p>Seraya Psikologi menyimpan data minimum yang dibutuhkan untuk booking, pembayaran, komunikasi, dan pencatatan consent. Kami tidak menyimpan catatan klinis, diagnosis, hasil asesmen, transkrip sesi, atau narrasi krisis.</p>
     <h2>Data yang kami simpan</h2>
     <ul>
-      <li>Identitas minimum: nama tampilan, email (wajib), nomor HP (opsional, hanya untuk dukungan WhatsApp manual).</li>
+      <li><strong>Profil klien:</strong> nama panggilan, tanggal lahir, jenis kelamin, pekerjaan, pendidikan, nomor WhatsApp, status, agama, dan alamat yang diperlukan untuk layanan.</li>
+      <li><strong>Data invoice:</strong> hanya data minimum untuk identitas, kontak, layanan, jadwal, dan pembayaran; narasi intake tidak dicantumkan.</li>
       <li>Data booking: layanan, jadwal, mode, payment reference, consent version.</li>
       <li>Notifikasi: appointment reminder, status pembayaran.</li>
       <li>Audit: aksi privileged (Admin, psikolog, sistem).</li>

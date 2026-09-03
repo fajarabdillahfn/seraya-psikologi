@@ -55,6 +55,7 @@ import { renderClientLogin, renderClientProfile } from "../views/client-auth";
 
 interface Env {
   DB: D1Database;
+  ASSETS?: Fetcher;
   ENVIRONMENT?: string;
   GOOGLE_OAUTH_CLIENT_ID?: string;
   GOOGLE_OAUTH_CLIENT_SECRET?: string;
@@ -74,15 +75,16 @@ const app = new Hono<{ Bindings: Env }>();
 // Static assets
 // ---------------------------------------------------------------------------
 
-app.get("/static/css/main.css", async (c) => {
-  if (!c.env.DB) {
-    return new Response("", { status: 404 });
-  }
-  return new Response("/* MVP placeholder */", {
-    status: 200,
-    headers: { "content-type": "text/css; charset=utf-8" },
-  });
+app.get("/static/logo.jpeg", async (c) => {
+  const logo = await c.env.ASSETS?.fetch(new URL("/logo.jpeg", c.req.url));
+  if (!logo?.ok) return c.notFound();
+  return new Response(logo.body, { headers: { "content-type": "image/jpeg", "cache-control": "public, max-age=86400" } });
 });
+
+app.get("/static/css/main.css", (c) => new Response("/* inline styles are used by the MVP */", {
+  status: 200,
+  headers: { "content-type": "text/css; charset=utf-8" },
+}));
 
 app.get("/healthz", (c) =>
   c.json({ status: "ok", environment: c.env.ENVIRONMENT ?? "unknown" })
