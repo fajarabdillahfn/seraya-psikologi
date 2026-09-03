@@ -5,6 +5,7 @@
 Last reviewed: 2026-09-03
 
 > Final cross-review completed with Agy (Gemini 3.8 Flash High) on 2026-09-03. Customer-data boundaries were double-checked; see `docs/reviews/2026-09-02-final-cross-review.md`.
+> Implementation backlog plan: `.hermes/plans/2026-09-03_implementation-backlog-seraya-psikologi.md`.
 
 ## DONE — verified
 
@@ -33,8 +34,9 @@ Last reviewed: 2026-09-03
 
 ## NEXT — ordered
 
-- **N10 — Implementation backlog** — translate the closed PRDs into small implementation slices and acceptance tests. Do not modify code yet.
-- **N11 — Implementation approval checkpoint** — review the backlog, dependencies, and test seams before coding.
+- **N10 — Implementation backlog** — plan saved at `.hermes/plans/2026-09-03_implementation-backlog-seraya-psikologi.md`; translate closed PRDs into small implementation slices and acceptance tests. Do not modify code yet.
+- **N10a — UI/UX design checkpoints** — design each slice before its implementation, starting with auth/profile, booking, payment, and Admin queues. UI/UX is not a final-only phase.
+- **N11 — Implementation approval checkpoint** — review the backlog, dependencies, design checkpoints, and test seams before coding.
 - **N12 — Resume implementation** — only after explicit user approval.
 ## BLOCKED / production gate
 
