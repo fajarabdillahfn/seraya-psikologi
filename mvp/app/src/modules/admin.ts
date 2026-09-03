@@ -59,11 +59,11 @@ export class AdminWorkspaceModule {
     const [{ rows: holds }, { rows: appts }, { rows: payments }, { rows: refunds }, { rows: participants }, { rows: cancellations }] = await Promise.all([
       this.db.query({ sql: `SELECT * FROM slot_hold WHERE booking_id = ?`, params: [bookingId] }),
       this.db.query({ sql: `SELECT * FROM appointment WHERE booking_id = ?`, params: [bookingId] }),
-      this.db.query({ sql: `SELECT * FROM payment WHERE booking_id = ?`, params: [bookingId] }),
+      this.db.query({ sql: `SELECT * FROM payment_proof WHERE booking_id = ?`, params: [bookingId] }),
       this.db.query({
-        sql: `SELECT r.* FROM refund_action r
-              JOIN payment p ON p.id = r.payment_id
-              WHERE p.booking_id = ?`,
+        sql: `SELECT * FROM documents
+              WHERE entity_type = 'booking' AND entity_id = ? AND kind IN ('refund_evidence', 'cancellation_evidence')
+              ORDER BY created_at DESC`,
         params: [bookingId],
       }),
       this.db.query({ sql: `SELECT * FROM booking_participant WHERE booking_id = ?`, params: [bookingId] }),
