@@ -17,13 +17,21 @@ Last reviewed: 2026-09-02
 - **D10 — Documentation refactor published** — overview + kanban + focused PRDs + reference archive.
 - **D11 — PRD 01 business review closed** — profile/address fields, counseling intake, individual-only scope, online prices, offline price/schedule/venue, cutoff, and labels are approved. Implementation is intentionally deferred.
 - **D12 — PRD 02 business review closed** — manual payment flow: client transfers, sends proof via WhatsApp, Admin verifies in the web admin dashboard, then the official invoice is generated and the booking is confirmed; under/overpayment rules and cancellation note defined. Implementation is intentionally deferred.
-- **D13 — PRD 03 business review closed** — public navigation (Beranda, Layanan with four-pillar hover submenu, List Psikolog, About, FAQ), warm-professional tone, public-claim policy, 100% Bahasa Indonesia, placeholder visual assets. Implementation is intentionally deferred.
+- **D14 — PRD 04 business review closed** — Sunday–Saturday booking, public-holiday closure, 60-minute shared grid, Admin WhatsApp changes, and psychologist-unavailable procedure approved. Implementation is intentionally deferred.
+- **D15 — PRD 05 business review closed** — client-side cancellation/refund via WhatsApp only; Admin status and cancellation/refund evidence requirements approved. Implementation is intentionally deferred.
+- **D16 — PRD 06 business review closed** — data scope, client/Admin access, scoped psychologist sharing, client rights, email breach notice, 18+ policy, no marketing, and placeholder public copy approved. Implementation is intentionally deferred.
+- **D17 — PRD 07 business review closed** — Superadmin/Admin/Psychologist roles, one Superadmin, dashboard procedures, audit trail, and 1-hour operational target approved. Implementation is intentionally deferred.
+- **D18 — PRD 08 business review closed** — lightweight maintainer launch checklist approved; deferred features separated from launch blockers. Implementation is intentionally deferred.
 
 ## DOING — current focus
 
-- **W03 — PRD 08 Launch Checklist review** — use the lightweight maintainer checklist to separate real launch blockers from later features.
+- **No active product-owner review item.** Business PRD review is complete. The next item is implementation planning, but implementation remains paused until explicitly resumed.
 
-Implementation of PRD 01–07 remains deferred while the PRD review sequence continues.
+## NEXT — ordered
+
+- **N10 — Implementation backlog** — translate the closed PRDs into small implementation slices and acceptance tests. Do not modify code yet.
+- **N11 — Implementation approval checkpoint** — review the backlog, dependencies, and test seams before coding.
+- **N12 — Resume implementation** — only after explicit user approval.
 
 The documentation refactor is complete: this board and the focused PRDs are now the default reading path.
 

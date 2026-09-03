@@ -1,6 +1,6 @@
 # PRD 08 — Launch Checklist
 
-Status: **Working checklist** (2026-09-02). This is intentionally lightweight for one long-term maintainer.
+Status: **Business review closed** on 2026-09-02. Implementation intentionally deferred.
 
 ## How to use this checklist
 
@@ -129,7 +129,7 @@ The launch decision is not “production-ready forever”. Re-run sections B–G
 
 ## Status
 
-**Ready for business review.** This checklist is a practical release aid, not an enterprise governance process.
+**Business review closed.** This checklist is a practical release aid, not an enterprise governance process. Implementation and checklist execution are separate: the checklist is not marked Ready merely because the PRD review is closed.
 
 ## Related
 

@@ -1,6 +1,6 @@
 # PRD 06 — Privacy & Consent
 
-Status: **Business review in progress** (2026-09-02). Data scope, access, and rights are now defined; public copy is placeholder until clinical/ethics and legal sign-off.
+Status: **Business review closed** on 2026-09-02. Implementation intentionally deferred.
 
 ## Goal
 
@@ -115,7 +115,13 @@ The placeholder is acceptable during development. The final copy requires clinic
 - `docs/adr/0086-audit-security-retention-policy.md`
 - `docs/adr/0087-client-redaction-pseudonymization.md`
 
+## Status
+
+**Business review closed. Implementation intentionally deferred.**
+
+The remaining items are final public copy, technical controls, retention configuration, and operational procedure follow-ups.
+
 ## Change log
 
 - 2026-09-02: Initial data boundary and consent rules from Round 3.
-- 2026-09-02: Recorded product-owner decisions: data scope covers full profile, booking, and history; access limited to the client and Admin (with psychologist access scoped to a specific booking); client rights to access, correct, and delete data; data breach notification by email; no marketing or newsletter; minor policy remains 18+ only; the three public copies remain placeholder until clinical/ethics and legal sign-off.
+- 2026-09-02: Recorded product-owner decisions: full profile, booking, and history data; client/Admin access with scoped psychologist sharing; client access/correction/deletion rights; email breach notification; no marketing; 18+ only; public copies remain placeholders until sign-off.

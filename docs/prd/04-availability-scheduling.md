@@ -1,6 +1,6 @@
 # PRD 04 — Availability & Scheduling
 
-Status: **Business review in progress** (2026-09-02). Slot rules, schedule, and capacity are already locked in PRD 01; this PRD records the resulting availability surface and the remaining schedule/exception details.
+Status: **Business review closed** on 2026-09-02. Implementation intentionally deferred.
 
 ## Goal
 
@@ -88,6 +88,11 @@ Expose only slots that are genuinely bookable for the selected offering and prot
 - `docs/prd/07-staff-admin-operations.md`
 - `docs/adr/0091-capacity-overlap-buffer.md`
 
+## Status
+
+**Business review closed. Implementation intentionally deferred.**
+
+The remaining operational and Admin UI details are implementation/planning follow-ups, not unresolved business rules.
 ## Change log
 
 - 2026-09-02: Initial locked rules based on the PRD 01 review (timezone, duration, transition buffer, horizon, cutoff, offline schedule, venue, online services).

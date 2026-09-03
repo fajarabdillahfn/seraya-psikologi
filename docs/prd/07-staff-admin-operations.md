@@ -1,6 +1,6 @@
 # PRD 07 — Staff & Admin Operations
 
-Status: **Business review in progress** (2026-09-02). Roles, bootstrap, and operational procedures are now defined.
+Status: **Business review closed** on 2026-09-02. Implementation intentionally deferred.
 
 ## Goal
 
@@ -204,7 +204,13 @@ The audit trail is append-only. It is the source of truth for the SLA, for the c
 - `docs/adr/0080-google-sso-staff-access.md`
 - `docs/adr/0081-two-admin-bootstrap.md`
 
+## Status
+
+**Business review closed. Implementation intentionally deferred.**
+
+The remaining items are technical security settings, operational templates, and implementation follow-ups; they do not reopen the role or workflow decisions.
+
 ## Change log
 
 - 2026-09-02: Initial role and bootstrap rules from the Round 2 review.
-- 2026-09-02: Recorded product-owner decisions: roles Superadmin/Admin/Psychologist; one Superadmin; free capacity for Admin and Psychologist; the Admin dashboard is the only place where payment verification, cancellation/refund, schedule exceptions, and staff onboarding are performed; Admin response SLA is 1 hour, between 08.00 and 20.00 WIB, with the rest of the day falling to the next window.
+- 2026-09-02: Recorded product-owner decisions: Superadmin/Admin/Psychologist roles; one Superadmin; dashboard-based operations; Admin response SLA 1 hour during 08.00–20.00 WIB.

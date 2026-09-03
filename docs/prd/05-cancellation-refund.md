@@ -1,6 +1,6 @@
 # PRD 05 — Cancellation & Refund
 
-Status: **Business review in progress** (2026-09-02). Client-side handling and the Admin-side evidence model are now defined.
+Status: **Business review closed** on 2026-09-02. Implementation intentionally deferred.
 
 ## Goal
 
@@ -117,7 +117,13 @@ For each cancellation/refund action, the workspace records:
 - `docs/adr/0077-launch-full-or-no-refund.md`
 - `docs/adr/0095-package-cancellation-matrix.md`
 
+## Status
+
+**Business review closed. Implementation intentionally deferred.**
+
+The remaining items are implementation, retention, and operational template follow-ups; they do not reopen the business decision.
+
 ## Change log
 
-- 2026-09-02: Initial rule from PRD 04: cancellation/refund handled by Admin via WhatsApp; no public UI; public policy in Terms and Conditions.
-- 2026-09-02: Expanded with Admin status model (`none`, `requested`, `approved`, `rejected`, `refund_pending`, `refund_completed`, `refund_failed`) and evidence requirements (WhatsApp screenshot for cancellation, transfer proof for refund), and the required fields per Admin action.
+- 2026-09-02: Initial rule: cancellation/refund handled by Admin via WhatsApp; no public UI; public policy in Terms and Conditions.
+- 2026-09-02: Added Admin status model and evidence requirements: WhatsApp screenshot for cancellation, transfer proof for refund, and required fields per Admin action.
