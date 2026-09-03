@@ -36,7 +36,30 @@ const BASE_STYLES = `
   small.muted { color:var(--muted); }
   .warning { background:#fff8e8; border-left:4px solid #c48727; padding:12px 16px; margin:16px 0; border-radius:0 10px 10px 0; }
   .success { background:#eef8f3; border-left:4px solid var(--brand); padding:12px 16px; margin:16px 0; border-radius:0 10px 10px 0; }
-  @media (max-width:720px) { .shell{padding:0 16px} header{position:static} .nav{align-items:flex-start; flex-direction:column; gap:10px} nav{width:100%} main{padding:28px 0}.grid{grid-template-columns:1fr}.hero{border-radius:16px;padding:28px 22px} table{display:block;overflow-x:auto;white-space:nowrap} }
+  .skip-link { position:absolute; left:-999px; top:8px; background:#fff; color:var(--brand-dark); padding:10px 14px; z-index:10; border-radius:8px; }
+  .skip-link:focus { left:8px; }
+  .nav-link { position:relative; }
+  .menu-panel { position:absolute; top:calc(100% + 10px); right:0; width:360px; padding:14px; background:#fff; border:1px solid var(--line); border-radius:16px; box-shadow:0 14px 34px rgba(35,48,46,.14); opacity:0; pointer-events:none; transform:translateY(-6px); transition:opacity .15s ease,transform .15s ease; }
+  .nav-link:focus-within .menu-panel,.nav-link:hover .menu-panel { opacity:1; pointer-events:auto; transform:translateY(0); }
+  .menu-panel a { display:block; padding:12px; margin:2px 0; }
+  .menu-panel strong { display:block; color:var(--brand-dark); }
+  .menu-panel small { display:block; color:var(--muted); margin-top:2px; }
+  .hero-split { display:grid; grid-template-columns:minmax(0,1.15fr) minmax(280px,.85fr); align-items:center; gap:36px; }
+  .hero-art { min-height:320px; display:grid; place-items:center; background:radial-gradient(circle at 50% 45%,#fff 0 18%,transparent 19%),linear-gradient(145deg,#e4f2ed,#f8ead0); border-radius:28px; overflow:hidden; position:relative; }
+  .hero-art:after { content:""; position:absolute; inset:22px; border:1px solid rgba(49,92,87,.15); border-radius:22px; }
+  .hero-art img { width:min(62%,260px); border-radius:24px; position:relative; z-index:1; box-shadow:0 18px 34px rgba(49,92,87,.18); }
+  .eyebrow { text-transform:uppercase; letter-spacing:.12em; font-size:.76rem; font-weight:800; color:var(--brand); }
+  .trust-row { display:flex; flex-wrap:wrap; gap:8px; margin-top:22px; }
+  .trust-pill { padding:8px 11px; border:1px solid var(--line); border-radius:999px; background:rgba(255,255,255,.7); font-size:.84rem; color:var(--brand-dark); }
+  .section-intro { max-width:680px; color:var(--muted); }
+  .service-card { display:flex; flex-direction:column; min-height:250px; }
+  .service-card .cta-secondary { margin-top:auto; align-self:flex-start; }
+  .stepper { display:grid; grid-template-columns:repeat(4,1fr); gap:12px; counter-reset:step; }
+  .step { position:relative; padding:18px; background:#fff; border:1px solid var(--line); border-radius:14px; }
+  .step:before { counter-increment:step; content:counter(step); display:grid; place-items:center; width:30px; height:30px; border-radius:50%; background:var(--warm); color:var(--brand-dark); font-weight:800; margin-bottom:12px; }
+  .quote-card { background:var(--brand-dark); color:#fff; border-radius:18px; padding:26px; }
+  .quote-card h2,.quote-card p { color:#fff; }
+  @media (max-width:720px) { .shell{padding:0 16px} header{position:static} .nav{align-items:flex-start; flex-direction:column; gap:10px} nav{width:100%} .menu-panel{position:static;width:100%;margin-top:8px;display:none} .nav-link:hover .menu-panel,.nav-link:focus-within .menu-panel{display:block} main{padding:28px 0}.grid{grid-template-columns:1fr}.hero{border-radius:16px;padding:24px 18px}.hero-split{grid-template-columns:1fr;gap:24px}.hero-art{min-height:230px}.stepper{grid-template-columns:1fr} table{display:block;overflow-x:auto;white-space:nowrap} }
 `;
 
 const base = (title: string, body: string) =>
@@ -45,11 +68,11 @@ const base = (title: string, body: string) =>
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>${title} — Seraya Psikologi</title>
     <style>${BASE_STYLES}</style>
-  </head><body><header><div class="shell nav">
+  </head><body><a class="skip-link" href="#main-content">Lewati ke konten utama</a><header><div class="shell nav">
       <a class="brand" href="/"><img src="/static/logo.jpeg" alt="Logo Seraya Psikologi"><span>Seraya Psikologi</span></a>
-      <nav aria-label="Navigasi utama"><a href="/">Beranda</a><a href="/pulang">Layanan</a><a href="/fuja">Psikolog</a><a href="/faq">FAQ</a><a href="/book">Booking</a></nav>
+      <nav aria-label="Navigasi utama"><a href="/">Beranda</a><span class="nav-link"><a href="/layanan" aria-haspopup="true">Layanan</a><span class="menu-panel" role="menu"><a href="/pulang" role="menuitem"><strong>SERAYA PULANG · Tersedia</strong><small>Konseling individu via Chat, Call, atau tatap muka.</small></a><a href="/layanan#berdaya" role="menuitem"><strong>SERAYA BERDAYA · Segera hadir</strong><small>Ruang refleksi dan penguatan diri.</small></a><a href="/layanan#bersama" role="menuitem"><strong>SERAYA BERSAMA · Segera hadir</strong><small>Aktivitas kelompok dan komunitas.</small></a><a href="/layanan#berbagi" role="menuitem"><strong>SERAYA BERBAGI · Segera hadir</strong><small>Edukasi kesehatan mental untuk publik.</small></a></span></span><a href="/psikolog">List Psikolog</a><a href="/about">Tentang Seraya</a><a href="/faq">FAQ</a><a class="cta-secondary" href="/book">Booking Sesi</a></nav>
     </div></header>
-    <main><div class="shell">${body}</div></main>
+    <main id="main-content"><div class="shell">${body}</div></main>
     <footer><div class="shell">
       <p>Seraya Psikologi — bukan layanan kegawatdaruratan. <a href="/safety/crisis">Butuh bantuan segera?</a></p>
       <p><small class="muted"><a href="/privacy">Privasi</a> · <a href="/consent">Informed Consent</a> · <a href="/cancellation">Cancellation</a></small></p>
@@ -64,45 +87,22 @@ export function renderHome(p: {
 }): string {
   return base(
     "Beranda",
-    `<section class="hero">
-      <h1>Ruang untuk pulang ke diri sendiri</h1>
-      <p>Seraya Psikologi mendampingi kamu memahami apa yang sedang kamu hadapi — dengan psikolog umum, online atau offline, dari ${p.priceOnlineSingle} per sesi.</p>
-      <p><a class="cta" href="/pulang">Mulai dari SERAYA PULANG</a></p>
+    `<div class="hero hero-split">
+      <div><p class="eyebrow">Ruang aman untuk berproses</p><h1>Ruang yang tenang untuk pulang ke diri sendiri.</h1>
+      <p>Konseling individu bersama ${p.psychologistName}. Hadir melalui Chat, Call, atau tatap muka di Karangploso, Malang.</p>
+      <p><a class="cta" href="/book">Mulai Konseling Sekarang →</a> <a class="cta-secondary" href="/pulang">Kenali Layanan</a></p>
+      <div class="trust-row"><span class="trust-pill">✓ Sesi utuh 60 menit</span><span class="trust-pill">✓ Harga transparan</span><span class="trust-pill">✓ Tanpa catatan klinis di web</span></div></div>
+      <div class="hero-art"><img src="/static/logo.jpeg" alt="Logo Seraya Psikologi"></div>
+    </div>
+    <section><p class="eyebrow">Kenapa Seraya?</p><h2>Tempat untuk memahami apa yang sedang kamu hadapi</h2><p class="section-intro">Kamu tidak harus punya semua jawaban sebelum mulai bercerita. Seraya menyediakan ruang konseling yang hangat, jelas, dan menghormati batas privasimu.</p>
+      <div class="grid"><div class="card"><h3>Didengar tanpa dihakimi</h3><p>Datang dengan cerita dan ritmemu sendiri. Sesi dirancang sebagai ruang percakapan yang aman.</p></div><div class="card"><h3>Jelas sejak awal</h3><p>Durasi, pilihan mode, harga, dan langkah pembayaran dijelaskan sebelum kamu booking.</p></div><div class="card"><h3>Privasi dihormati</h3><p>Sistem menyimpan data operasional seperlunya dan tidak menyimpan catatan klinis sesi.</p></div></div>
     </section>
-    <section>
-      <h2>Untuk apa Seraya?</h2>
-      <div class="card">
-        <p>Seraya membantu kamu dengan:</p>
-        <ul>
-          <li>Pengembangan diri dan pemahaman diri</li>
-          <li>Pengelolaan emosi dan stres</li>
-          <li>Kepercayaan diri dan self-esteem</li>
-        </ul>
-        <p>Kami tidak menangani kondisi yang membutuhkan psikolog klinis spesialis, psikiatri, atau kegawatdaruratan.</p>
-      </div>
+    <section><p class="eyebrow">Layanan peluncuran</p><h2>SERAYA PULANG</h2><p class="section-intro">Pilih cara bercerita yang paling nyaman untukmu. Semua sesi berlangsung 60 menit dan dibuka Senin–Minggu pada jadwal yang tersedia.</p>
+      <div class="grid"><div class="card service-card"><p class="eyebrow">Online</p><h3>Chat</h3><p class="price">Rp99.000</p><p>Untuk kamu yang lebih nyaman menyusun kata lewat tulisan.</p><a class="cta-secondary" href="/book">Pilih Sesi Chat →</a></div><div class="card service-card"><p class="eyebrow">Online</p><h3>Call</h3><p class="price">Rp125.000</p><p>Percakapan dua arah dari tempat yang nyaman untukmu.</p><a class="cta-secondary" href="/book">Pilih Sesi Call →</a></div><div class="card service-card"><p class="eyebrow">Offline · Malang</p><h3>Tatap Muka</h3><p class="price">Rp200.000</p><p>Di Havana Park Blok H-3, Kepuharjo, Karangploso.</p><a class="cta-secondary" href="/book">Pilih Sesi Offline →</a></div></div>
     </section>
-    <section>
-      <h2>Kenalan dengan ${p.psychologistName}</h2>
-      <p>Fuja akan menemani sesi pertama kamu. Pendekatan hangat, empatik, dan bebas penghakiman.</p>
-      <p><a class="cta-secondary" href="/fuja">Lihat profil Fuja</a> <a class="cta-secondary" href="/book">Booking sesi</a></p>
-    </section>
-    <section>
-      <h2>Harga transparan</h2>
-      <div class="card">
-        <p><strong>Individual:</strong> online ${p.priceOnlineSingle} · offline ${p.priceOfflineSingle} (per sesi, 60 menit)</p>
-        <p><strong>Paket:</strong> tersedia 2 dan 3 sesi dengan harga lebih hemat</p>
-        <p><small class="muted">SERAYA BERDAYA, BERSAMA, BERBAGI — pilar program lain yang belum membuka booking di MVP.</small></p>
-      </div>
-    </section>
-    <section>
-      <h2>Bagaimana cara booking?</h2>
-      <ol>
-        <li>Pilih layanan dan slot yang tersedia</li>
-        <li>Isi data minimum dan setujui informed consent</li>
-        <li>Bayar via QRIS atau transfer bank, lalu kirim bukti ke Admin via WhatsApp</li>
-        <li>Terima konfirmasi dan detail sesi lewat email</li>
-      </ol>
-    </section>`
+    <section class="quote-card"><p class="eyebrow" style="color:#f3e9d2">Bersama Fuja</p><h2>Berproses dengan psikolog yang mendengar tanpa menghakimi</h2><p>${p.psychologistName} mendampingi sesi dengan pendekatan hangat, empatik, dan client-centered.</p><p><a class="cta-secondary" style="border-color:#fff;color:#fff" href="/fuja">Lihat Profil Fuja</a></p></section>
+    <section><p class="eyebrow">Cara memulai</p><h2>Empat langkah sederhana</h2><div class="stepper"><div class="step"><h3>Pilih mode</h3><p>Chat, Call, atau Offline sesuai kebutuhanmu.</p></div><div class="step"><h3>Pilih jadwal</h3><p>Lihat slot yang tersedia dan pilih waktu yang cocok.</p></div><div class="step"><h3>Isi intake</h3><p>Ceritakan topik sesi dan setujui informed consent.</p></div><div class="step"><h3>Transfer & konfirmasi</h3><p>Kirim bukti ke WhatsApp Admin. Invoice resmi terbit setelah verifikasi.</p></div></div></section>
+    <section><h2>Batas layanan kami</h2><div class="card"><p>Seraya melayani kebutuhan konseling individu non-darurat untuk usia 18 tahun ke atas. Seraya bukan layanan kegawatdaruratan, diagnosis psikiatri, atau layanan peresepan obat.</p><p><a class="cta-secondary" href="/safety/crisis">Butuh bantuan segera?</a> <a class="cta" href="/book">Booking Sesi</a></p></div></section>`
   );
 }
 
@@ -137,7 +137,23 @@ export function renderPulang(p: { psychologistName: string }): string {
   );
 }
 
-export function renderFuja(p: {
+export function renderServicesPage(): string {
+  return base("Layanan", `<p class="eyebrow">Layanan Seraya</p><h1>Pilih ruang yang paling nyaman untukmu.</h1>
+    <p class="section-intro">Saat ini Seraya membuka satu layanan: konseling individu melalui SERAYA PULANG. Program lain sedang kami siapkan dengan tenang.</p>
+    <section class="card"><p class="eyebrow">Tersedia sekarang</p><h2>SERAYA PULANG</h2><p>Konseling individu 1-on-1 bersama Fuja Rahayu Kinanti, S.Psi., Psikolog. Durasi setiap sesi 60 menit.</p><div class="grid"><div class="card service-card"><h3>Chat</h3><p class="price">Rp99.000</p><p>Untuk kamu yang lebih nyaman menulis.</p><a class="cta-secondary" href="/book">Lihat jadwal Chat →</a></div><div class="card service-card"><h3>Call</h3><p class="price">Rp125.000</p><p>Percakapan suara atau video dari tempatmu.</p><a class="cta-secondary" href="/book">Lihat jadwal Call →</a></div><div class="card service-card"><h3>Tatap Muka</h3><p class="price">Rp200.000</p><p>Havana Park Blok H-3, Kepuharjo, Karangploso.</p><a class="cta-secondary" href="/book">Lihat jadwal Offline →</a></div></div></section>
+    <section><p class="eyebrow">Segera hadir</p><h2>Pilar Seraya lainnya</h2><div class="grid"><div class="card"><h3>SERAYA BERDAYA</h3><p>Ruang edukasi mandiri dan refleksi pribadi.</p><span class="trust-pill">Segera hadir</span></div><div class="card"><h3>SERAYA BERSAMA</h3><p>Aktivitas kelompok dan ruang bertumbuh bersama.</p><span class="trust-pill">Segera hadir</span></div><div class="card"><h3>SERAYA BERBAGI</h3><p>Wawasan kesehatan mental untuk masyarakat luas.</p><span class="trust-pill">Segera hadir</span></div></div></section>`);
+}
+
+export function renderAboutPage(): string {
+  return base("Tentang Seraya", `<p class="eyebrow">Tentang Seraya</p><h1>Kami percaya setiap cerita layak mendapat ruang.</h1>
+    <p class="section-intro">Seraya Psikologi hadir sebagai ruang konseling yang hangat, terjangkau, dan jujur tentang batas layanan psikologi umum.</p>
+    <section class="card"><h2>Mengapa Seraya ada?</h2><p>Memulai konseling tidak selalu mudah. Karena itu kami ingin membuat langkah pertama terasa lebih jelas: kamu tahu siapa yang mendampingi, berapa biayanya, bagaimana menjadwalkan sesi, dan bagaimana data kamu diperlakukan.</p><p>Seraya dibangun dengan pendekatan manusiawi—mendengarkan tanpa menghakimi, tanpa menjanjikan hasil instan, dan tanpa menyimpan catatan klinis di sistem website.</p></section>
+    <section class="quote-card"><h2>Ruang aman bukan berarti tanpa batas.</h2><p>Kami melayani konseling individu non-darurat untuk usia 18 tahun ke atas. Jika kebutuhanmu berada di luar kompetensi layanan, kami akan menyarankan rujukan yang lebih tepat.</p></section>
+    <section><h2>Nilai yang kami pegang</h2><div class="grid"><div class="card"><h3>Jelas</h3><p>Harga, durasi, proses booking, dan batas layanan dijelaskan sejak awal.</p></div><div class="card"><h3>Hangat</h3><p>Kamu boleh datang sebagai dirimu sendiri, dengan ritme yang terasa aman.</p></div><div class="card"><h3>Menjaga privasi</h3><p>Data hanya digunakan untuk kebutuhan layanan, booking, komunikasi, dan administrasi.</p></div></div></section>
+    <section class="card"><h2>Mulai dari langkah kecil</h2><p>Kenali layanan peluncuran kami atau langsung pilih jadwal bersama Fuja.</p><a class="cta" href="/book">Booking Sesi →</a></section>`);
+}
+
+ export function renderFuja(p: {
   name: string;
   bio: string;
   expertise: string[];

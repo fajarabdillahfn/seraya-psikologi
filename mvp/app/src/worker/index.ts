@@ -36,6 +36,8 @@ import { AdminWorkspaceModule } from "../modules/admin";
 import {
   renderHome,
   renderPulang,
+  renderServicesPage,
+  renderAboutPage,
   renderFuja,
   renderFaq,
   renderCrisisNotice,
@@ -185,7 +187,9 @@ app.get("/pulang", (c) =>
   }))
 );
 
-app.get("/about", (c) => c.html("<h1>Tentang Seraya</h1><p>Placeholder.</p>"));
+app.get("/layanan", (c) => c.html(renderServicesPage()));
+app.get("/about", (c) => c.html(renderAboutPage()));
+app.get("/psikolog", (c) => c.redirect("/fuja"));
 
 app.get("/fuja", (c) =>
   c.html(renderFuja({
