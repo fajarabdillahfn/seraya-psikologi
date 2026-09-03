@@ -10,7 +10,7 @@ Collect only the data needed to book and operate a session, while making the bou
 
 The MVP stores the following categories of data:
 
-- **Client profile data** (see PRD 01): full name, preferred name, date of birth, gender, occupation, education, WhatsApp phone number, status, religion, country, province, city/regency, address. The profile is captured during the first login and reused for every booking.
+- **Client profile data** (see PRD 01): Google SSO account identity/name, user-provided Nama Panggilan, date of birth, gender, occupation, education, WhatsApp phone number, status, religion, country, province, city/regency, address. Google SSO supplies the authenticated account identity; Nama Panggilan is the user-provided profile name.
 - **Booking and intake data**: the selected individual service, selected slot, intake answers (counseling topics, problem description, returning-client flag, expected outcome), the immutable OfferSnapshot, the slot hold record, and the capacity reservation.
 - **Consent record**: the versioned Informed Consent accepted by the client for each booking, with the consent text and timestamp.
 - **Payment evidence**: payment method, amount, evidence metadata, verified-by reference, verified-at timestamp, and status. The full transcript of any WhatsApp conversation about the payment is not stored.

@@ -2,7 +2,9 @@
 
 > Lightweight Kanban. This is the current project-control document. Move an item only when the stated evidence exists.
 
-Last reviewed: 2026-09-02
+Last reviewed: 2026-09-03
+
+> Final cross-review completed with Agy (Gemini 3.8 Flash High) on 2026-09-03. Customer-data boundaries were double-checked; see `docs/reviews/2026-09-02-final-cross-review.md`.
 
 ## DONE — verified
 
@@ -17,6 +19,7 @@ Last reviewed: 2026-09-02
 - **D10 — Documentation refactor published** — overview + kanban + focused PRDs + reference archive.
 - **D11 — PRD 01 business review closed** — profile/address fields, counseling intake, individual-only scope, online prices, offline price/schedule/venue, cutoff, and labels are approved. Implementation is intentionally deferred.
 - **D12 — PRD 02 business review closed** — manual payment flow: client transfers, sends proof via WhatsApp, Admin verifies in the web admin dashboard, then the official invoice is generated and the booking is confirmed; under/overpayment rules and cancellation note defined. Implementation is intentionally deferred.
+- **D13 — PRD 03 business review closed** — public navigation, Layanan submenu, tone, claims, 100% Bahasa Indonesia, placeholder visual assets. Implementation is intentionally deferred.
 - **D14 — PRD 04 business review closed** — Sunday–Saturday booking, public-holiday closure, 60-minute shared grid, Admin WhatsApp changes, and psychologist-unavailable procedure approved. Implementation is intentionally deferred.
 - **D15 — PRD 05 business review closed** — client-side cancellation/refund via WhatsApp only; Admin status and cancellation/refund evidence requirements approved. Implementation is intentionally deferred.
 - **D16 — PRD 06 business review closed** — data scope, client/Admin access, scoped psychologist sharing (including confirmed booking mode, slot, topics, non-clinical description, expected outcome, and returning-client flag), client rights, email breach notice, 18+ policy, no marketing, and placeholder public copy approved. Implementation is intentionally deferred.

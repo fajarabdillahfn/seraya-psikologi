@@ -16,8 +16,11 @@
 - Brand: **Seraya Psikologi**.
 - Launch bookable program: **SERAYA PULANG**.
 - Launch psychologist: **Fuja Rahayu Kinanti** (publication evidence still needs operational verification).
-- Session: individual online/offline counseling, 60 minutes.
-- Client: Google SSO login required; all profile/address fields and all counseling-intake fields are required before booking.
+- **Session:** individual online/offline counseling, 60 minutes.
+- **Client:** Google SSO login required; guest booking is not allowed; all profile/address and counseling-intake fields are required before booking.
+- **Online services:** Chat Rp99.000 and Call Rp125.000.
+- **Offline service:** Rp200.000 at Havana Park, 09.00–12.00 and 16.00–20.00 WIB.
+- **Booking cutoff:** 2 hours before session start.
 - Cancellation/refund: Admin WhatsApp; no public cancellation/refund UI; outcomes are full refund or no refund.
 - Couple counseling: modeled, but launch timing is still deferred.
 - MVP does not store clinical notes, diagnosis, assessment results, transcripts, or session notes.

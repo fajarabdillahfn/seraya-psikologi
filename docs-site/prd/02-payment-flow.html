@@ -26,7 +26,7 @@
 <li>Header: <strong>Seraya Psikologi</strong>.</li>
 <li>Required sections:</li>
 <li>Booking identifier and issue date.</li>
-<li>Client profile data (name, email, phone, address) and any required intake summary.</li>
+<li>Client profile data needed for identity, contact, and invoice issuance. Do not include counseling topics, problem descriptions, expected outcomes, or other intake narratives in the financial invoice; those remain in the scoped booking record.</li>
 <li>Psychologist and selected service (mode: Chat, Call, or Offline), date, time, duration, and location when applicable.</li>
 <li>Package label and total amount in IDR.</li>
 <li>Payment status and verification reference (e.g., verified by, verified at, payment_proof identifier).</li>
@@ -64,7 +64,7 @@
 <h2 id="privacy-and-data-boundary">Privacy and data boundary</h2>
 <ul>
 <li>The <code>payment_proof</code> table stores: payment method, amount, evidence metadata, verification actor, verification timestamp, and status. It does not store raw WhatsApp transcripts, full bank account details beyond what is needed, or clinical content.</li>
-<li>The booking shows the minimum profile data needed to issue the invoice; the full profile is not duplicated into the invoice.</li>
+<li>The invoice includes only the minimum client profile fields needed for identity, contact, and invoicing; intake narratives are never duplicated into the financial invoice.</li>
 <li>Retention and privacy treatment follow PRD 06 and are production-gated, not enforced by this PRD.</li>
 </ul>
 <h2 id="data-flow">Data flow</h2>
@@ -83,7 +83,7 @@
 <ul>
 <li>Booking is <code>pending_manual_payment</code> immediately after submission; the client cannot see a confirmed state before Admin verification.</li>
 <li>The preliminary view shows booking ID, amount, Seraya account, booking expiry, and a WhatsApp deep-link to Admin.</li>
-<li>The official invoice is only generated after Admin verification; it is not shown on the preliminary view.</li>
+<li>The official invoice is only generated after Admin verification; it contains no counseling intake narratives.</li>
 <li>Underpayment produces a recorded top-up request and the booking remains unconfirmed until settled.</li>
 <li>Overpayment produces a recorded manual return and a separate <code>RefundAction</code>; the booking can be confirmed at the service price.</li>
 <li>Cancellation because no payment is recorded as an explicit cancellation note in the admin dashboard; absence of note means the booking is in progress.</li>
