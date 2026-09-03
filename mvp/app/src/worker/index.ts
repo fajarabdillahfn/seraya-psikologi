@@ -550,6 +550,33 @@ app.post("/api/payment/manual/verify", async (c) => {
   }
 });
 
+app.get("/admin/refunds/new", (c) => {
+  const gate = adminGate(c);
+  if (gate) return gate;
+  return c.html(`<h1>Record Manual Refund</h1>
+    <form method=POST action=/admin/refunds>
+      <label>Booking ID <input name=bookingId required></label><br>
+      <label>Amount IDR <input name=amountIdr type=number min=0 required></label><br>
+      <label>Reason <input name=reasonCategory required></label><br>
+      <label>Note <textarea name=note></textarea></label><br>
+      <button type=submit>Record Refund</button>
+    </form>`);
+});
+
+app.post("/admin/refunds", async (c) => {
+  const gate = adminGate(c);
+  if (gate) return gate;
+  const body = await c.req.parseBody();
+  const adapter = createAdapter({ DB: c.env.DB });
+  const admin = new AdminWorkspaceModule(adapter, new WhatsAppManualPaymentModule(adapter));
+  try {
+    const result = await admin.recordRefund({ bookingId: String(body["bookingId"] ?? ""), amountIdr: Number(body["amountIdr"] ?? 0), reasonCategory: String(body["reasonCategory"] ?? ""), note: body["note"] ? String(body["note"]) : null, actorMembershipId: "PLACEHOLDER_ADMIN" });
+    return c.text(`Refund ${result.refundId} recorded as pending.`);
+  } catch (error) {
+    return c.text(error instanceof Error ? error.message : "Failed to record refund", 400);
+  }
+});
+
 app.get("/admin/cancellations/new", (c) => {
   const gate = adminGate(c);
   if (gate) return gate;

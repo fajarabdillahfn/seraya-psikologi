@@ -137,6 +137,42 @@ export class AdminWorkspaceModule {
     return { evidenceId };
   }
 
+  async recordRefund(args: {
+    bookingId: string;
+    amountIdr: number;
+    reasonCategory: string;
+    note?: string | null;
+    actorMembershipId: string;
+  }): Promise<{ refundId: string }> {
+    if (!Number.isInteger(args.amountIdr) || args.amountIdr < 0) throw new Error("refund amount invalid");
+    const refundId = randomUUID();
+    await this.db.batch([{
+      sql: `INSERT INTO manual_refund (id, booking_id, amount_idr, reason_category, created_by_membership_id, note)
+            VALUES (?, ?, ?, ?, ?, ?)`,
+      params: [refundId, args.bookingId, args.amountIdr, args.reasonCategory.trim(), args.actorMembershipId, args.note?.trim() || null],
+    }]);
+    return { refundId };
+  }
+
+  async completeRefund(args: { refundId: string; actorMembershipId: string }): Promise<void> {
+    const { rows } = await this.db.query<{ booking_id: string; status: string }>({
+      sql: `SELECT booking_id, status FROM manual_refund WHERE id = ?`,
+      params: [args.refundId],
+    });
+    const refund = rows[0];
+    if (!refund) throw new Error("refund not found");
+    if (refund.status !== "pending") throw new Error("refund is already finalized");
+    const { rows: evidence } = await this.db.query<{ id: string }>({
+      sql: `SELECT id FROM admin_evidence WHERE booking_id = ? AND evidence_kind = 'refund_transfer' LIMIT 1`,
+      params: [refund.booking_id],
+    });
+    if (!evidence[0]) throw new Error("refund transfer evidence is required before completion");
+    await this.db.batch([{
+      sql: `UPDATE manual_refund SET status = 'completed', completed_by_membership_id = ?, completed_at = datetime('now') WHERE id = ? AND status = 'pending'`,
+      params: [args.actorMembershipId, args.refundId],
+    }]);
+  }
+
   /**
    * Apply cancellation decision. ADR 0095 transition matrix.
    * Atomic per-target effects:
