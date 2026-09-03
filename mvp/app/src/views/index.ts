@@ -47,7 +47,11 @@ const BASE_STYLES = `
   .hero-split { display:grid; grid-template-columns:minmax(0,1.15fr) minmax(280px,.85fr); align-items:center; gap:36px; }
   .hero-art { min-height:320px; display:grid; place-items:center; background:radial-gradient(circle at 50% 45%,#fff 0 18%,transparent 19%),linear-gradient(145deg,#e4f2ed,#f8ead0); border-radius:28px; overflow:hidden; position:relative; }
   .hero-art:after { content:""; position:absolute; inset:22px; border:1px solid rgba(49,92,87,.15); border-radius:22px; }
-  .hero-art img { width:min(62%,260px); border-radius:24px; position:relative; z-index:1; box-shadow:0 18px 34px rgba(49,92,87,.18); }
+  .hero-art img { width:min(44%,190px); aspect-ratio:1; object-fit:cover; border-radius:50%; position:relative; z-index:1; box-shadow:0 18px 34px rgba(49,92,87,.18); }
+  .hero-orbit { position:absolute; border:1px solid rgba(49,92,87,.22); border-radius:50%; }
+  .orbit-one { width:72%; aspect-ratio:1; }
+  .orbit-two { width:88%; aspect-ratio:1; border-style:dashed; transform:rotate(22deg); }
+  .hero-caption { position:absolute; bottom:24px; z-index:1; text-align:center; color:var(--brand-dark); font-size:.82rem; font-weight:700; line-height:1.35; }
   .eyebrow { text-transform:uppercase; letter-spacing:.12em; font-size:.76rem; font-weight:800; color:var(--brand); }
   .trust-row { display:flex; flex-wrap:wrap; gap:8px; margin-top:22px; }
   .trust-pill { padding:8px 11px; border:1px solid var(--line); border-radius:999px; background:rgba(255,255,255,.7); font-size:.84rem; color:var(--brand-dark); }
@@ -92,7 +96,7 @@ export function renderHome(p: {
       <p>Konseling individu bersama ${p.psychologistName}. Hadir melalui Chat, Call, atau tatap muka di Karangploso, Malang.</p>
       <p><a class="cta" href="/book">Mulai Konseling Sekarang →</a> <a class="cta-secondary" href="/pulang">Kenali Layanan</a></p>
       <div class="trust-row"><span class="trust-pill">✓ Sesi utuh 60 menit</span><span class="trust-pill">✓ Harga transparan</span><span class="trust-pill">✓ Tanpa catatan klinis di web</span></div></div>
-      <div class="hero-art"><img src="/static/logo.jpeg" alt="Logo Seraya Psikologi"></div>
+      <div class="hero-art"><span class="hero-orbit orbit-one"></span><span class="hero-orbit orbit-two"></span><img src="/static/logo.jpeg" alt="Logo Seraya Psikologi"><span class="hero-caption">Ruang untuk berhenti sejenak,<br>lalu melangkah dengan lebih sadar.</span></div>
     </div>
     <section><p class="eyebrow">Kenapa Seraya?</p><h2>Tempat untuk memahami apa yang sedang kamu hadapi</h2><p class="section-intro">Kamu tidak harus punya semua jawaban sebelum mulai bercerita. Seraya menyediakan ruang konseling yang hangat, jelas, dan menghormati batas privasimu.</p>
       <div class="grid"><div class="card"><h3>Didengar tanpa dihakimi</h3><p>Datang dengan cerita dan ritmemu sendiri. Sesi dirancang sebagai ruang percakapan yang aman.</p></div><div class="card"><h3>Jelas sejak awal</h3><p>Durasi, pilihan mode, harga, dan langkah pembayaran dijelaskan sebelum kamu booking.</p></div><div class="card"><h3>Privasi dihormati</h3><p>Sistem menyimpan data operasional seperlunya dan tidak menyimpan catatan klinis sesi.</p></div></div>
@@ -100,7 +104,7 @@ export function renderHome(p: {
     <section><p class="eyebrow">Layanan peluncuran</p><h2>SERAYA PULANG</h2><p class="section-intro">Pilih cara bercerita yang paling nyaman untukmu. Semua sesi berlangsung 60 menit dan dibuka Senin–Minggu pada jadwal yang tersedia.</p>
       <div class="grid"><div class="card service-card"><p class="eyebrow">Online</p><h3>Chat</h3><p class="price">Rp99.000</p><p>Untuk kamu yang lebih nyaman menyusun kata lewat tulisan.</p><a class="cta-secondary" href="/book">Pilih Sesi Chat →</a></div><div class="card service-card"><p class="eyebrow">Online</p><h3>Call</h3><p class="price">Rp125.000</p><p>Percakapan dua arah dari tempat yang nyaman untukmu.</p><a class="cta-secondary" href="/book">Pilih Sesi Call →</a></div><div class="card service-card"><p class="eyebrow">Offline · Malang</p><h3>Tatap Muka</h3><p class="price">Rp200.000</p><p>Di Havana Park Blok H-3, Kepuharjo, Karangploso.</p><a class="cta-secondary" href="/book">Pilih Sesi Offline →</a></div></div>
     </section>
-    <section class="quote-card"><p class="eyebrow" style="color:#f3e9d2">Bersama Fuja</p><h2>Berproses dengan psikolog yang mendengar tanpa menghakimi</h2><p>${p.psychologistName} mendampingi sesi dengan pendekatan hangat, empatik, dan client-centered.</p><p><a class="cta-secondary" style="border-color:#fff;color:#fff" href="/fuja">Lihat Profil Fuja</a></p></section>
+    <section class="quote-card"><p class="eyebrow" style="color:#f3e9d2">Bersama Fuja</p><h2>Berproses dengan psikolog yang mendengar tanpa menghakimi</h2><p>${p.psychologistName} mendampingi sesi dengan pendekatan hangat, empatik, dan client-centered.</p><p><a class="cta-secondary" style="border-color:#fff;color:#fff" href="/fuja">Lihat Profil Fuja</a> <a class="cta" style="background:#f3e9d2;color:#214542" href="/book">Jadwalkan Sesi →</a></p></section>
     <section><p class="eyebrow">Cara memulai</p><h2>Empat langkah sederhana</h2><div class="stepper"><div class="step"><h3>Pilih mode</h3><p>Chat, Call, atau Offline sesuai kebutuhanmu.</p></div><div class="step"><h3>Pilih jadwal</h3><p>Lihat slot yang tersedia dan pilih waktu yang cocok.</p></div><div class="step"><h3>Isi intake</h3><p>Ceritakan topik sesi dan setujui informed consent.</p></div><div class="step"><h3>Transfer & konfirmasi</h3><p>Kirim bukti ke WhatsApp Admin. Invoice resmi terbit setelah verifikasi.</p></div></div></section>
     <section><h2>Batas layanan kami</h2><div class="card"><p>Seraya melayani kebutuhan konseling individu non-darurat untuk usia 18 tahun ke atas. Seraya bukan layanan kegawatdaruratan, diagnosis psikiatri, atau layanan peresepan obat.</p><p><a class="cta-secondary" href="/safety/crisis">Butuh bantuan segera?</a> <a class="cta" href="/book">Booking Sesi</a></p></div></section>`
   );
