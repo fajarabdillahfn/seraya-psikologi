@@ -61,9 +61,9 @@ export class AdminWorkspaceModule {
       this.db.query({ sql: `SELECT * FROM appointment WHERE booking_id = ?`, params: [bookingId] }),
       this.db.query({ sql: `SELECT * FROM payment_proof WHERE booking_id = ?`, params: [bookingId] }),
       this.db.query({
-        sql: `SELECT * FROM documents
-              WHERE entity_type = 'booking' AND entity_id = ? AND kind IN ('refund_evidence', 'cancellation_evidence')
-              ORDER BY created_at DESC`,
+        sql: `SELECT * FROM admin_evidence
+              WHERE booking_id = ?
+              ORDER BY recorded_at DESC`,
         params: [bookingId],
       }),
       this.db.query({ sql: `SELECT * FROM booking_participant WHERE booking_id = ?`, params: [bookingId] }),
@@ -97,7 +97,7 @@ export class AdminWorkspaceModule {
     targetKind: "booking" | "appointment" | "package_purchase";
     targetId: string;
     clientId: string;
-    intakeChannel: string;
+    intakeChannel: "client_whatsapp" | "admin_whatsapp" | "psychologist_unavailable";
     intakeSummary?: string | null;
   }): Promise<{ cancellationRequestId: string }> {
     const id = randomUUID();
@@ -117,6 +117,24 @@ export class AdminWorkspaceModule {
       },
     ]);
     return { cancellationRequestId: id };
+  }
+
+  async recordEvidence(args: {
+    bookingId: string;
+    evidenceKind: "cancellation_whatsapp" | "refund_transfer";
+    storageReference: string;
+    note?: string | null;
+    actorMembershipId: string;
+  }): Promise<{ evidenceId: string }> {
+    if (!args.storageReference.trim()) throw new Error("evidence reference is required");
+    const evidenceId = randomUUID();
+    await this.db.batch([{
+      sql: `INSERT INTO admin_evidence
+            (id, booking_id, evidence_kind, storage_reference, note, recorded_by_membership_id)
+            VALUES (?, ?, ?, ?, ?, ?)`,
+      params: [evidenceId, args.bookingId, args.evidenceKind, args.storageReference.trim(), args.note?.trim() || null, args.actorMembershipId],
+    }]);
+    return { evidenceId };
   }
 
   /**
@@ -150,6 +168,20 @@ export class AdminWorkspaceModule {
     if (!req) throw new Error("cancellation_request not found");
     if (req.state !== "pending") {
       throw new Error("cancellation_request already decided");
+    }
+
+    if (args.outcome === "approve") {
+      const { rows: evidence } = await this.db.query<{ id: string }>({
+        sql: `SELECT id FROM admin_evidence
+              WHERE booking_id = (
+                SELECT CASE WHEN target_kind = 'booking' THEN target_id
+                  WHEN target_kind = 'appointment' THEN (SELECT booking_id FROM appointment WHERE id = target_id)
+                  ELSE (SELECT booking_id FROM package_purchase WHERE id = target_id) END
+                FROM cancellation_request WHERE id = ?
+              ) AND evidence_kind = 'cancellation_whatsapp' LIMIT 1`,
+        params: [args.cancellationRequestId],
+      });
+      if (!evidence[0]) throw new Error("cancellation evidence is required before approval");
     }
 
     const decisionId = randomUUID();

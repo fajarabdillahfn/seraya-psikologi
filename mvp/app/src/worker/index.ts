@@ -577,10 +577,30 @@ app.post("/admin/cancellations", async (c) => {
     targetKind: String(body["target_kind"] ?? "booking") as "booking" | "appointment" | "package_purchase",
     targetId: String(body["target_id"] ?? ""),
     clientId: String(body["client_id"] ?? ""),
-    intakeChannel: String(body["intake_channel"] ?? "admin_whatsapp"),
+    intakeChannel: String(body["intake_channel"] ?? "admin_whatsapp") as "client_whatsapp" | "admin_whatsapp" | "psychologist_unavailable",
     intakeSummary: body["intake_summary"] ? String(body["intake_summary"]) : null,
   });
   return c.text(`Cancellation request ${id.cancellationRequestId} recorded.`);
+});
+
+app.post("/admin/evidence", async (c) => {
+  const gate = adminGate(c);
+  if (gate) return gate;
+  const body = await c.req.parseBody();
+  const adapter = createAdapter({ DB: c.env.DB });
+  const admin = new AdminWorkspaceModule(adapter, new WhatsAppManualPaymentModule(adapter));
+  try {
+    const result = await admin.recordEvidence({
+      bookingId: String(body["bookingId"] ?? ""),
+      evidenceKind: String(body["evidenceKind"] ?? "cancellation_whatsapp") as "cancellation_whatsapp" | "refund_transfer",
+      storageReference: String(body["storageReference"] ?? ""),
+      note: body["note"] ? String(body["note"]) : null,
+      actorMembershipId: "PLACEHOLDER_ADMIN",
+    });
+    return c.text(`Evidence ${result.evidenceId} recorded.`);
+  } catch (error) {
+    return c.text(error instanceof Error ? error.message : "Failed to record evidence", 400);
+  }
 });
 
 // ---------------------------------------------------------------------------
