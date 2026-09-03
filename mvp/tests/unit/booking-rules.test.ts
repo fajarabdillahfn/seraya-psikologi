@@ -103,3 +103,25 @@ describe("phone normalization", () => {
   });
 });
 
+
+
+describe("AvailabilityModule cutoff query", () => {
+  it("queries only slots strictly after now plus two hours", async () => {
+    const { AvailabilityModule } = await import("../../app/src/modules/availability");
+    let query = "";
+    let params: unknown[] = [];
+    const db = {
+      query: async <T>(q: { sql: string; params?: unknown[] }) => {
+        query = q.sql; params = q.params ?? [];
+        return { rows: [] as T[], rows_read: 0, rows_written: 0 };
+      },
+      batch: async () => ({ rows: [], rows_read: 0, rows_written: 0 }),
+    };
+    await new AvailabilityModule(db as never).listAvailableSlots({
+      offeringId: "offering",
+      now: new Date("2026-09-03T07:00:00.000Z"),
+    });
+    expect(query).toContain("s.starts_at_utc > ?");
+    expect(params[1]).toBe("2026-09-03T09:00:00.000Z");
+  });
+});

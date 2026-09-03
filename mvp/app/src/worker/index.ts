@@ -29,6 +29,8 @@ import { createAdapter } from "../persistence/d1-adapter";
 import { CatalogModule } from "../modules/catalog";
 import { AvailabilityModule } from "../modules/availability";
 import { BookingModule, normalizeIndonesianPhone } from "../modules/booking";
+import { ClientModule, profileInputFromForm } from "../modules/client";
+import { ClientAuthModule, clearSessionCookie, exchangeGoogleCode, googleAuthorizationUrl, readCookie, safeReturnTo, sessionCookie } from "../modules/auth";
 import { WhatsAppManualPaymentModule } from "../modules/payment";
 import { AdminWorkspaceModule } from "../modules/admin";
 import {
@@ -49,11 +51,14 @@ import {
   renderAdminPaymentVerify,
   renderAdminPaymentRecord,
 } from "../views/index";
+import { renderClientLogin, renderClientProfile } from "../views/client-auth";
 
 interface Env {
   DB: D1Database;
   ENVIRONMENT?: string;
-  GOOGLE_OAUTH_CLIENT_ID?: string;  // PLACEHOLDER (TBC-STAFF-SESSION-01)
+  GOOGLE_OAUTH_CLIENT_ID?: string;
+  GOOGLE_OAUTH_CLIENT_SECRET?: string;
+  GOOGLE_OAUTH_REDIRECT_URI?: string;
   EMAIL_PROVIDER_KEY?: string;      // PLACEHOLDER (TBC-NOTIFY-01)
   ALLOW_PLACEHOLDER_ADMIN_AUTH?: string; // 'true' enables /admin/* in dev only
   ADMIN_WHATSAPP_NUMBER?: string;   // e.g. "+6281234567890"
@@ -82,6 +87,78 @@ app.get("/static/css/main.css", async (c) => {
 app.get("/healthz", (c) =>
   c.json({ status: "ok", environment: c.env.ENVIRONMENT ?? "unknown" })
 );
+
+// ---------------------------------------------------------------------------
+// Client Google SSO and profile gate
+// ---------------------------------------------------------------------------
+
+app.get("/auth/login", (c) => {
+  const returnTo = safeReturnTo(c.req.query("return_to"));
+  const error = c.req.query("error");
+  return c.html(renderClientLogin({ returnTo, error }));
+});
+
+app.get("/auth/google", async (c) => {
+  const clientId = c.env.GOOGLE_OAUTH_CLIENT_ID;
+  const redirectUri = c.env.GOOGLE_OAUTH_REDIRECT_URI ?? `${new URL(c.req.url).origin}/auth/callback`;
+  if (!clientId) return c.html(renderClientLogin({ returnTo: safeReturnTo(c.req.query("return_to")), error: "Login Google belum dikonfigurasi." }), 503);
+  const auth = new ClientAuthModule(createAdapter({ DB: c.env.DB }));
+  const state = await auth.createOAuthState(safeReturnTo(c.req.query("return_to")));
+  return c.redirect(googleAuthorizationUrl({ clientId, redirectUri, state }));
+});
+
+app.get("/auth/callback", async (c) => {
+  const code = c.req.query("code");
+  const state = c.req.query("state");
+  const clientId = c.env.GOOGLE_OAUTH_CLIENT_ID;
+  const clientSecret = c.env.GOOGLE_OAUTH_CLIENT_SECRET;
+  const redirectUri = c.env.GOOGLE_OAUTH_REDIRECT_URI ?? `${new URL(c.req.url).origin}/auth/callback`;
+  if (!code || !state || !clientId || !clientSecret) return c.redirect("/auth/login?error=Login%20Google%20belum%20tersedia");
+  try {
+    const adapter = createAdapter({ DB: c.env.DB });
+    const auth = new ClientAuthModule(adapter);
+    const returnTo = await auth.consumeOAuthState(state);
+    const identity = await exchangeGoogleCode({ code, clientId, clientSecret, redirectUri });
+    const client = await new ClientModule(adapter).findOrCreateGoogleClient({ googleSubject: identity.sub, email: identity.email, displayName: identity.name });
+    const session = await auth.createSession(client.id, returnTo);
+    const headers = new Headers({ Location: client.profileComplete ? returnTo : `/client/profile?return_to=${encodeURIComponent(returnTo)}` });
+    headers.append("Set-Cookie", sessionCookie(session.token));
+    return new Response(null, { status: 302, headers });
+  } catch {
+    return c.redirect("/auth/login?error=Gagal%20menghubungkan%20akun%20Google");
+  }
+});
+
+app.get("/auth/logout", async (c) => {
+  const auth = new ClientAuthModule(createAdapter({ DB: c.env.DB }));
+  await auth.revokeSession(readCookie(c.req.raw, "seraya_session"));
+  const headers = new Headers({ Location: "/" });
+  headers.append("Set-Cookie", clearSessionCookie());
+  return new Response(null, { status: 302, headers });
+});
+
+app.get("/client/profile", async (c) => {
+  const adapter = createAdapter({ DB: c.env.DB });
+  const session = await new ClientAuthModule(adapter).getSession(readCookie(c.req.raw, "seraya_session"));
+  if (!session) return c.redirect(`/auth/login?return_to=${encodeURIComponent(safeReturnTo(c.req.query("return_to")))}`);
+  const profile = await new ClientModule(adapter).getProfile(session.clientId);
+  if (!profile) return c.redirect("/auth/login?error=Profil%20tidak%20ditemukan");
+  return c.html(renderClientProfile({ email: profile.email, profile: profile as unknown as Record<string, string> }));
+});
+
+app.post("/client/profile", async (c) => {
+  const adapter = createAdapter({ DB: c.env.DB });
+  const session = await new ClientAuthModule(adapter).getSession(readCookie(c.req.raw, "seraya_session"));
+  if (!session) return c.redirect("/auth/login");
+  const body = await c.req.parseBody();
+  try {
+    await new ClientModule(adapter).saveProfile(session.clientId, profileInputFromForm(body));
+    return c.redirect(safeReturnTo(String(body.returnTo ?? "/book")));
+  } catch {
+    const profile = await new ClientModule(adapter).getProfile(session.clientId);
+    return c.html(renderClientProfile({ email: profile?.email ?? "", profile: body as Record<string, string>, error: "Mohon periksa kembali data profil Anda." }), 400);
+  }
+});
 
 // ---------------------------------------------------------------------------
 // Public surfaces
@@ -134,16 +211,26 @@ app.get("/cancellation", (c) => c.html(renderCancellationPolicy()));
 // Booking flow
 // ---------------------------------------------------------------------------
 
-app.get("/book", (c) =>
-  c.html(renderBookingOffer({
+app.get("/book", async (c) => {
+  const adapter = createAdapter({ DB: c.env.DB });
+  const session = await new ClientAuthModule(adapter).getSession(readCookie(c.req.raw, "seraya_session"));
+  if (!session) return c.redirect(`/auth/login?return_to=${encodeURIComponent("/book")}`);
+  const client = await new ClientModule(adapter).getProfile(session.clientId);
+  if (!client?.profileComplete) return c.redirect(`/client/profile?return_to=${encodeURIComponent("/book")}`);
+  return c.html(renderBookingOffer({
     services: [
       { id: "individual-online-single", name: "Konseling Individu — Online (60 menit)", price: "Rp125.000", mode: "online" },
       { id: "individual-offline-single", name: "Konseling Individu — Offline (60 menit)", price: "Rp200.000", mode: "offline" },
     ],
-  }))
-);
+  }));
+});
 
 app.get("/book/:offeringId/slots", async (c) => {
+  const authAdapter = createAdapter({ DB: c.env.DB });
+  const clientSession = await new ClientAuthModule(authAdapter).getSession(readCookie(c.req.raw, "seraya_session"));
+  if (!clientSession) return c.redirect(`/auth/login?return_to=${encodeURIComponent(`/book/${c.req.param("offeringId")}/slots`)}`);
+  const client = await new ClientModule(authAdapter).getProfile(clientSession.clientId);
+  if (!client?.profileComplete) return c.redirect(`/client/profile?return_to=${encodeURIComponent(`/book/${c.req.param("offeringId")}/slots`)}`);
   const offeringId = c.req.param("offeringId");
   const adapter = createAdapter({ DB: c.env.DB });
   const availability = new AvailabilityModule(adapter);
@@ -154,22 +241,43 @@ app.get("/book/:offeringId/slots", async (c) => {
   return c.html(renderBookingSlot({ offeringId, slots }));
 });
 
-app.get("/book/:offeringId/intake", (c) =>
-  c.html(renderBookingIntake({
+app.get("/book/:offeringId/intake", async (c) => {
+  const authAdapter = createAdapter({ DB: c.env.DB });
+  const clientSession = await new ClientAuthModule(authAdapter).getSession(readCookie(c.req.raw, "seraya_session"));
+  if (!clientSession) return c.redirect(`/auth/login?return_to=${encodeURIComponent(c.req.url)}`);
+  const client = await new ClientModule(authAdapter).getProfile(clientSession.clientId);
+  if (!client?.profileComplete) return c.redirect(`/client/profile?return_to=${encodeURIComponent(c.req.url)}`);
+  const slotId = c.req.query("slot");
+  if (!slotId) {
+    return c.redirect(`/book/${c.req.param("offeringId")}/slots`);
+  }
+  return c.html(renderBookingIntake({
     offeringId: c.req.param("offeringId"),
-    slotId: c.req.query("slot"),
+    slotId,
+    returnTo: `/book/${c.req.param("offeringId")}/intake?slot=${encodeURIComponent(slotId)}`,
     consentVersion: "v1-2026-08-31",
-  }))
-);
+  }));
+});
 
 app.post("/api/booking/create", async (c) => {
   const body = await c.req.parseBody();
+  const returnTo = safeReturnTo(String(body["returnTo"] ?? "/book"));
   const adapter = createAdapter({ DB: c.env.DB });
+  const session = await new ClientAuthModule(adapter).getSession(readCookie(c.req.raw, "seraya_session"));
+  if (!session) return c.redirect(`/auth/login?return_to=${encodeURIComponent(returnTo)}`);
+  const client = await new ClientModule(adapter).getProfile(session.clientId);
+  if (!client?.profileComplete) return c.redirect(`/client/profile?return_to=${encodeURIComponent(returnTo)}`);
+  const offeringId = String(body["offeringId"] ?? "").trim();
+  if (!offeringId) return c.redirect("/book");
+  const catalog = new CatalogModule(adapter);
+  const offering = await catalog.getPublishedOffering(offeringId);
+  if (!offering) return c.text("Layanan tidak tersedia.", 404);
+  const offerSnapshot = await catalog.createCurrentOfferSnapshot(offeringId, "v1-2026-09-03");
   const availability = new AvailabilityModule(adapter);
   const booking = new BookingModule(adapter, availability);
   const result = await booking.createBooking({
-    clientId: String(body["clientId"] ?? ""),
-    offerSnapshotId: String(body["offerSnapshotId"] ?? ""),
+    clientId: session.clientId,
+    offerSnapshotId: offerSnapshot.id,
     slotId: String(body["slotId"] ?? ""),
     idempotencyKey: String(body["idempotencyKey"] ?? crypto.randomUUID()),
     intake: {

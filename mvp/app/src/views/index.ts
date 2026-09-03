@@ -330,14 +330,16 @@ export function renderBookingIntake(p: {
   offeringId: string;
   consentVersion: string;
   slotId?: string;
-  nowIso?: string;
+  returnTo?: string;
 }): string {
+  const returnTo = p.returnTo ?? "/book";
   return base(
     "Data Booking",
     `<h1>Data Booking</h1>
     <form method=POST action=/api/booking/create>
       <input type=hidden name=offeringId value="${p.offeringId}">
       <input type=hidden name=slotId value="${p.slotId ?? ""}">
+      <input type=hidden name=returnTo value="${returnTo}">
       <input type=hidden name=consentVersion value="${p.consentVersion}">
       <p><label>Nama panggilan (wajib)<br><input name=displayName required maxlength=120></label></p>
       <p><label>Tanggal lahir (wajib, minimal 18 tahun)<br><input name=dateOfBirth type=date required></label></p>

@@ -57,6 +57,51 @@ export interface OfferSnapshotRow {
 export class CatalogModule {
   constructor(private readonly db: PersistenceAdapter) {}
 
+  async getPublishedOffering(id: string): Promise<ServiceOfferingRow | null> {
+    const { rows } = await this.db.query<ServiceOfferingRow>({
+      sql: `SELECT so.* FROM service_offering so
+            JOIN psychologist p ON p.id = so.psychologist_id
+            WHERE so.id = ? AND so.active = 1 AND so.audience = 'individual' AND p.publish_status = 'published'`,
+      params: [id],
+    });
+    return rows[0] ?? null;
+  }
+
+  async getCurrentPrice(offeringId: string): Promise<number | null> {
+    const { rows } = await this.db.query<{ price_idr: number }>({
+      sql: `SELECT price_idr FROM service_offering_revision WHERE offering_id = ? ORDER BY version DESC LIMIT 1`,
+      params: [offeringId],
+    });
+    return rows[0]?.price_idr ?? null;
+  }
+
+  async createCurrentOfferSnapshot(offeringId: string, policyVersion = "v1"): Promise<OfferSnapshotRow> {
+    const { rows } = await this.db.query<{
+      mode: "online" | "offline";
+      duration_minutes: number;
+      transition_buffer_min: number;
+      price_idr: number;
+    }>({
+      sql: `SELECT so.mode, sor.duration_minutes, sor.transition_buffer_min, sor.price_idr
+            FROM service_offering so
+            JOIN service_offering_revision sor ON sor.offering_id = so.id
+            WHERE so.id = ? AND so.active = 1 AND so.audience = 'individual'
+            ORDER BY sor.version DESC LIMIT 1`,
+      params: [offeringId],
+    });
+    const current = rows[0];
+    if (!current) throw new Error("offering not found or not bookable");
+    return this.createOfferSnapshot({
+      offeringId,
+      packageId: null,
+      priceIdr: current.price_idr,
+      durationMinutes: current.duration_minutes,
+      transitionBufferMin: current.transition_buffer_min,
+      mode: current.mode,
+      policyVersion,
+    });
+  }
+
   async listPublishedOfferings(): Promise<ServiceOfferingRow[]> {
     const { rows } = await this.db.query<ServiceOfferingRow>({
       sql: `SELECT * FROM service_offering WHERE active = 1
