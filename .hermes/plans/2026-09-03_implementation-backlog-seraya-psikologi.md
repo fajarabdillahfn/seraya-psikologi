@@ -6,6 +6,8 @@
 
 **Architecture:** Keep Cloudflare Worker + Hono + D1 and the `PersistenceAdapter` seam. Work incrementally; do not replace the current MVP wholesale. Preserve manual WhatsApp payment and the approved customer-data boundary.
 
+**Operational approval:** N11 is approved for this backlog/design planning. N12 implementation has not been authorized yet; the user must issue a separate explicit instruction to start code changes.
+
 **Tech stack:** TypeScript, Hono, Cloudflare Worker, D1/SQLite, server-rendered views, existing tests and smoke tests.
 
 ## Non-negotiable constraints

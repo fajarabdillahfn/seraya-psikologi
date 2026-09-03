@@ -1,0 +1,208 @@
+<!doctype html><html lang="id"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>UI/UX Checkpoint 01 — Seraya Psikologi</title><link rel="stylesheet" href="../../assets/main.css"></head><body><div class="shell"><header class="site-header"><div><a class="brand" href="../../index.html">Seraya Psikologi</a><div class="subtitle">Project control center · MVP review</div></div><nav class="topnav"><a href="../../index.html">Overview</a><a href="../../workboard.html">Workboard</a><a href="../../prd/index.html">Focused PRDs</a><a href="../../reference/index.html">Reference</a></nav></header><div class="muted" style="font-size:.84rem;margin-bottom:18px"><a href="../../index.html">Home</a> / Focused PRD</div><main><h1 id="uiux-checkpoint-01-google-sso-profile-completion">UI/UX Checkpoint 01 — Google SSO + Profile Completion</h1>
+<p>Status: <strong>Design brief ready for review</strong>
+Date: 2026-09-03
+Scope: S02 Client Profile + S03 Google SSO client login gate</p>
+<blockquote>
+<p>This is a design artifact, not an implementation authorization. Code changes remain paused until the user explicitly starts N12.</p>
+</blockquote>
+<h2 id="objective">Objective</h2>
+<p>Make login and profile completion feel like one clear first step before booking:</p>
+<ol>
+<li>Client chooses Login with Google.</li>
+<li>Google authenticates the client.</li>
+<li>The system checks profile completeness and age eligibility.</li>
+<li>Incomplete clients complete Profil Saya and Alamat Saya.</li>
+<li>Complete and eligible clients return to the booking path they originally requested.</li>
+</ol>
+<h2 id="surface-archetypes">Surface archetypes</h2>
+<ul>
+<li>Login: <strong>Decide/Learn</strong> — one focused action, trust-building explanation, no competing actions.</li>
+<li>Profile completion: <strong>Configure</strong> — progressive form, clear requiredness, validation, save state, and recovery from errors.</li>
+</ul>
+<h2 id="screen-states">Screen states</h2>
+<h3 id="1-login-gate-authlogin">1. Login gate — <code>/auth/login</code></h3>
+<p>Default:</p>
+<ul>
+<li>Seraya Psikologi brand.</li>
+<li>Heading: <code>Masuk untuk Melanjutkan Booking</code>.</li>
+<li>Short explanation: login is required to protect booking data and send confirmation to the verified email.</li>
+<li>Primary action: <code>Lanjutkan dengan Google</code>.</li>
+<li>Link to Privacy and Safety/Crisis information.</li>
+<li>Preserve a validated internal <code>return_to</code> path.</li>
+</ul>
+<p>Loading:</p>
+<ul>
+<li>Button becomes <code>Menghubungkan ke Google...</code>.</li>
+<li>Prevent duplicate clicks.</li>
+</ul>
+<p>OAuth error/cancelled:</p>
+<ul>
+<li>Alert: <code>Gagal menghubungkan akun Google. Silakan coba kembali.</code></li>
+<li>Keep the client on the login page.</li>
+<li>Do not lose the validated booking destination.</li>
+</ul>
+<p>Expired session:</p>
+<ul>
+<li>Alert: <code>Sesi Anda telah berakhir. Silakan masuk kembali untuk melanjutkan.</code></li>
+</ul>
+<h3 id="2-profile-completion-clientprofile">2. Profile completion — <code>/client/profile</code></h3>
+<p>Header:</p>
+<ul>
+<li>Heading: <code>Lengkapi Profil Anda</code>.</li>
+<li>Explain that the data is needed before booking.</li>
+<li>Show verified Google email as read-only account identity.</li>
+<li>Do not present Google account name as the user-entered profile name.</li>
+</ul>
+<p>Sections:</p>
+<ol>
+<li><code>Profil Saya</code></li>
+<li><code>Alamat Saya</code></li>
+</ol>
+<p>Saving:</p>
+<ul>
+<li>Button becomes <code>Menyimpan Profil...</code>.</li>
+<li>Disable inputs and prevent duplicate submission.</li>
+</ul>
+<p>Validation error:</p>
+<ul>
+<li>A top summary uses <code>role="alert"</code>.</li>
+<li>Focus moves to the summary.</li>
+<li>Invalid fields have inline errors and preserve entered values.</li>
+</ul>
+<p>Age ineligible:</p>
+<ul>
+<li>Tanggal Lahir shows an inline error.</li>
+<li>Submit is blocked for age below 18.</li>
+<li>Copy: <code>Layanan pendaftaran mandiri saat ini hanya tersedia untuk klien berusia 18 tahun ke atas. Untuk kebutuhan rujukan atau bantuan, silakan hubungi WhatsApp Admin Seraya.</code></li>
+</ul>
+<p>Success:</p>
+<ul>
+<li>Save profile.</li>
+<li>Set profile complete.</li>
+<li>Redirect to the validated internal <code>return_to</code> path.</li>
+<li>Show: <code>Profil berhasil disimpan. Silakan lanjutkan pemilihan jadwal sesi.</code></li>
+</ul>
+<h2 id="field-inventory">Field inventory</h2>
+<p>All fields below are required by the product-owner decision. Do not add fields without a new product decision.</p>
+<h3 id="profil-saya">Profil Saya</h3>
+<ul>
+<li>Nama Panggilan — text input.</li>
+<li>Tanggal Lahir — date input; must represent age 18+ on the current Asia/Jakarta date.</li>
+<li>Jenis Kelamin — select.</li>
+<li>Pekerjaan — text input.</li>
+<li>Pendidikan — select.</li>
+<li>No. WhatsApp — telephone input; normalize and validate Indonesian number.</li>
+<li>Status — select.</li>
+<li>Agama — select.</li>
+</ul>
+<h3 id="alamat-saya">Alamat Saya</h3>
+<ul>
+<li>Negara — select or text input; default Indonesia.</li>
+<li>Provinsi — text input; a lightweight datalist may be used.</li>
+<li>Kota atau Kabupaten — text input; a lightweight datalist may be used.</li>
+<li>Alamat — textarea.</li>
+</ul>
+<h3 id="account-identity">Account identity</h3>
+<ul>
+<li>Google email — read-only, supplied by Google SSO.</li>
+<li>Google subject/account identifier — system-only; never editable or displayed as a form field.</li>
+</ul>
+<h2 id="validation-behavior">Validation behavior</h2>
+<p>All user-facing messages are in Bahasa Indonesia.</p>
+<ul>
+<li>Missing field: <code>&lt;Label&gt; wajib diisi.</code></li>
+<li>Invalid date: <code>Tanggal lahir tidak valid.</code></li>
+<li>Future date: <code>Tanggal lahir tidak boleh di masa depan.</code></li>
+<li>Under 18: use the age-ineligible copy above.</li>
+<li>Invalid WhatsApp: <code>Nomor WhatsApp tidak valid. Gunakan format nomor Indonesia aktif, contoh: 08123456789.</code></li>
+<li>Invalid/empty address: <code>Mohon masukkan alamat domisili lengkap.</code></li>
+<li>Form summary: <code>Mohon lengkapi dan periksa kembali data Anda sebelum melanjutkan.</code></li>
+</ul>
+<p>Validation rules:</p>
+<ul>
+<li>Validate on blur and again on server submit.</li>
+<li>Trim text values.</li>
+<li>Normalize valid <code>08...</code> to <code>+628...</code> before storage.</li>
+<li>Accept <code>+628...</code> and approved local Indonesian format at input; store one canonical format.</li>
+<li>Calculate age using <code>Asia/Jakarta</code>, not server-local timezone.</li>
+<li>Never log submitted profile values or validation payloads.</li>
+</ul>
+<p>Exact dropdown vocabularies remain implementation details unless already specified in the business PRD; do not silently add sensitive categories.</p>
+<h2 id="privacy-boundaries">Privacy boundaries</h2>
+<p>The form may explain that data is used for identity, booking, administration, and offline-session operations. It must not imply that all profile fields are shared with the psychologist.</p>
+<p>Psychologist sharing is not part of this screen. Later, for a confirmed booking, the psychologist receives only the approved operational whitelist:</p>
+<ul>
+<li>Nama Panggilan.</li>
+<li>Nomor WhatsApp.</li>
+<li>Mode: Chat, Call, or Offline.</li>
+<li>Scheduled slot.</li>
+<li>Counseling topics.</li>
+<li>Non-clinical problem description.</li>
+<li>Expected outcome.</li>
+<li>Returning-client flag.</li>
+</ul>
+<p>The psychologist does not receive full address, religion, occupation, education, or payment evidence.</p>
+<h2 id="mobile-layout">Mobile layout</h2>
+<p>Target viewport: 360px and above.</p>
+<ul>
+<li>Single-column layout.</li>
+<li>16px horizontal gutter.</li>
+<li>Sections stacked as <code>Profil Saya</code> then <code>Alamat Saya</code>.</li>
+<li>Inputs at least 44px high; use 16px input text.</li>
+<li>Full-width primary save button.</li>
+<li>Do not rely on placeholder text as the field label.</li>
+<li>Error summary and field errors remain readable without horizontal scrolling.</li>
+<li>Keep the Google login gate visually simple and centered.</li>
+</ul>
+<h2 id="accessibility">Accessibility</h2>
+<ul>
+<li>Use semantic <code>&lt;form&gt;</code>, <code>&lt;fieldset&gt;</code>, and <code>&lt;legend&gt;</code>.</li>
+<li>Every input has an explicit <code>&lt;label for="..."&gt;</code>.</li>
+<li>Every required field exposes required state to assistive technology.</li>
+<li>Invalid input uses <code>aria-invalid="true"</code>.</li>
+<li>Inline errors are referenced through <code>aria-describedby</code>.</li>
+<li>Error summary uses <code>role="alert"</code> and receives focus after failed submit.</li>
+<li>Focus indicator must be visible against the Seraya palette.</li>
+<li>Keyboard users can complete all fields and submit without a mouse.</li>
+</ul>
+<h2 id="redirect-and-security-behavior">Redirect and security behavior</h2>
+<ul>
+<li><code>return_to</code> accepts only an internal relative path.</li>
+<li>Reject <code>https://...</code>, protocol-relative <code>//...</code>, and malformed values.</li>
+<li>Fallback is a safe internal booking entry route.</li>
+<li>Session cookie is HTTP-only, Secure, SameSite=Lax, and scoped to <code>/</code>.</li>
+<li>Google identity is the account key; user-entered fields cannot change account ownership.</li>
+<li>Profile completion does not grant access to another client’s booking.</li>
+</ul>
+<h2 id="design-acceptance-criteria">Design acceptance criteria</h2>
+<ul>
+<li>[ ] Login gate has one clear primary CTA and explains why login is required.</li>
+<li>[ ] OAuth loading, cancel/error, expired-session, and success states are designed.</li>
+<li>[ ] Profile form contains exactly the approved fields, grouped into Profil Saya and Alamat Saya.</li>
+<li>[ ] All fields are visually marked required.</li>
+<li>[ ] Age 18+ and WhatsApp validation states are designed.</li>
+<li>[ ] Server-side validation failure preserves entered values.</li>
+<li>[ ] Success returns the client to the original internal booking path.</li>
+<li>[ ] 360px mobile layout is usable without horizontal scrolling.</li>
+<li>[ ] Keyboard and screen-reader behavior is specified.</li>
+<li>[ ] Privacy explanation does not imply full-profile sharing with psychologists.</li>
+<li>[ ] No clinical-record field is added.</li>
+</ul>
+<h2 id="implementation-handoff-boundary">Implementation handoff boundary</h2>
+<p>This brief is ready to inform S02/S03 implementation after design review. It does not authorize code changes, schema changes, migration, or deployment. N12 remains a separate explicit approval.</p>
+<h2 id="source-references">Source references</h2>
+<ul>
+<li><code>docs/prd/01-booking-flow.md</code></li>
+<li><code>docs/prd/06-privacy-consent.md</code></li>
+<li><code>docs/prd/07-staff-admin-operations.md</code></li>
+<li><code>docs/IMPLEMENTATION-BACKLOG.md</code></li>
+<li><code>docs-site/reference/screenshots/ibunda-mockup-profil-alamat.jpg</code></li>
+<li>Agy design review: Gemini 3.8 Flash High, 2026-09-03</li>
+</ul>
+<h2 id="review-notes">Review notes</h2>
+<ul>
+<li>Google SSO account identity and user-entered Nama Panggilan are intentionally separate.</li>
+<li>All profile/address fields remain required because this is an explicit business decision.</li>
+<li>The form design should not decide the final legal/privacy wording; PRD 06 owns that copy.</li>
+<li>This first checkpoint is deliberately limited to client login and profile completion; booking and Admin screens belong to later checkpoints.</li>
+</ul></main><footer>Seraya Psikologi · generated from repository · <a href="../../reference/index.html">Long-form reference</a></footer></div></body></html>
