@@ -11,7 +11,7 @@ Expose only slots that are genuinely bookable for the selected offering and prot
 - Canonical timezone: `Asia/Jakarta` (WIB).
 - Session duration: **60 minutes**.
 - Transition buffer: 15 minutes before and after a reservation.
-- **Slot grid: 60 minutes.** A slot starts on the hour (for example 09.00 or 16.00) and ends 60 minutes later.
+- **Slot grid: 60-minute session blocks with fixed buffer-aware starts.** Sessions remain 60 minutes, but starts are generated from the operating windows with the 15-minute transition buffer included. Morning examples: 09.00–10.00 and 10.30–11.30. Evening examples: 16.00–17.00, 17.30–18.30, and 18.45–19.45. The exact generated starts are the source of truth; the system must not offer a slot whose session plus buffer exceeds the operating window.
 - Booking horizon: 90 days.
 - Booking cutoff: 2 hours before start.
 - Booking days: **Senin sampai Minggu** (Monday through Sunday).
@@ -26,8 +26,8 @@ Expose only slots that are genuinely bookable for the selected offering and prot
 ## Public slot list
 
 - The site shows the next 90 days of slots, scoped to the selected offering and the day’s open window.
-- For online offerings, the day’s open window is 09.00–12.00 and 16.00–20.00 WIB.
-- For offline individual counseling, the day’s open window is the same hours (09.00–12.00 and 16.00–20.00 WIB) at Havana Park.
+- For online offerings, the day’s open windows are 09.00–12.00 and 16.00–20.00 WIB, with fixed buffer-aware session starts defined above.
+- For offline individual counseling, the day’s open windows are the same hours at Havana Park, with fixed buffer-aware session starts defined above.
 - Slots that are at or within 2 hours of session start are not selectable. The client sees them only as informational or hidden, depending on design.
 - A slot that is already held or booked is not selectable.
 - A day that is on the closed-day list shows no bookable slot.

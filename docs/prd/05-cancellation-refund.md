@@ -33,6 +33,9 @@ A booking has a `cancellation_status` field that is independent of `booking.stat
 
 The status is `none` by default and only changes when an Admin takes an action or records a client request. Status changes are append-only at the audit level; the current status is the latest in the audit chain.
 
+- `cancellation_trigger` is either `client_requested` or `psychologist_unavailable`. A client-requested case requires the incoming WhatsApp screenshot. A psychologist-unavailable case requires an Admin operational note plus outbound notification evidence (or a recorded failed-contact attempt).
+- For `psychologist_unavailable`, Admin may record the case without an incoming client-request screenshot, immediately offer reschedule or full refund, and release the affected capacity according to the Admin decision.
+
 ## Admin evidence
 
 Two evidence types are required for the Admin-side procedure:
@@ -89,7 +92,7 @@ For each cancellation/refund action, the workspace records:
 ## Acceptance checks
 
 - The website does not expose a public cancel or refund endpoint.
-- A cancellation/refund request cannot move beyond `none` without WhatsApp evidence uploaded by Admin.
+- A cancellation/refund request cannot move beyond `none` without evidence uploaded by Admin. For a **client-requested** cancellation, the required evidence is a screenshot of the incoming WhatsApp request. For a **psychologist-unavailable** cancellation, the required evidence is an Admin operational note plus a screenshot of the Admin's outbound WhatsApp notification to the client (or an equivalent recorded notification if the client cannot be reached).
 - A refund cannot be marked `refund_completed` without refund evidence uploaded by Admin.
 - Every status change writes a new audit record with actor, timestamp, decision reason, and evidence reference.
 - A status change is idempotent: repeating the same action with the same inputs does not create duplicate state changes.
