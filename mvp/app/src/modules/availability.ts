@@ -18,6 +18,7 @@ import { randomUUID } from "node:crypto";
 
 const SLOT_GRID_MINUTES = 30;
 const BOOKING_HORIZON_DAYS = 90;
+const BOOKING_CUTOFF_MINUTES = 120;
 const DEFAULT_TRANSITION_BUFFER_MIN = 15;
 
 export interface AvailabilitySlotRow {
@@ -50,13 +51,13 @@ export class AvailabilityModule {
               AND cr.state IN ('hold_active','confirmed')
             WHERE s.offering_id = ?
               AND s.withdrawn = 0
-              AND s.starts_at_utc >= ?
+              AND s.starts_at_utc > ?
               AND s.ends_at_utc <= ?
               AND cr.id IS NULL
             ORDER BY s.starts_at_utc ASC`,
       params: [
         args.offeringId,
-        args.now.toISOString(),
+        new Date(args.now.getTime() + BOOKING_CUTOFF_MINUTES * 60 * 1000).toISOString(),
         horizonEnd.toISOString(),
       ],
     });

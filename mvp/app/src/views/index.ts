@@ -322,23 +322,27 @@ export function renderBookingSlot(p: {
     "Pilih Slot",
     `<h1>Pilih Slot</h1>
     <ul>${items}</ul>
-    <p><small class="muted">Waktu dalam Asia/Jakarta (WIB). Cutoff booking: minimal 1 jam sebelum sesi.</small></p>`
+    <p><small class="muted">Waktu dalam Asia/Jakarta (WIB). Cutoff booking: minimal 2 jam sebelum sesi.</small></p>`
   );
 }
 
 export function renderBookingIntake(p: {
   offeringId: string;
   consentVersion: string;
+  slotId?: string;
+  nowIso?: string;
 }): string {
   return base(
     "Data Booking",
     `<h1>Data Booking</h1>
     <form method=POST action=/api/booking/create>
       <input type=hidden name=offeringId value="${p.offeringId}">
+      <input type=hidden name=slotId value="${p.slotId ?? ""}">
       <input type=hidden name=consentVersion value="${p.consentVersion}">
-      <p><label>Nama lengkap (wajib)<br><input name=displayName required maxlength=120></label></p>
+      <p><label>Nama panggilan (wajib)<br><input name=displayName required maxlength=120></label></p>
+      <p><label>Tanggal lahir (wajib, minimal 18 tahun)<br><input name=dateOfBirth type=date required></label></p>
       <p><label>Email (wajib, untuk konfirmasi booking)<br><input name=contactEmail type=email required></label></p>
-      <p><label>Nomor HP (opsional, format +62xxx)<br><input name=contactPhone placeholder="+628123456789"></label></p>
+      <p><label>Nomor WhatsApp (wajib, format Indonesia)<br><input name=contactPhone type=tel required placeholder="08123456789"></label></p>
       <p><label>Pesan singkat (opsional, non-klinis, max 280 karakter)<br><textarea name=shortMessage maxlength=280 placeholder="Ceritakan situasi Anda secara singkat. Tidak untuk triage atau keluhan klinis."></textarea></label></p>
       <p><label><input type=checkbox name=crisisAck value=true required> Saya memahami bahwa Seraya bukan layanan kegawatdaruratan. Untuk kondisi krisis, saya akan menghubungi 119 atau IGD terdekat.</label></p>
       <p><label><input type=checkbox name=consentAck value=true required> Saya telah membaca dan menyetujui <a href="/consent" target=_blank>Informed Consent</a> dan <a href="/privacy" target=_blank>Kebijakan Privasi</a>.</label></p>

@@ -28,7 +28,7 @@ import { Hono } from "hono";
 import { createAdapter } from "../persistence/d1-adapter";
 import { CatalogModule } from "../modules/catalog";
 import { AvailabilityModule } from "../modules/availability";
-import { BookingModule } from "../modules/booking";
+import { BookingModule, normalizeIndonesianPhone } from "../modules/booking";
 import { WhatsAppManualPaymentModule } from "../modules/payment";
 import { AdminWorkspaceModule } from "../modules/admin";
 import {
@@ -157,6 +157,7 @@ app.get("/book/:offeringId/slots", async (c) => {
 app.get("/book/:offeringId/intake", (c) =>
   c.html(renderBookingIntake({
     offeringId: c.req.param("offeringId"),
+    slotId: c.req.query("slot"),
     consentVersion: "v1-2026-08-31",
   }))
 );
@@ -174,7 +175,8 @@ app.post("/api/booking/create", async (c) => {
     intake: {
       displayName: String(body["displayName"] ?? ""),
       contactEmail: String(body["contactEmail"] ?? ""),
-      contactPhone: body["contactPhone"] ? String(body["contactPhone"]) : null,
+      contactPhone: normalizeIndonesianPhone(String(body["contactPhone"] ?? "")),
+      dateOfBirth: String(body["dateOfBirth"] ?? ""),
       consentVersion: String(body["consentVersion"] ?? "v1-2026-08-31"),
       crisisAck: body["crisisAck"] === "on" || body["crisisAck"] === "true",
       shortMessage: body["shortMessage"] ? String(body["shortMessage"]) : null,

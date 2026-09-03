@@ -17,8 +17,42 @@ import { AvailabilityModule } from "./availability";
 import { DomainError, IntakeErrors, type AudienceMatch } from "../domain/types";
 
 const SLOT_HOLD_TTL_MINUTES = 10;
-const BOOKING_CUTOFF_MINUTES = 60;
-const DEFAULT_TIMEZONE_OFFSET_MIN = 7 * 60; // Asia/Jakarta = UTC+7
+const BOOKING_CUTOFF_MINUTES = 120;
+
+// Launch accepts Indonesian mobile WhatsApp numbers only. Input may be
+// normalized upstream; this rule validates the canonical E.164 shape.
+const INDONESIAN_E164_PHONE = /^\+628[1-9][0-9]{6,11}$/;
+
+export function normalizeIndonesianPhone(input: string): string {
+  const compact = input.trim().replace(/[\s\-().]/g, "");
+  if (compact.startsWith("08")) return `+62${compact.slice(1)}`;
+  if (compact.startsWith("628")) return `+${compact}`;
+  return compact;
+}
+
+function isValidIndonesianPhone(phone: string): boolean {
+  return INDONESIAN_E164_PHONE.test(phone);
+}
+
+function calculateAgeOnDate(dateOfBirth: string, now: Date): number {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(dateOfBirth);
+  if (!match) {
+    throw new DomainError(IntakeErrors.OutOfScope, "date_of_birth invalid");
+  }
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  const day = Number(match[3]);
+  const dob = new Date(Date.UTC(year, month - 1, day));
+  if (dob.getUTCFullYear() !== year || dob.getUTCMonth() !== month - 1 || dob.getUTCDate() !== day) {
+    throw new DomainError(IntakeErrors.OutOfScope, "date_of_birth invalid");
+  }
+  const jakartaNow = new Date(now.getTime() + 7 * 60 * 60 * 1000);
+  let age = jakartaNow.getUTCFullYear() - year;
+  const birthdayPassed = jakartaNow.getUTCMonth() + 1 > month ||
+    (jakartaNow.getUTCMonth() + 1 === month && jakartaNow.getUTCDate() >= day);
+  if (!birthdayPassed) age -= 1;
+  return age;
+}
 
 const CLINICAL_BLOCKLIST: RegExp[] = [
   /(bunuh diri|suicide|kill myself|ending my life|不想活)/i,
@@ -26,13 +60,11 @@ const CLINICAL_BLOCKLIST: RegExp[] = [
   /(darurat|emergency|panic attack|serangan panik)/i,
 ];
 
-const E164_PHONE = /^\+[1-9]\d{6,14}$/;
-
 export interface IntakeInput {
   displayName: string;
   contactEmail: string;
-  contactPhone?: string | null;
-  dateOfBirth?: string | null;
+  contactPhone: string;
+  dateOfBirth: string;
   consentVersion: string;
   crisisAck: boolean;
   shortMessage?: string | null;
@@ -70,11 +102,15 @@ export class BookingModule {
     if (!name || name.length > 120) {
       throw new DomainError(IntakeErrors.MissingName, "display_name invalid");
     }
-    if (input.contactEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(input.contactEmail)) {
+    if (!input.contactEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(input.contactEmail)) {
       throw new DomainError(IntakeErrors.MissingEmail, "contact_email invalid");
     }
-    if (input.contactPhone && !E164_PHONE.test(input.contactPhone)) {
+    const normalizedPhone = normalizeIndonesianPhone(input.contactPhone ?? "");
+    if (!normalizedPhone || !isValidIndonesianPhone(normalizedPhone)) {
       throw new DomainError(IntakeErrors.InvalidPhone, "contact_phone invalid");
+    }
+    if (!input.dateOfBirth) {
+      throw new DomainError(IntakeErrors.OutOfScope, "date_of_birth required");
     }
     if (!input.consentVersion) {
       throw new DomainError(IntakeErrors.InvalidConsentVersion, "consent_version required");
@@ -94,27 +130,16 @@ export class BookingModule {
       }
     }
 
-    // Booking cutoff: now > slot_start - 60 minutes.
+    // Booking cutoff: reject at or inside slot_start - 120 minutes.
     const cutoffAt = new Date(slotStartsAtUtc).getTime() - BOOKING_CUTOFF_MINUTES * 60 * 1000;
-    if (now.getTime() > cutoffAt) {
+    if (now.getTime() >= cutoffAt) { // exact cutoff is closed
       throw new DomainError(IntakeErrors.CutoffTooLate, "booking is past the cutoff window");
     }
 
-    // Audience match (very simple — real implementation looks up
-    // aud_exclusion/aud_needs, but the cutoff-age check is the MVP gate).
-    if (input.dateOfBirth) {
-      const dob = new Date(input.dateOfBirth);
-      const age = Math.floor(
-        (now.getTime() - dob.getTime()) / (365.25 * 24 * 60 * 60 * 1000)
-      );
-      if (age >= 16 && age <= 17) {
-        // minor route; guardian payload must be supplied separately by
-        // RecordCoupleParticipant or Admin intake (out of scope here).
-        return "minor_16_17_guardian";
-      }
-      if (age < 16 || age > 40) {
-        return "out_of_scope";
-      }
+    // Age is a calendar calculation in Asia/Jakarta; no 365.25-day approximation.
+    const age = calculateAgeOnDate(input.dateOfBirth, now);
+    if (age < 18) {
+      throw new DomainError(IntakeErrors.OutOfScope, "client must be 18 or older");
     }
     return "eligible_18_40";
   }
@@ -141,6 +166,9 @@ export class BookingModule {
       slot.starts_at_utc,
       new Date()
     );
+    if (audienceMatch !== "eligible_18_40") {
+      throw new DomainError(IntakeErrors.OutOfScope, "client must be 18 or older");
+    }
 
     // Pre-check overlap (ADR 0091 §6).
     const startWithBuffer = new Date(
