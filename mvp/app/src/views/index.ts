@@ -355,7 +355,17 @@ export function renderBookingIntake(p: {
       <p><label>Tanggal lahir (wajib, minimal 18 tahun)<br><input name=dateOfBirth type=date required></label></p>
       <p><label>Email (wajib, untuk konfirmasi booking)<br><input name=contactEmail type=email required></label></p>
       <p><label>Nomor WhatsApp (wajib, format Indonesia)<br><input name=contactPhone type=tel required placeholder="08123456789"></label></p>
-      <p><label>Pesan singkat (opsional, non-klinis, max 280 karakter)<br><textarea name=shortMessage maxlength=280 placeholder="Ceritakan situasi Anda secara singkat. Tidak untuk triage atau keluhan klinis."></textarea></label></p>
+      <fieldset><legend>Intake konseling</legend>
+        <p><span>Topik yang ingin dibahas (wajib, bisa pilih beberapa)</span><br>
+          <label><input type=checkbox name=topics value="Pengembangan diri" required> Pengembangan diri</label>
+          <label><input type=checkbox name=topics value="Kecemasan dan stres"> Kecemasan dan stres</label>
+          <label><input type=checkbox name=topics value="Relasi"> Relasi</label>
+          <label><input type=checkbox name=topics value="Kepercayaan diri"> Kepercayaan diri</label>
+        </p>
+        <p><label>Deskripsi masalah (wajib, minimal 50 karakter)<br><textarea name=problemDescription minlength=50 maxlength=2000 required placeholder="Ceritakan situasi yang ingin dibahas, tanpa informasi kegawatdaruratan."></textarea></label></p>
+        <p><label>Harapan dari sesi (wajib)<br><textarea name=expectedOutcome maxlength=1000 required></textarea></label></p>
+        <p><span>Apakah kamu pernah menggunakan layanan Seraya? (wajib)</span><br><label><input type=radio name=returningClient value="yes" required> Ya</label> <label><input type=radio name=returningClient value="no"> Belum</label></p>
+      </fieldset>
       <p><label><input type=checkbox name=crisisAck value=true required> Saya memahami bahwa Seraya bukan layanan kegawatdaruratan. Untuk kondisi krisis, saya akan menghubungi 119 atau IGD terdekat.</label></p>
       <p><label><input type=checkbox name=consentAck value=true required> Saya telah membaca dan menyetujui <a href="/consent" target=_blank>Informed Consent</a> dan <a href="/privacy" target=_blank>Kebijakan Privasi</a>.</label></p>
       <p><button class="cta" type=submit>Lanjut ke pembayaran</button></p>
@@ -395,8 +405,8 @@ export function renderBookingConfirmation(p: {
 
     <h2>Cara Bayar via WhatsApp</h2>
     <div class="card">
-      <p><strong>1. Download invoice:</strong> <a class="cta-secondary" href="${esc(p.pdfDownloadPath)}">Unduh invoice PDF</a> (atau <a href="/api/booking/${esc(p.bookingId)}/invoice.txt">salin teks invoice</a>).</p>
-      <p><strong>2. Kirim pembayaran</strong> sesuai instruksi di invoice (bank/QRIS) sebelum batas waktu di atas.</p>
+      <p><strong>1. Lihat instruksi pembayaran:</strong> transfer sesuai nominal dan rekening/QRIS yang ditampilkan di bawah. Invoice resmi PDF dan teks tersedia setelah Admin memverifikasi pembayaran.</p>
+      <p><strong>2. Kirim pembayaran</strong> sesuai instruksi transfer/QRIS sebelum batas waktu di atas.</p>
       <p><strong>3. Kirim bukti transfer</strong> (screenshot / foto struk) ke Admin Seraya via WhatsApp:</p>
       <p><a class="cta" href="${esc(waUrl)}" target="_blank" rel="noopener">Kirim bukti ke WhatsApp Admin</a></p>
       <p><small class="muted">Nomor Admin Seraya: <code>${esc(p.adminWhatsapp)}</code></small></p>

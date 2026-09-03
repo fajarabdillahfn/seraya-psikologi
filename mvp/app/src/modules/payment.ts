@@ -220,7 +220,8 @@ export class WhatsAppManualPaymentModule {
    */
   async generateInvoice(
     bookingId: string,
-    format: "pdf" | "text"
+    format: "pdf" | "text",
+    kind: "official" | "preliminary" = "official"
   ): Promise<InvoiceOutput> {
     const { rows } = await this.db.query<{
       booking_id: string;
@@ -247,6 +248,13 @@ export class WhatsAppManualPaymentModule {
     });
     const row = rows[0];
     if (!row) throw new Error(`booking ${bookingId} not found`);
+    if (kind === "official") {
+      const { rows: verified } = await this.db.query<{ id: string }>({
+        sql: `SELECT id FROM payment_proof WHERE booking_id = ? AND status = 'verified' LIMIT 1`,
+        params: [bookingId],
+      });
+      if (!verified[0]) throw new Error(`official invoice unavailable until payment verification`);
+    }
 
     const invoiceInput: InvoiceInput = {
       bookingId: row.booking_id,

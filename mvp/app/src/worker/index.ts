@@ -289,7 +289,10 @@ app.post("/api/booking/create", async (c) => {
       dateOfBirth: String(body["dateOfBirth"] ?? ""),
       consentVersion: String(body["consentVersion"] ?? "v1-2026-08-31"),
       crisisAck: body["crisisAck"] === "on" || body["crisisAck"] === "true",
-      shortMessage: body["shortMessage"] ? String(body["shortMessage"]) : null,
+      topics: Array.isArray(body["topics"]) ? body["topics"].map(String) : body["topics"] ? [String(body["topics"])] : [],
+      problemDescription: String(body["problemDescription"] ?? ""),
+      expectedOutcome: String(body["expectedOutcome"] ?? ""),
+      returningClient: body["returningClient"] === "yes",
     },
   });
 
@@ -303,15 +306,15 @@ app.post("/api/booking/create", async (c) => {
   //   - The booking is now in 'pending_manual_payment'; Admin will verify
   //     the payment_proof once the client sends the transfer slip.
   const payment = new WhatsAppManualPaymentModule(adapter);
-  const invoice = await payment.generateInvoice(result.bookingId, "text");
-  const adminWhatsapp = c.env.ADMIN_WHATSAPP_NUMBER ?? "+628000000000";
+  const preliminary = await payment.generateInvoice(result.bookingId, "text", "preliminary");
+  const adminWhatsapp = c.env.ADMIN_WHATSAPP_NUMBER ?? "+628****0000";
 
   return c.html(renderBookingConfirmation({
     bookingId: result.bookingId,
     expiresAt: result.expiresAt,
-    whatsappMessage: invoice.textMessage,
+    whatsappMessage: preliminary.textMessage,
     adminWhatsapp,
-    pdfDownloadPath: `/api/booking/${result.bookingId}/invoice.pdf`,
+    pdfDownloadPath: "",
   }));
 });
 
@@ -319,6 +322,12 @@ app.post("/api/booking/create", async (c) => {
 app.get("/api/booking/:bookingId/invoice.pdf", async (c) => {
   const bookingId = c.req.param("bookingId");
   const adapter = createAdapter({ DB: c.env.DB });
+  const session = await new ClientAuthModule(adapter).getSession(readCookie(c.req.raw, "seraya_session"));
+  if (!session) return c.redirect(`/auth/login?return_to=${encodeURIComponent(c.req.url)}`);
+  const { rows: owned } = await adapter.query<{ id: string }>({ sql: `SELECT id FROM booking WHERE id = ? AND client_id = ?`, params: [bookingId, session.clientId] });
+  if (!owned[0]) return c.notFound();
+  const client = await new ClientModule(adapter).getProfile(session.clientId);
+  if (!client?.profileComplete) return c.redirect(`/client/profile?return_to=${encodeURIComponent(c.req.url)}`); 
   const payment = new WhatsAppManualPaymentModule(adapter);
   try {
     const invoice = await payment.generateInvoice(bookingId, "pdf");
@@ -340,6 +349,12 @@ app.get("/api/booking/:bookingId/invoice.pdf", async (c) => {
 app.get("/api/booking/:bookingId/invoice.txt", async (c) => {
   const bookingId = c.req.param("bookingId");
   const adapter = createAdapter({ DB: c.env.DB });
+  const session = await new ClientAuthModule(adapter).getSession(readCookie(c.req.raw, "seraya_session"));
+  if (!session) return c.redirect(`/auth/login?return_to=${encodeURIComponent(c.req.url)}`);
+  const { rows: owned } = await adapter.query<{ id: string }>({ sql: `SELECT id FROM booking WHERE id = ? AND client_id = ?`, params: [bookingId, session.clientId] });
+  if (!owned[0]) return c.notFound();
+  const client = await new ClientModule(adapter).getProfile(session.clientId);
+  if (!client?.profileComplete) return c.redirect(`/client/profile?return_to=${encodeURIComponent(c.req.url)}`); 
   const payment = new WhatsAppManualPaymentModule(adapter);
   try {
     const invoice = await payment.generateInvoice(bookingId, "text");

@@ -13,6 +13,10 @@ const baseIntake = (overrides: Partial<IntakeInput> = {}): IntakeInput => ({
   dateOfBirth: "1990-01-01",
   consentVersion: "v1",
   crisisAck: true,
+  topics: ["Pengembangan diri"],
+  problemDescription: "Saya ingin memahami pola pikiran dan emosi yang mengganggu aktivitas saya sehari-hari.",
+  expectedOutcome: "Saya ingin punya langkah praktis untuk mengelola situasi ini.",
+  returningClient: false,
   ...overrides,
 });
 
@@ -123,5 +127,27 @@ describe("AvailabilityModule cutoff query", () => {
     });
     expect(query).toContain("s.starts_at_utc > ?");
     expect(params[1]).toBe("2026-09-03T09:00:00.000Z");
+  });
+});
+
+
+describe("approved counseling intake", () => {
+  it("requires topics, a 50-character problem description, and expected outcome", () => {
+    const error = validate(baseIntake({ topics: [], problemDescription: "too short", expectedOutcome: "" }));
+    expect(error).toBeInstanceOf(DomainError);
+    expect((error as DomainError).code).toBe(IntakeErrors.ClinicalNarrative);
+  });
+
+  it("accepts a non-clinical problem description of at least 50 characters", () => {
+    expect(validate(baseIntake({
+      problemDescription: "Saya ingin memahami pola emosi saya setiap hari dengan lebih baik.",
+      expectedOutcome: "Saya ingin mendapatkan satu atau dua langkah praktis.",
+    }))).toBeNull();
+  });
+
+  it("rejects crisis content in intake narrative", () => {
+    const error = validate(baseIntake({ problemDescription: "Saya mengalami serangan panik yang mengganggu pekerjaan saya setiap hari." }));
+    expect(error).toBeInstanceOf(DomainError);
+    expect((error as DomainError).code).toBe(IntakeErrors.ClinicalNarrative);
   });
 });

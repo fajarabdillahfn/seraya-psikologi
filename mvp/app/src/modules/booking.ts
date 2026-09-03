@@ -67,9 +67,10 @@ export interface IntakeInput {
   dateOfBirth: string;
   consentVersion: string;
   crisisAck: boolean;
-  shortMessage?: string | null;
-  isCouple?: boolean;
-  isPackage?: boolean;
+  topics: string[];
+  problemDescription: string;
+  expectedOutcome: string;
+  returningClient: boolean;
 }
 
 export interface CreateBookingArgs {
@@ -118,15 +119,20 @@ export class BookingModule {
     if (!input.crisisAck) {
       throw new DomainError(IntakeErrors.CrisisAckNotSet, "crisis disclaimer must be acknowledged");
     }
-    if (input.shortMessage) {
-      const stripped = input.shortMessage.trim();
-      if (stripped.length > 280) {
-        throw new DomainError(IntakeErrors.ClinicalNarrative, "short_message too long");
-      }
-      for (const re of CLINICAL_BLOCKLIST) {
-        if (re.test(stripped)) {
-          throw new DomainError(IntakeErrors.ClinicalNarrative, "short_message contains clinical content");
-        }
+    if (!Array.isArray(input.topics) || input.topics.length === 0 || input.topics.length > 5) {
+      throw new DomainError(IntakeErrors.ClinicalNarrative, "topics required");
+    }
+    const problemDescription = input.problemDescription.trim();
+    if (problemDescription.length < 50 || problemDescription.length > 2000) {
+      throw new DomainError(IntakeErrors.ClinicalNarrative, "problem_description must be 50-2000 characters");
+    }
+    const expectedOutcome = input.expectedOutcome.trim();
+    if (!expectedOutcome || expectedOutcome.length > 1000) {
+      throw new DomainError(IntakeErrors.ClinicalNarrative, "expected_outcome required");
+    }
+    for (const narrative of [problemDescription, expectedOutcome]) {
+      if (CLINICAL_BLOCKLIST.some((re) => re.test(narrative))) {
+        throw new DomainError(IntakeErrors.ClinicalNarrative, "intake contains clinical or crisis content");
       }
     }
 
@@ -202,15 +208,17 @@ export class BookingModule {
       {
         sql: `INSERT INTO booking
               (id, client_id, offer_snapshot_id, state, is_package, is_couple,
-               intake_short_message, crisis_ack)
-              VALUES (?, ?, ?, 'pending_manual_payment', ?, ?, ?, ?)`,
+               intake_topics, intake_problem_description, intake_expected_outcome,
+               intake_returning_client, intake_short_message, crisis_ack)
+              VALUES (?, ?, ?, 'pending_manual_payment', 0, 0, ?, ?, ?, ?, NULL, ?)`,
         params: [
           bookingId,
           args.clientId,
           args.offerSnapshotId,
-          args.intake.isPackage ? 1 : 0,
-          args.intake.isCouple ? 1 : 0,
-          args.intake.shortMessage ?? null,
+          JSON.stringify(args.intake.topics),
+          args.intake.problemDescription.trim(),
+          args.intake.expectedOutcome.trim(),
+          args.intake.returningClient ? 1 : 0,
           args.intake.crisisAck ? 1 : 0,
         ],
       },
