@@ -48,10 +48,25 @@ export class ClientAuthModule {
   }
 
   async consumeOAuthState(state: string, now = new Date()): Promise<string> {
-    const { rows } = await this.db.query<{ return_to: string; expires_at: string }>({ sql: `SELECT return_to, expires_at FROM oauth_state WHERE state = ?`, params: [state] });
+    let rows: { return_to: string; expires_at: string }[];
+    try {
+      const result = await this.db.query<{ return_to: string; expires_at: string }>({
+        sql: `SELECT return_to, expires_at FROM oauth_state WHERE state = ?`,
+        params: [state],
+      });
+      rows = result.rows;
+    } catch (error) {
+      throw new DomainError("E-AUTH-STATE-READ", "oauth state database read failed", error);
+    }
     const row = rows[0];
-    if (!row || new Date(row.expires_at).getTime() <= now.getTime()) throw new DomainError("E-AUTH-INVALID-STATE", "oauth state invalid or expired");
-    await this.db.batch([{ sql: `DELETE FROM oauth_state WHERE state = ?`, params: [state] }]);
+    if (!row || new Date(row.expires_at).getTime() <= now.getTime()) {
+      throw new DomainError("E-AUTH-INVALID-STATE", "oauth state invalid or expired");
+    }
+    try {
+      await this.db.batch([{ sql: `DELETE FROM oauth_state WHERE state = ?`, params: [state] }]);
+    } catch (error) {
+      throw new DomainError("E-AUTH-STATE-DELETE", "oauth state database delete failed", error);
+    }
     return safeReturnTo(row.return_to);
   }
 

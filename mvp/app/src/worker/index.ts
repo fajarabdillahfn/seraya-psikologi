@@ -174,7 +174,11 @@ app.get("/auth/callback", async (c) => {
     const safeReason = stage === "database_state"
       ? (error instanceof DomainError && error.code === "E-AUTH-INVALID-STATE"
         ? "state_not_found_or_expired"
-        : "database_query_failed")
+        : error instanceof DomainError && error.code === "E-AUTH-STATE-READ"
+          ? "oauth_state_read_failed"
+          : error instanceof DomainError && error.code === "E-AUTH-STATE-DELETE"
+            ? "oauth_state_delete_failed"
+            : "database_query_failed")
       : stage;
     return c.redirect(`/auth/login?error=${encodeURIComponent(`Login Google gagal pada tahap ${safeReason}. Kode bantuan: ${requestId.slice(0, 8)}`)}`);
   }
