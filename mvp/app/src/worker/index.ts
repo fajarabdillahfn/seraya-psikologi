@@ -25,6 +25,7 @@
  */
 
 import { Hono } from "hono";
+import { DomainError } from "../domain/types";
 import { createAdapter } from "../persistence/d1-adapter";
 import { CatalogModule } from "../modules/catalog";
 import { AvailabilityModule } from "../modules/availability";
@@ -129,10 +130,26 @@ app.get("/auth/google", async (c) => {
 app.get("/auth/callback", async (c) => {
   const code = c.req.query("code");
   const state = c.req.query("state");
+  const providerError = c.req.query("error");
   const clientId = c.env.GOOGLE_OAUTH_CLIENT_ID;
   const clientSecret = c.env.GOOGLE_OAUTH_CLIENT_SECRET;
   const redirectUri = c.env.GOOGLE_OAUTH_REDIRECT_URI ?? `${new URL(c.req.url).origin}/auth/callback`;
-  if (!code || !state || !clientId || !clientSecret) return c.redirect("/auth/login?error=Login%20Google%20belum%20tersedia");
+  const requestId = crypto.randomUUID();
+  if (providerError) {
+    console.warn(JSON.stringify({ event: "oauth_callback_provider_error", requestId, providerError }));
+    return c.redirect(`/auth/login?error=${encodeURIComponent("Login Google dibatalkan atau tidak diizinkan.")}`);
+  }
+  if (!code || !state || !clientId || !clientSecret) {
+    console.error(JSON.stringify({
+      event: "oauth_callback_missing_parameters",
+      requestId,
+      hasCode: Boolean(code),
+      hasState: Boolean(state),
+      hasClientId: Boolean(clientId),
+      hasClientSecret: Boolean(clientSecret),
+    }));
+    return c.redirect(`/auth/login?error=${encodeURIComponent("Login Google belum siap. Silakan hubungi Admin.")}`);
+  }
   try {
     const adapter = createAdapter({ DB: c.env.DB });
     const auth = new ClientAuthModule(adapter);
@@ -143,8 +160,14 @@ app.get("/auth/callback", async (c) => {
     const headers = new Headers({ Location: client.profileComplete ? returnTo : `/client/profile?return_to=${encodeURIComponent(returnTo)}` });
     headers.append("Set-Cookie", sessionCookie(session.token));
     return new Response(null, { status: 302, headers });
-  } catch {
-    return c.redirect("/auth/login?error=Gagal%20menghubungkan%20akun%20Google");
+  } catch (error) {
+    const details = error instanceof DomainError
+      ? { errorCode: error.code, errorMessage: error.message }
+      : { errorName: error instanceof Error ? error.name : "UnknownError", errorMessage: error instanceof Error ? error.message : String(error) };
+    // Never log code, state, tokens, client secrets, email, or redirect query
+    // values. requestId lets an operator correlate this event in Wrangler tail.
+    console.error(JSON.stringify({ event: "oauth_callback_failed", requestId, redirectUri, ...details }));
+    return c.redirect(`/auth/login?error=${encodeURIComponent(`Login Google gagal. Kode bantuan: ${requestId.slice(0, 8)}`)}`);
   }
 });
 
