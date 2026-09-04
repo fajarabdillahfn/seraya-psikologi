@@ -299,7 +299,7 @@ function psychologistPhotoUrl(p: PsychologistCard): string {
 function psychologistPortrait(p: PsychologistCard, size: number): string {
   const initials = initialsOf(p.name);
   const url = psychologistPhotoUrl(p);
-  return `<span class="profile-avatar" style="width:${size}px;height:${size}px;font-size:${Math.round(size * 0.32)}px;color:transparent">
+  return `<span class="profile-avatar" style="position:relative;width:${size}px;height:${size}px;font-size:${Math.round(size * 0.32)}px;color:transparent;flex:none">
     <img src="${esc(url)}" alt="Foto ${esc(p.name)}" loading="lazy" decoding="async" width="${size}" height="${size}" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;border-radius:50%" onerror="this.remove();">
     ${esc(initials)}
   </span>`;
