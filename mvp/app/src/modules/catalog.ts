@@ -136,6 +136,25 @@ export class CatalogModule {
     return rows;
   }
 
+  async listBookableOfferings(psychologistId?: string): Promise<Array<ServiceOfferingRow & { display_name: string; price_idr: number }>> {
+    const params: unknown[] = [];
+    let filter = "";
+    if (psychologistId) { filter = " AND so.psychologist_id = ?"; params.push(psychologistId); }
+    const { rows } = await this.db.query<ServiceOfferingRow & { display_name: string; price_idr: number }>({
+      sql: `SELECT so.*, s.display_name, sor.price_idr
+            FROM service_offering so
+            JOIN service s ON s.id = so.service_id
+            JOIN service_offering_revision sor ON sor.offering_id = so.id
+            WHERE so.active = 1 AND so.audience = 'individual'
+              AND so.id LIKE 'off_%'
+              AND so.psychologist_id IN (SELECT id FROM psychologist WHERE publish_status = 'published')${filter}
+              AND sor.version = (SELECT MAX(version) FROM service_offering_revision WHERE offering_id = so.id)
+            ORDER BY so.psychologist_id, so.mode, s.display_name`,
+      params,
+    });
+    return rows;
+  }
+
   async getPsychologist(id: string): Promise<PsychologistRow | null> {
     const { rows } = await this.db.query<PsychologistRow>({
       sql: `SELECT id, display_name, publish_status, bio, expertise, education, photo_url

@@ -39,6 +39,8 @@ import {
   renderServicesPage,
   renderAboutPage,
   renderFuja,
+  renderPsychologistList,
+  renderPsychologistProfile,
   renderFaq,
   renderCrisisNotice,
   renderPrivacyNotice,
@@ -197,9 +199,28 @@ app.get("/pulang", (c) =>
 
 app.get("/layanan", (c) => c.html(renderServicesPage()));
 app.get("/about", (c) => c.html(renderAboutPage()));
-app.get("/psikolog", (c) => c.redirect("/fuja"));
 
-app.get("/fuja", (c) =>
+const psychologistProfiles = [
+  { id: "fuja", name: "Fuja Rahayu Kinanti, S.Psi., Psikolog", role: "Psikolog Umum", bio: "Ruang konseling yang hangat untuk mengurai hal-hal yang terasa kusut dan menemukan langkah yang terasa tepat.", expertise: ["Kecemasan dan overthinking", "Pengembangan diri", "Pengelolaan emosi", "Relasi interpersonal"], education: ["Universitas Gadjah Mada — S1 Psikologi (2015)", "Universitas Muhammadiyah Malang — Pendidikan Profesi Psikolog (2026)"], bookable: true },
+  { id: "daris", name: "Rahama Darus Salamah, S.Psi., Psikolog, CHt", role: "Psikolog Umum", bio: "Ruang yang hangat, aman, dan tidak menghakimi untuk merasa diterima, didengarkan, dan sedikit lebih lega menjadi diri sendiri.", expertise: ["Pengembangan diri", "Kepercayaan diri", "Pengelolaan emosi", "Relasi interpersonal"], education: ["Universitas Sebelas Maret — S1 Psikologi (2023)", "Universitas Muhammadiyah Malang — Pendidikan Profesi Psikolog (2026)"], bookable: true },
+  { id: "zahra", name: "Zahratussyafiyah, S.Psi., Psikolog", role: "Psikolog Umum", bio: "Rekan perjalanan dan teman berdiskusi dalam ruang yang hangat, terbuka, dan penuh penerimaan.", expertise: ["Kecemasan dan overthinking", "Kesepian dan quarter-life crisis", "Kepercayaan diri", "Relasi interpersonal"], education: ["UIN Maulana Malik Ibrahim Malang — S1 Psikologi (2020)", "Universitas Muhammadiyah Malang — Pendidikan Profesi Psikolog (2026)"], bookable: true },
+  { id: "hasanah", name: "Raudhatul Hasanah, S.Psi., Psikolog, CHt.", role: "Psikolog Umum", bio: "Memiliki minat pada permasalahan individu terkait penerimaan diri, persiapan pra-nikah, dinamika dan komunikasi dengan pasangan, serta relasi orang tua dan anak.", expertise: ["Penerimaan diri", "Persiapan pra-nikah", "Dinamika pasangan", "Relasi orang tua dan anak"], education: ["Universitas Negeri Malang — S1 Psikologi (2006)", "Universitas Muhammadiyah Malang — Pendidikan Profesi Psikolog (2026)"], bookable: true },
+  { id: "chika", name: "Kurnia Armachika Maylasari, S.Psi., Psikolog", role: "Psikolog Umum", bio: "Ruang yang hangat, aman, dan kolaboratif untuk memahami pengalaman dan menemukan langkah bertumbuh yang sesuai.", expertise: ["Permasalahan anak", "Relasi orang tua dan anak", "Parenting", "Akademik dan karier"], education: ["UIN Sunan Ampel Surabaya — S1 Psikologi (2024)", "Universitas Muhammadiyah Malang — Pendidikan Profesi Psikolog (2026)"], bookable: true },
+] as const;
+
+app.get("/psikolog", (c) => c.html(renderPsychologistList([...psychologistProfiles])));
+app.get("/psikolog/:id", (c) => {
+  const profile = psychologistProfiles.find((item) => item.id === c.req.param("id"));
+  if (!profile) return c.text("Profil psikolog tidak ditemukan.", 404);
+  return c.html(renderPsychologistProfile(profile));
+});
+app.get("/fuja", (c) => c.redirect("/psikolog/fuja"));
+app.get("/daris", (c) => c.redirect("/psikolog/daris"));
+app.get("/zahra", (c) => c.redirect("/psikolog/zahra"));
+app.get("/hasanah", (c) => c.redirect("/psikolog/hasanah"));
+app.get("/chika", (c) => c.redirect("/psikolog/chika"));
+
+app.get("/legacy-fuja", (c) =>
   c.html(renderFuja({
     name: "Fuja Rahayu Kinanti, S.Psi., Psikolog",
     bio: "Pendekatan hangat, empatik, dan bebas penghakiman. Berpengalaman lebih dari 50 sesi konseling.",
@@ -233,11 +254,10 @@ app.get("/book", async (c) => {
   if (!session) return c.redirect(`/auth/login?return_to=${encodeURIComponent("/book")}`);
   const client = await new ClientModule(adapter).getProfile(session.clientId);
   if (!client?.profileComplete) return c.redirect(`/client/profile?return_to=${encodeURIComponent("/book")}`);
+  const catalog = new CatalogModule(adapter);
+  const offerings = await catalog.listBookableOfferings(c.req.query("psychologist") || undefined);
   return c.html(renderBookingOffer({
-    services: [
-      { id: "individual-online-single", name: "Konseling Individu — Online (60 menit)", price: "Rp125.000", mode: "online" },
-      { id: "individual-offline-single", name: "Konseling Individu — Offline (60 menit)", price: "Rp200.000", mode: "offline" },
-    ],
+    services: offerings.map((offering) => ({ id: offering.id, name: `${offering.display_name} — ${offering.psychologist_id}`, price: `Rp${offering.price_idr.toLocaleString("id-ID")}`, mode: offering.mode })),
   }));
 });
 

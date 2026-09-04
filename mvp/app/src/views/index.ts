@@ -167,7 +167,27 @@ export function renderAboutPage(): string {
     <section class="card"><h2>Mulai dari langkah kecil</h2><p>Kenali layanan peluncuran kami atau langsung pilih jadwal bersama Fuja.</p><a class="cta" href="/book">Booking Sesi →</a></section>`);
 }
 
- export function renderFuja(p: {
+ export interface PsychologistCard {
+  id: string;
+  name: string;
+  role: string;
+  bio: string;
+  expertise: readonly string[];
+  education: readonly string[];
+  bookable: boolean;
+}
+
+export function renderPsychologistList(psychologists: PsychologistCard[]): string {
+  const cards = psychologists.map((p) => `<article class="card service-card"><div class="profile-mini"><img src="/static/logo.jpeg" alt="Identitas visual ${p.name}"><div><p class="eyebrow">${p.role}</p><h2>${p.name}</h2></div></div><p>${p.bio}</p><div class="trust-row">${p.expertise.slice(0, 3).map((x) => `<span class="trust-pill">${x}</span>`).join("")}</div><p><span class="trust-pill">✓ Siap booking</span></p><a class="cta-secondary" href="/psikolog/${p.id}">Lihat profil →</a></article>`).join("");
+  return base("List Psikolog", `<p class="eyebrow">Tim Psikolog Seraya</p><h1>Temukan psikolog yang tepat untuk menemani prosesmu.</h1><p class="section-intro">Kelima psikolog Seraya siap menerima booking konseling individu. Pilih profil untuk melihat fokus pendampingan dan format sesi.</p><section class="grid psychologist-grid">${cards}</section><section class="warning"><p>Semua psikolog menggunakan harga dan lokasi layanan Seraya yang sama. Booking tersedia untuk usia 18 tahun ke atas dan kondisi non-darurat.</p></section>`);
+}
+
+export function renderPsychologistProfile(p: PsychologistCard): string {
+  const topics = p.expertise.map((topic) => `<span class="trust-pill">${topic}</span>`).join("");
+  return base("Profil Psikolog", `<section class="profile-hero"><div class="profile-avatar"><img src="/static/logo.jpeg" alt="Identitas visual ${p.name}"></div><div><p class="eyebrow">Profil Psikolog · Seraya Psikologi</p><h1>${p.name}</h1><p class="profile-role">${p.role} · Pendekatan hangat dan client-centered</p><p class="profile-bio">${p.bio}</p><p><a class="cta" href="/book?psychologist=${p.id}">Cari Jadwal Sesi →</a></p></div></section><div class="trust-row"><span class="trust-pill">✓ Siap booking</span><span class="trust-pill">✓ Sesi individual</span><span class="trust-pill">✓ Durasi 60 menit</span></div><section class="profile-layout"><div><section class="card"><p class="eyebrow">Tentang psikolog</p><h2>Ruang percakapan yang hangat dan terarah</h2><p>${p.bio}</p></section><section class="card"><p class="eyebrow">Topik keahlian</p><h2>Hal-hal yang bisa kamu bawa ke sesi</h2><div class="trust-row">${topics}</div></section><section class="card"><p class="eyebrow">Pendidikan</p><ul>${p.education.map((x) => `<li>${x}</li>`).join("")}</ul></section></div><aside class="card profile-sidebar"><p class="eyebrow">Informasi layanan</p><h2>Format sesi</h2><div class="service-row"><strong>Chat</strong><span>Rp99.000</span></div><div class="service-row"><strong>Call</strong><span>Rp125.000</span></div><div class="service-row"><strong>Tatap muka</strong><span>Rp200.000</span></div><hr><p><strong>Durasi</strong><br>60 menit per sesi</p><p><strong>Lokasi</strong><br>Havana Park Blok H-3<br>Kepuharjo, Karangploso, Malang</p><a class="cta" href="/book?psychologist=${p.id}">Cari Jadwal →</a></aside></section><section class="warning"><p>Seraya melayani konseling individu non-darurat untuk usia 18 tahun ke atas. Untuk kondisi krisis, <a href="/safety/crisis">cari bantuan darurat</a>.</p></section>`);
+}
+
+export function renderFuja(p: {
   name: string;
   bio: string;
   expertise: string[];
@@ -176,22 +196,15 @@ export function renderAboutPage(): string {
   priceChat?: string;
   priceCall?: string;
 }): string {
-  const topics = p.expertise.map((topic) => `<span class="trust-pill">${topic}</span>`).join("");
-  return base(
-    "Profil Psikolog",
-    `<section class="profile-hero">
-      <div class="profile-avatar"><img src="/static/logo.jpeg" alt="Identitas visual Seraya Psikologi"></div>
-      <div><p class="eyebrow">Profil Psikolog · Seraya Psikologi</p><h1>${p.name}</h1><p class="profile-role">Psikolog Umum · Pendekatan client-centered</p><p class="profile-bio">${p.bio}</p><p><a class="cta" href="/book">Cari Jadwal Sesi →</a></p></div>
-    </section>
-    <div class="trust-row"><span class="trust-pill">✓ Sesi individual</span><span class="trust-pill">✓ Durasi 60 menit</span><span class="trust-pill">✓ Online & tatap muka</span></div>
-    <section class="profile-layout">
-      <div><section class="card"><p class="eyebrow">Tentang psikolog</p><h2>Ruang percakapan yang hangat dan terarah</h2><p>${p.name} mendampingi klien untuk memahami dinamika diri, emosi, relasi, dan perubahan hidup dengan cara yang empatik dan tidak menghakimi.</p><p>Setiap sesi dimulai dari cerita dan kebutuhanmu. Jika kebutuhan berada di luar cakupan layanan psikolog umum atau membutuhkan bantuan darurat, kamu akan diarahkan ke dukungan yang lebih tepat.</p></section>
-      <section class="card"><p class="eyebrow">Topik keahlian</p><h2>Hal-hal yang bisa kamu bawa ke sesi</h2><div class="trust-row">${topics}</div></section></div>
-      <aside class="card profile-sidebar"><p class="eyebrow">Informasi layanan</p><h2>Format sesi</h2><div class="service-row"><strong>Chat</strong><span>${p.priceChat ?? "Rp99.000"}</span></div><div class="service-row"><strong>Call</strong><span>${p.priceCall ?? "Rp125.000"}</span></div><div class="service-row"><strong>Tatap muka</strong><span>${p.priceOfflineSingle}</span></div><hr><p><strong>Durasi</strong><br>60 menit per sesi</p><p><strong>Lokasi offline</strong><br>Havana Park Blok H-3<br>Kepuharjo, Karangploso, Malang</p><a class="cta" href="/book">Cari Jadwal →</a></aside>
-    </section>
-    <section class="card profile-credentials"><p class="eyebrow">Kepercayaan dan batas layanan</p><h2>Informasi yang jelas sejak awal</h2><div class="grid"><div><h3>Psikolog terverifikasi</h3><p>Profil dan kelayakan praktik ditinjau sebelum ditampilkan di website.</p></div><div><h3>Privasi dihormati</h3><p>Data operasional sesi dibagikan seperlunya. Website tidak menyimpan catatan klinis.</p></div><div><h3>Bukan layanan darurat</h3><p>Untuk kondisi krisis, gunakan bantuan segera melalui halaman <a href="/safety/crisis">Bantuan Darurat</a>.</p></div></div></section>
-    <section class="warning"><p><strong>Catatan:</strong> Seraya melayani konseling individu non-darurat untuk usia 18 tahun ke atas. <a href="/privacy">Baca Kebijakan Privasi</a> sebelum booking.</p></section>`
-  );
+  return renderPsychologistProfile({
+    id: "fuja",
+    name: p.name,
+    role: "Psikolog Umum",
+    bio: p.bio,
+    expertise: p.expertise,
+    education: [],
+    bookable: true,
+  });
 }
 
 export function renderFaq(): string {
