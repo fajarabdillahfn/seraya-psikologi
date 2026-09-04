@@ -43,6 +43,16 @@ export class D1PersistenceAdapter implements PersistenceAdapter {
     };
   }
 
+  async execute<T = unknown>(q: AdapterQuery): Promise<AdapterBatchResult<T>> {
+    const result = await this.env.DB!.prepare(q.sql).bind(...(q.params ?? [])).run();
+    return {
+      rows: ((result as unknown as { results?: T[] }).results ?? []) as T[],
+      rows_read: 0,
+      rows_written: (result.meta as { changes?: number } | undefined)?.changes ?? 0,
+      meta: result.meta,
+    };
+  }
+
   async batch<T = unknown>(
     queries: AdapterQuery[]
   ): Promise<AdapterBatchResult<T>> {

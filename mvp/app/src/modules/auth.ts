@@ -62,21 +62,19 @@ export class ClientAuthModule {
     if (!row || new Date(row.expires_at).getTime() <= now.getTime()) {
       throw new DomainError("E-AUTH-INVALID-STATE", "oauth state invalid or expired");
     }
-    let lastError: unknown;
-    for (let attempt = 0; attempt < 3; attempt += 1) {
-      try {
-        await this.db.batch([{ sql: `DELETE FROM oauth_state WHERE state = ?`, params: [state] }]);
-        lastError = undefined;
-        break;
-      } catch (error) {
-        lastError = error;
-        if (attempt < 2) {
-          await new Promise((resolve) => setTimeout(resolve, 25 * (attempt + 1)));
-        }
+    try {
+      const deleteState = { sql: `DELETE FROM oauth_state WHERE state = ?`, params: [state] };
+      // A single DELETE should use D1's native run() path. `db.batch()` is
+      // reserved for multi-row atomic mutations and was causing the OAuth
+      // callback to fail despite the same SQL succeeding in D1 directly.
+      if (this.db.execute) {
+        await this.db.execute(deleteState);
+      } else {
+        // Compatibility path for lightweight test adapters.
+        await this.db.batch([deleteState]);
       }
-    }
-    if (lastError !== undefined) {
-      throw new DomainError("E-AUTH-STATE-DELETE", "oauth state database delete failed", lastError);
+    } catch (error) {
+      throw new DomainError("E-AUTH-STATE-DELETE", "oauth state database delete failed", error);
     }
     return safeReturnTo(row.return_to);
   }

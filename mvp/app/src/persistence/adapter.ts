@@ -36,6 +36,9 @@ export interface PersistenceAdapter {
    * `ConsumeEntitlement`, `RestoreEntitlement`, `ExecuteRefundAction`).
    */
   batch<T = unknown>(queries: AdapterQuery[]): Promise<AdapterBatchResult<T>>;
+
+  /** Execute one mutation with the driver's native single-statement method. */
+  execute?<T = unknown>(q: AdapterQuery): Promise<AdapterBatchResult<T>>;
 }
 
 export interface PersistenceEnv {
