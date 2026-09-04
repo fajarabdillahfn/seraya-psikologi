@@ -171,7 +171,12 @@ app.get("/auth/callback", async (c) => {
     // Never log code, state, tokens, client secrets, email, or redirect query
     // values. requestId lets an operator correlate this event in Wrangler tail.
     console.error(JSON.stringify({ event: "oauth_callback_failed", requestId, stage, redirectUri, ...details }));
-    return c.redirect(`/auth/login?error=${encodeURIComponent(`Login Google gagal pada tahap ${stage}. Kode bantuan: ${requestId.slice(0, 8)}`)}`);
+    const safeReason = stage === "database_state"
+      ? (error instanceof DomainError && error.code === "E-AUTH-INVALID-STATE"
+        ? "state_not_found_or_expired"
+        : "database_query_failed")
+      : stage;
+    return c.redirect(`/auth/login?error=${encodeURIComponent(`Login Google gagal pada tahap ${safeReason}. Kode bantuan: ${requestId.slice(0, 8)}`)}`);
   }
 });
 
