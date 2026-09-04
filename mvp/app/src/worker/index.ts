@@ -85,20 +85,10 @@ app.get("/static/logo.jpeg", async (c) => {
   return new Response(logo.body, { headers: { "content-type": "image/jpeg", "cache-control": "public, max-age=86400" } });
 });
 
-// Psychologist portrait photos. The Workers Assets binding serves from
-// `app/public/`, so we map /static/psychologists/<slug>.jpeg to
-// /psychologists/<slug>.jpeg at root. Slugs are restricted to a safe set
-// to avoid path-traversal; new psychologists also need to be added here.
-const PSYCHOLOGIST_PHOTO_SLUGS = new Set(["fuja", "daris", "zahra", "hasanah", "chika"]);
-app.get("/static/psychologists/:slug.jpeg", async (c) => {
-  const slug = c.req.param("slug");
-  if (!slug || !PSYCHOLOGIST_PHOTO_SLUGS.has(slug)) return c.notFound();
-  const asset = await c.env.ASSETS?.fetch(new URL(`/psychologists/${slug}.jpeg`, c.req.url));
-  if (!asset?.ok) return c.notFound();
-  return new Response(asset.body, {
-    headers: { "content-type": "image/jpeg", "cache-control": "public, max-age=86400" },
-  });
-});
+// Psychologist portrait photos are served directly by Cloudflare Assets
+// from `app/public/psychologists/<slug>.jpeg` at the domain root. The
+// `psychologistPortrait()` view emits <img onerror> fallback chains, so
+// missing files degrade gracefully without needing a worker handler.
 
 app.get("/static/css/main.css", (c) => new Response("/* inline styles are used by the MVP */", {
   status: 200,

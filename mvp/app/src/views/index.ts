@@ -290,7 +290,10 @@ function initialsOf(name: string): string {
 }
 
 function psychologistPhotoUrl(p: PsychologistCard): string {
-  return `/static/psychologists/${encodeURIComponent(p.id)}.jpeg`;
+  // Served directly from Cloudflare Assets (app/public/ at domain root).
+  // `onerror` on the <img> falls back to the inner monogram — see
+  // psychologistPortrait() — so a missing file degrades gracefully.
+  return `/psychologists/${encodeURIComponent(p.id)}.jpeg`;
 }
 
 function psychologistPortrait(p: PsychologistCard, size: number): string {
