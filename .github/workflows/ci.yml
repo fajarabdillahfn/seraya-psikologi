@@ -13,13 +13,17 @@ jobs:
         working-directory: mvp
     steps:
       - uses: actions/checkout@v4
+      # pnpm 11 requires Node >= 22.13, so install Node 22 first, then pnpm.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
       - uses: pnpm/action-setup@v4
         with:
           version: 11
           package_json_file: mvp/package.json
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
           cache: pnpm
           cache-dependency-path: mvp/pnpm-lock.yaml
       - run: pnpm install --frozen-lockfile --ignore-scripts

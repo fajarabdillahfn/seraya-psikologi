@@ -189,6 +189,7 @@ export class BookingModule {
       psychologistId: slot.psychologist_id,
       startsAtUtc: startWithBuffer,
       endsAtUtc: endWithBuffer,
+      now: new Date(),
     });
     if (!available) {
       throw new DomainError("E-SLOT-UNAVAILABLE", "capacity overlap detected");
@@ -370,6 +371,7 @@ export class BookingModule {
       psychologistId: slot.psychologist_id,
       startsAtUtc: startWithBuffer,
       endsAtUtc: endWithBuffer,
+      now,
     });
     if (!available) throw new DomainError("E-SLOT-UNAVAILABLE", "capacity overlap detected");
 
