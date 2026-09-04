@@ -96,6 +96,14 @@ app.get("/healthz", (c) =>
 // Client Google SSO and profile gate
 // ---------------------------------------------------------------------------
 
+app.get("/auth/status", async (c) => {
+  const adapter = createAdapter({ DB: c.env.DB });
+  const session = await new ClientAuthModule(adapter).getSession(readCookie(c.req.raw, "seraya_session"));
+  if (!session) return c.json({ authenticated: false });
+  const profile = await new ClientModule(adapter).getProfile(session.clientId);
+  return c.json({ authenticated: true, profileComplete: Boolean(profile?.profileComplete), displayName: profile?.namaPanggilan || profile?.email || "Profil Saya" });
+});
+
 app.get("/auth/login", (c) => {
   const returnTo = safeReturnTo(c.req.query("return_to"));
   const error = c.req.query("error");
@@ -147,7 +155,7 @@ app.get("/client/profile", async (c) => {
   if (!session) return c.redirect(`/auth/login?return_to=${encodeURIComponent(safeReturnTo(c.req.query("return_to")))}`);
   const profile = await new ClientModule(adapter).getProfile(session.clientId);
   if (!profile) return c.redirect("/auth/login?error=Profil%20tidak%20ditemukan");
-  return c.html(renderClientProfile({ email: profile.email, profile: profile as unknown as Record<string, string> }));
+  return c.html(renderClientProfile({ email: profile.email, profile: profile as unknown as Record<string, string>, returnTo: safeReturnTo(c.req.query("return_to"), "/book") }));
 });
 
 app.post("/client/profile", async (c) => {
