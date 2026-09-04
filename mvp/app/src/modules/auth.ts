@@ -76,6 +76,23 @@ export class ClientAuthModule {
       }
     }
     if (lastError !== undefined) {
+      const diagnostic = lastError instanceof Error
+        ? { name: lastError.name, message: lastError.message.slice(0, 240) }
+        : { name: "UnknownError", message: String(lastError).slice(0, 240) };
+      console.error(JSON.stringify({ event: "oauth_state_delete_probe", ...diagnostic, hasNativeExecute: Boolean(this.db.execute) }));
+    }
+    if (lastError !== undefined) {
+      // Some D1 deployments intermittently reject the single-statement run()
+      // path while the same prepared mutation succeeds through all(). Retry
+      // the mutation through the adapter query seam before surfacing failure.
+      try {
+        await this.db.query(deleteState);
+        lastError = undefined;
+      } catch (fallbackError) {
+        lastError = fallbackError;
+      }
+    }
+    if (lastError !== undefined) {
       throw new DomainError("E-AUTH-STATE-DELETE", "oauth state database delete failed", lastError);
     }
     return safeReturnTo(row.return_to);
