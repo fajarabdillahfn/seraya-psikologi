@@ -62,10 +62,21 @@ export class ClientAuthModule {
     if (!row || new Date(row.expires_at).getTime() <= now.getTime()) {
       throw new DomainError("E-AUTH-INVALID-STATE", "oauth state invalid or expired");
     }
-    try {
-      await this.db.batch([{ sql: `DELETE FROM oauth_state WHERE state = ?`, params: [state] }]);
-    } catch (error) {
-      throw new DomainError("E-AUTH-STATE-DELETE", "oauth state database delete failed", error);
+    let lastError: unknown;
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      try {
+        await this.db.batch([{ sql: `DELETE FROM oauth_state WHERE state = ?`, params: [state] }]);
+        lastError = undefined;
+        break;
+      } catch (error) {
+        lastError = error;
+        if (attempt < 2) {
+          await new Promise((resolve) => setTimeout(resolve, 25 * (attempt + 1)));
+        }
+      }
+    }
+    if (lastError !== undefined) {
+      throw new DomainError("E-AUTH-STATE-DELETE", "oauth state database delete failed", lastError);
     }
     return safeReturnTo(row.return_to);
   }
