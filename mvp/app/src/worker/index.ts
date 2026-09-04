@@ -150,12 +150,16 @@ app.get("/auth/callback", async (c) => {
     }));
     return c.redirect(`/auth/login?error=${encodeURIComponent("Login Google belum siap. Silakan hubungi Admin.")}`);
   }
+  let stage = "database_state";
   try {
     const adapter = createAdapter({ DB: c.env.DB });
     const auth = new ClientAuthModule(adapter);
     const returnTo = await auth.consumeOAuthState(state);
+    stage = "google_token_exchange";
     const identity = await exchangeGoogleCode({ code, clientId, clientSecret, redirectUri });
+    stage = "client_profile";
     const client = await new ClientModule(adapter).findOrCreateGoogleClient({ googleSubject: identity.sub, email: identity.email, displayName: identity.name });
+    stage = "session_creation";
     const session = await auth.createSession(client.id, returnTo);
     const headers = new Headers({ Location: client.profileComplete ? returnTo : `/client/profile?return_to=${encodeURIComponent(returnTo)}` });
     headers.append("Set-Cookie", sessionCookie(session.token));
@@ -166,8 +170,8 @@ app.get("/auth/callback", async (c) => {
       : { errorName: error instanceof Error ? error.name : "UnknownError", errorMessage: error instanceof Error ? error.message : String(error) };
     // Never log code, state, tokens, client secrets, email, or redirect query
     // values. requestId lets an operator correlate this event in Wrangler tail.
-    console.error(JSON.stringify({ event: "oauth_callback_failed", requestId, redirectUri, ...details }));
-    return c.redirect(`/auth/login?error=${encodeURIComponent(`Login Google gagal. Kode bantuan: ${requestId.slice(0, 8)}`)}`);
+    console.error(JSON.stringify({ event: "oauth_callback_failed", requestId, stage, redirectUri, ...details }));
+    return c.redirect(`/auth/login?error=${encodeURIComponent(`Login Google gagal pada tahap ${stage}. Kode bantuan: ${requestId.slice(0, 8)}`)}`);
   }
 });
 
