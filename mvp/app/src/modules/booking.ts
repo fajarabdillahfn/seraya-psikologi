@@ -301,6 +301,111 @@ export class BookingModule {
   }
 
   /**
+   * Create a slot hold without the full intake. Used by the slot-pick action
+   * to reserve the seat for 10 minutes before intake submission.
+   *
+   * - Reuses booking.state = 'pending_manual_payment' so existing admin
+   *   flows (payment verified → confirmed) keep working without schema change.
+   * - Returns the existing bookingId/holdId if a non-expired hold already
+   *   exists for the same client + slot (idempotent on second click).
+   */
+  async createSlotHoldOnly(args: {
+    clientId: string;
+    offerSnapshotId: string;
+    slotId: string;
+    idempotencyKey: string;
+    now?: Date;
+  }): Promise<CreateBookingResult> {
+    const now = args.now ?? new Date();
+    const { rows: existing } = await this.db.query<{
+      booking_id: string;
+      hold_id: string;
+      reservation_id: string;
+      expires_at: string;
+    }>({
+      sql: `SELECT b.id AS booking_id, sh.id AS hold_id, cr.id AS reservation_id, sh.expires_at
+            FROM slot_hold sh
+            JOIN booking b ON b.id = sh.booking_id
+            LEFT JOIN capacity_reservation cr ON cr.parent_id = sh.id AND cr.reservation_kind = 'slot_hold'
+            WHERE sh.slot_id = ?
+              AND sh.state = 'active'
+              AND sh.expires_at > ?
+              AND b.client_id = ?
+              AND b.state = 'pending_manual_payment'
+            ORDER BY sh.created_at DESC LIMIT 1`,
+      params: [args.slotId, now.toISOString(), args.clientId],
+    });
+    if (existing[0]) {
+      return {
+        bookingId: existing[0].booking_id,
+        slotHoldId: existing[0].hold_id,
+        capacityReservationId: existing[0].reservation_id ?? "",
+        expiresAt: existing[0].expires_at,
+      };
+    }
+
+    const { rows: slotRows } = await this.db.query<{
+      id: string;
+      psychologist_id: string;
+      offering_id: string;
+      starts_at_utc: string;
+      ends_at_utc: string;
+    }>({
+      sql: `SELECT id, psychologist_id, offering_id, starts_at_utc, ends_at_utc
+            FROM availability_slot WHERE id = ? AND withdrawn = 0`,
+      params: [args.slotId],
+    });
+    const slot = slotRows[0];
+    if (!slot) throw new DomainError("E-SLOT-NOT-FOUND", "availability_slot not found or withdrawn");
+
+    const startWithBuffer = new Date(
+      new Date(slot.starts_at_utc).getTime() -
+        (await this.getTransitionBuffer(slot.offering_id)) * 60 * 1000,
+    ).toISOString();
+    const endWithBuffer = new Date(
+      new Date(slot.ends_at_utc).getTime() +
+        (await this.getTransitionBuffer(slot.offering_id)) * 60 * 1000,
+    ).toISOString();
+    const available = await this.availability.isSlotAvailable({
+      psychologistId: slot.psychologist_id,
+      startsAtUtc: startWithBuffer,
+      endsAtUtc: endWithBuffer,
+    });
+    if (!available) throw new DomainError("E-SLOT-UNAVAILABLE", "capacity overlap detected");
+
+    const bookingId = randomUUID();
+    const slotHoldId = randomUUID();
+    const capacityReservationId = randomUUID();
+    const expiresAt = new Date(now.getTime() + SLOT_HOLD_TTL_MINUTES * 60 * 1000).toISOString();
+
+    await this.db.batch([
+      {
+        sql: `INSERT INTO booking
+              (id, client_id, offer_snapshot_id, state, is_package, is_couple,
+               intake_topics, intake_problem_description, intake_expected_outcome,
+               intake_returning_client, intake_short_message, crisis_ack)
+              VALUES (?, ?, ?, 'pending_manual_payment', 0, 0, '[]', NULL, NULL, 0, NULL, 0)`,
+        params: [bookingId, args.clientId, args.offerSnapshotId],
+      },
+      {
+        sql: `INSERT INTO slot_hold
+              (id, booking_id, slot_id, expires_at, state)
+              VALUES (?, ?, ?, ?, 'active')`,
+        params: [slotHoldId, bookingId, args.slotId, expiresAt],
+      },
+      {
+        sql: `INSERT INTO capacity_reservation
+              (id, psychologist_id, reservation_kind, parent_id,
+               starts_at_utc, ends_at_utc, state)
+              VALUES (?, ?, 'slot_hold', ?, ?, ?, 'hold_active')`,
+        params: [capacityReservationId, slot.psychologist_id, slotHoldId, startWithBuffer, endWithBuffer],
+      },
+    ]);
+
+    return { bookingId, slotHoldId, capacityReservationId, expiresAt };
+  }
+
+  /**
    * Confirm a booking after a verified payment proof (ADR 0097).
    *
    * Atomic transition:

@@ -125,8 +125,11 @@ describe("AvailabilityModule cutoff query", () => {
       offeringId: "offering",
       now: new Date("2026-09-03T07:00:00.000Z"),
     });
-    expect(query).toContain("s.starts_at_utc > ?");
-    expect(params[1]).toBe("2026-09-03T09:00:00.000Z");
+// cutoff is now + 2h; we compare using datetime() so seeded "YYYY-MM-DD HH:MM:SS"
+// strings sort correctly against ISO timestamps regardless of separator.
+expect(query).toContain("datetime(s.starts_at_utc) > datetime(?)");
+expect(query).toContain("datetime(s.ends_at_utc) <= datetime(?)");
+expect(params[2]).toBe("2026-09-03T09:00:00.000Z");
   });
 });
 

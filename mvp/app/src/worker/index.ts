@@ -85,6 +85,21 @@ app.get("/static/logo.jpeg", async (c) => {
   return new Response(logo.body, { headers: { "content-type": "image/jpeg", "cache-control": "public, max-age=86400" } });
 });
 
+// Psychologist portrait photos. The Workers Assets binding serves from
+// `app/public/`, so we map /static/psychologists/<slug>.jpeg to
+// /psychologists/<slug>.jpeg at root. Slugs are restricted to a safe set
+// to avoid path-traversal; new psychologists also need to be added here.
+const PSYCHOLOGIST_PHOTO_SLUGS = new Set(["fuja", "daris", "zahra", "hasanah", "chika"]);
+app.get("/static/psychologists/:slug.jpeg", async (c) => {
+  const slug = c.req.param("slug");
+  if (!slug || !PSYCHOLOGIST_PHOTO_SLUGS.has(slug)) return c.notFound();
+  const asset = await c.env.ASSETS?.fetch(new URL(`/psychologists/${slug}.jpeg`, c.req.url));
+  if (!asset?.ok) return c.notFound();
+  return new Response(asset.body, {
+    headers: { "content-type": "image/jpeg", "cache-control": "public, max-age=86400" },
+  });
+});
+
 app.get("/static/css/main.css", (c) => new Response("/* inline styles are used by the MVP */", {
   status: 200,
   headers: { "content-type": "text/css; charset=utf-8" },
@@ -205,14 +220,23 @@ const psychologistProfiles = [
   { id: "daris", name: "Rahama Darus Salamah, S.Psi., Psikolog, CHt", role: "Psikolog Umum", bio: "Ruang yang hangat, aman, dan tidak menghakimi untuk merasa diterima, didengarkan, dan sedikit lebih lega menjadi diri sendiri.", expertise: ["Pengembangan diri", "Kepercayaan diri", "Pengelolaan emosi", "Relasi interpersonal"], education: ["Universitas Sebelas Maret — S1 Psikologi (2023)", "Universitas Muhammadiyah Malang — Pendidikan Profesi Psikolog (2026)"], bookable: true },
   { id: "zahra", name: "Zahratussyafiyah, S.Psi., Psikolog", role: "Psikolog Umum", bio: "Rekan perjalanan dan teman berdiskusi dalam ruang yang hangat, terbuka, dan penuh penerimaan.", expertise: ["Kecemasan dan overthinking", "Kesepian dan quarter-life crisis", "Kepercayaan diri", "Relasi interpersonal"], education: ["UIN Maulana Malik Ibrahim Malang — S1 Psikologi (2020)", "Universitas Muhammadiyah Malang — Pendidikan Profesi Psikolog (2026)"], bookable: true },
   { id: "hasanah", name: "Raudhatul Hasanah, S.Psi., Psikolog, CHt.", role: "Psikolog Umum", bio: "Memiliki minat pada permasalahan individu terkait penerimaan diri, persiapan pra-nikah, dinamika dan komunikasi dengan pasangan, serta relasi orang tua dan anak.", expertise: ["Penerimaan diri", "Persiapan pra-nikah", "Dinamika pasangan", "Relasi orang tua dan anak"], education: ["Universitas Negeri Malang — S1 Psikologi (2006)", "Universitas Muhammadiyah Malang — Pendidikan Profesi Psikolog (2026)"], bookable: true },
-  { id: "chika", name: "Kurnia Armachika Maylasari, S.Psi., Psikolog", role: "Psikolog Umum", bio: "Ruang yang hangat, aman, dan kolaboratif untuk memahami pengalaman dan menemukan langkah bertumbuh yang sesuai.", expertise: ["Permasalahan anak", "Relasi orang tua dan anak", "Parenting", "Akademik dan karier"], education: ["UIN Sunan Ampel Surabaya — S1 Psikologi (2024)", "Universitas Muhammadiyah Malang — Pendidikan Profesi Psikolog (2026)"], bookable: true },
+  { id: "chika", name: "Kurnia Armachika Maylasari, S.Psi., Psikolog", role: "Psikolog Umum", bio: "Ruang yang hangat, aman, dan kolaboratif untuk memahami pengalaman dan menemukan langkah bertumbuh yang sesuai.", expertise: ["Pendampingan orang tua untuk permasalahan anak", "Relasi orang tua dan anak", "Parenting", "Akademik dan karier"], education: ["UIN Sunan Ampel Surabaya — S1 Psikologi (2024)", "Universitas Muhammadiyah Malang — Pendidikan Profesi Psikolog (2026)"], bookable: true },
 ] as const;
 
 app.get("/psikolog", (c) => c.html(renderPsychologistList([...psychologistProfiles])));
-app.get("/psikolog/:id", (c) => {
-  const profile = psychologistProfiles.find((item) => item.id === c.req.param("id"));
+app.get("/psikolog/:id", async (c) => {
+  const id = c.req.param("id");
+  const profile = psychologistProfiles.find((item) => item.id === id);
   if (!profile) return c.text("Profil psikolog tidak ditemukan.", 404);
-  return c.html(renderPsychologistProfile(profile));
+  const adapter = createAdapter({ DB: c.env.DB });
+  const catalog = new CatalogModule(adapter);
+  const offerings = await catalog.listBookableOfferings(id);
+  const serviceRows = offerings.map((o) => ({
+    mode: o.mode === "online" ? (o.display_name.includes("Chat") ? "Chat" : "Call") : "Tatap Muka",
+    priceLabel: `Rp${o.price_idr.toLocaleString("id-ID")}`,
+    offeringId: o.id,
+  }));
+  return c.html(renderPsychologistProfile(profile, { serviceRows }));
 });
 app.get("/fuja", (c) => c.redirect("/psikolog/fuja"));
 app.get("/daris", (c) => c.redirect("/psikolog/daris"));
@@ -248,58 +272,157 @@ app.get("/cancellation", (c) => c.html(renderCancellationPolicy()));
 // Booking flow
 // ---------------------------------------------------------------------------
 
+async function resolveOfferingContext(c: { env: Env; req: Request }, offeringId: string) {
+  const adapter = createAdapter({ DB: c.env.DB });
+  const catalog = new CatalogModule(adapter);
+  const offering = await catalog.getPublishedOffering(offeringId);
+  if (!offering) return null;
+  let psychologistName: string | undefined;
+  if (offering.psychologist_id) {
+    const psy = await catalog.getPsychologist(offering.psychologist_id);
+    if (psy) psychologistName = psy.display_name;
+  }
+  return { offering, psychologistName };
+}
+
 app.get("/book", async (c) => {
   const adapter = createAdapter({ DB: c.env.DB });
   const session = await new ClientAuthModule(adapter).getSession(readCookie(c.req.raw, "seraya_session"));
   if (!session) return c.redirect(`/auth/login?return_to=${encodeURIComponent("/book")}`);
   const client = await new ClientModule(adapter).getProfile(session.clientId);
   if (!client?.profileComplete) return c.redirect(`/client/profile?return_to=${encodeURIComponent("/book")}`);
+  const psid = c.req.query("psychologist");
   const catalog = new CatalogModule(adapter);
-  const offerings = await catalog.listBookableOfferings(c.req.query("psychologist") || undefined);
-  return c.html(renderBookingOffer({
-    services: offerings.map((offering) => ({ id: offering.id, name: `${offering.display_name} — ${offering.psychologist_id}`, price: `Rp${offering.price_idr.toLocaleString("id-ID")}`, mode: offering.mode })),
+  const offerings = await catalog.listBookableOfferings(psid || undefined);
+  let psychologistName: string | undefined;
+  if (psid) {
+    const psy = await catalog.getPsychologist(psid);
+    if (psy) psychologistName = psy.display_name;
+  }
+  const services = offerings.map((offering) => ({
+    id: offering.id,
+    name: offering.display_name,
+    price: `Rp${offering.price_idr.toLocaleString("id-ID")}`,
+    mode: offering.mode === "online" ? (offering.display_name.includes("Chat") ? "Online · Chat" : "Online · Call") : "Offline · Tatap muka",
   }));
+  return c.html(renderBookingOffer({ services, psychologistName }));
 });
 
 app.get("/book/:offeringId/slots", async (c) => {
-  const authAdapter = createAdapter({ DB: c.env.DB });
-  const clientSession = await new ClientAuthModule(authAdapter).getSession(readCookie(c.req.raw, "seraya_session"));
-  if (!clientSession) return c.redirect(`/auth/login?return_to=${encodeURIComponent(`/book/${c.req.param("offeringId")}/slots`)}`);
-  const client = await new ClientModule(authAdapter).getProfile(clientSession.clientId);
-  if (!client?.profileComplete) return c.redirect(`/client/profile?return_to=${encodeURIComponent(`/book/${c.req.param("offeringId")}/slots`)}`);
   const offeringId = c.req.param("offeringId");
   const adapter = createAdapter({ DB: c.env.DB });
+  const catalog = new CatalogModule(adapter);
+  const offering = await catalog.getPublishedOfferingWithDisplay(offeringId);
+  if (!offering) return c.text("Layanan tidak tersedia.", 404);
+  const authAdapter = createAdapter({ DB: c.env.DB });
+  const clientSession = await new ClientAuthModule(authAdapter).getSession(readCookie(c.req.raw, "seraya_session"));
   const availability = new AvailabilityModule(adapter);
-  const slots = await availability.listAvailableSlots({
+  const slots = await availability.listAvailableSlots({ offeringId, now: new Date() });
+  let psychologistName: string | undefined;
+  if (offering.psychologist_id) {
+    const psy = await catalog.getPsychologist(offering.psychologist_id);
+    if (psy) psychologistName = psy.display_name;
+  }
+  return c.html(renderBookingSlot({
     offeringId,
-    now: new Date(),
-  });
-  return c.html(renderBookingSlot({ offeringId, slots }));
+    slots,
+    hasSession: Boolean(clientSession),
+    psychologistName,
+    serviceName: offering.display_name,
+    priceLabel: `Rp${offering.price_idr.toLocaleString("id-ID")}`,
+  }));
+});
+
+app.post("/book/:offeringId/slots", async (c) => {
+  const offeringId = c.req.param("offeringId");
+  const body = await c.req.parseBody();
+  const slotId = String(body["slotId"] ?? "");
+  const returnTo = `/book/${offeringId}/slots`;
+  const adapter = createAdapter({ DB: c.env.DB });
+  const session = await new ClientAuthModule(adapter).getSession(readCookie(c.req.raw, "seraya_session"));
+  if (!session) return c.redirect(`/auth/login?return_to=${encodeURIComponent(returnTo)}`);
+  const client = await new ClientModule(adapter).getProfile(session.clientId);
+  if (!client?.profileComplete) return c.redirect(`/client/profile?return_to=${encodeURIComponent(returnTo)}`);
+  if (!slotId) return c.redirect(returnTo);
+  const catalog = new CatalogModule(adapter);
+  const offering = await catalog.getPublishedOffering(offeringId);
+  if (!offering) return c.text("Layanan tidak tersedia.", 404);
+  const offerSnapshot = await catalog.createCurrentOfferSnapshot(offeringId, "v1-2026-09-03");
+  const availability = new AvailabilityModule(adapter);
+  const bookingModule = new BookingModule(adapter, availability);
+  let holdResult;
+  try {
+    holdResult = await bookingModule.createSlotHoldOnly({
+      clientId: session.clientId,
+      offerSnapshotId: offerSnapshot.id,
+      slotId,
+      idempotencyKey: crypto.randomUUID(),
+    });
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : "";
+    if (msg.includes("capacity overlap")) {
+      return c.text("Slot sudah dipesan orang lain. Silakan pilih slot lain.", 409);
+    }
+    throw e;
+  }
+  return c.redirect(`/book/${offeringId}/intake?slot=${encodeURIComponent(slotId)}&hold=${encodeURIComponent(holdResult.slotHoldId)}&booking=${encodeURIComponent(holdResult.bookingId)}&expires_at=${encodeURIComponent(holdResult.expiresAt)}`);
 });
 
 app.get("/book/:offeringId/intake", async (c) => {
-  const authAdapter = createAdapter({ DB: c.env.DB });
-  const clientSession = await new ClientAuthModule(authAdapter).getSession(readCookie(c.req.raw, "seraya_session"));
-  if (!clientSession) return c.redirect(`/auth/login?return_to=${encodeURIComponent(c.req.url)}`);
-  const client = await new ClientModule(authAdapter).getProfile(clientSession.clientId);
+  const adapter = createAdapter({ DB: c.env.DB });
+  const session = await new ClientAuthModule(adapter).getSession(readCookie(c.req.raw, "seraya_session"));
+  if (!session) return c.redirect(`/auth/login?return_to=${encodeURIComponent(c.req.url)}`);
+  const client = await new ClientModule(adapter).getProfile(session.clientId);
   if (!client?.profileComplete) return c.redirect(`/client/profile?return_to=${encodeURIComponent(c.req.url)}`);
+  const offeringId = c.req.param("offeringId");
   const slotId = c.req.query("slot");
-  if (!slotId) {
-    return c.redirect(`/book/${c.req.param("offeringId")}/slots`);
+  const holdId = c.req.query("hold");
+  if (!slotId) return c.redirect(`/book/${offeringId}/slots`);
+  const catalog = new CatalogModule(adapter);
+  const offering = await catalog.getPublishedOfferingWithDisplay(offeringId);
+  if (!offering) return c.text("Layanan tidak tersedia.", 404);
+  let slotLabel: string | undefined;
+  if (slotId) {
+    const { rows } = await adapter.query<{ starts_at_utc: string; ends_at_utc: string }>({
+      sql: `SELECT starts_at_utc, ends_at_utc FROM availability_slot WHERE id = ?`,
+      params: [slotId],
+    });
+    if (rows[0]) {
+      const fmt = new Intl.DateTimeFormat("id-ID", {
+        timeZone: "Asia/Jakarta",
+        weekday: "long", day: "numeric", month: "long",
+        hour: "2-digit", minute: "2-digit", hour12: false,
+      });
+      const endFmt = new Intl.DateTimeFormat("id-ID", {
+        timeZone: "Asia/Jakarta", hour: "2-digit", minute: "2-digit", hour12: false,
+      });
+      slotLabel = `${fmt.format(new Date(rows[0].starts_at_utc))} – ${endFmt.format(new Date(rows[0].ends_at_utc))} WIB`;
+    }
   }
+  let psychologistName: string | undefined;
+  if (offering.psychologist_id) {
+    const psy = await catalog.getPsychologist(offering.psychologist_id);
+    if (psy) psychologistName = psy.display_name;
+  }
+  const expiresIso = c.req.query("expires_at") ?? undefined;
   return c.html(renderBookingIntake({
-    offeringId: c.req.param("offeringId"),
+    offeringId,
     slotId,
-    returnTo: `/book/${c.req.param("offeringId")}/intake?slot=${encodeURIComponent(slotId)}`,
+    returnTo: `/book/${offeringId}/intake?slot=${encodeURIComponent(slotId)}${holdId ? `&hold=${encodeURIComponent(holdId)}` : ""}${expiresIso ? `&expires_at=${encodeURIComponent(expiresIso)}` : ""}`,
     consentVersion: "v1-2026-08-31",
+    psychologistName,
+    serviceLabel: offering.display_name,
+    slotLabel,
+    priceLabel: `Rp${offering.price_idr.toLocaleString("id-ID")}`,
+    holdExpiresAt: expiresIso,
   }));
 });
 
 app.post("/api/booking/create", async (c) => {
   const body = await c.req.parseBody();
-  const returnTo = safeReturnTo(String(body["returnTo"] ?? "/book"));
   const adapter = createAdapter({ DB: c.env.DB });
   const session = await new ClientAuthModule(adapter).getSession(readCookie(c.req.raw, "seraya_session"));
+  const returnTo = safeReturnTo(String(body["returnTo"] ?? "/book"));
   if (!session) return c.redirect(`/auth/login?return_to=${encodeURIComponent(returnTo)}`);
   const client = await new ClientModule(adapter).getProfile(session.clientId);
   if (!client?.profileComplete) return c.redirect(`/client/profile?return_to=${encodeURIComponent(returnTo)}`);
@@ -308,47 +431,69 @@ app.post("/api/booking/create", async (c) => {
   const catalog = new CatalogModule(adapter);
   const offering = await catalog.getPublishedOffering(offeringId);
   if (!offering) return c.text("Layanan tidak tersedia.", 404);
+  const slotId = String(body["slotId"] ?? "");
+  if (!slotId) return c.redirect(`/book/${offeringId}/slots`);
   const offerSnapshot = await catalog.createCurrentOfferSnapshot(offeringId, "v1-2026-09-03");
   const availability = new AvailabilityModule(adapter);
-  const booking = new BookingModule(adapter, availability);
-  const result = await booking.createBooking({
-    clientId: session.clientId,
-    offerSnapshotId: offerSnapshot.id,
-    slotId: String(body["slotId"] ?? ""),
-    idempotencyKey: String(body["idempotencyKey"] ?? crypto.randomUUID()),
-    intake: {
-      displayName: String(body["displayName"] ?? ""),
-      contactEmail: String(body["contactEmail"] ?? ""),
-      contactPhone: normalizeIndonesianPhone(String(body["contactPhone"] ?? "")),
-      dateOfBirth: String(body["dateOfBirth"] ?? ""),
-      consentVersion: String(body["consentVersion"] ?? "v1-2026-08-31"),
-      crisisAck: body["crisisAck"] === "on" || body["crisisAck"] === "true",
-      topics: Array.isArray(body["topics"]) ? body["topics"].map(String) : body["topics"] ? [String(body["topics"])] : [],
-      problemDescription: String(body["problemDescription"] ?? ""),
-      expectedOutcome: String(body["expectedOutcome"] ?? ""),
-      returningClient: body["returningClient"] === "yes",
-    },
-  });
+  const bookingModule = new BookingModule(adapter, availability);
+  let result;
+  try {
+    result = await bookingModule.createBooking({
+      clientId: session.clientId,
+      offerSnapshotId: offerSnapshot.id,
+      slotId,
+      idempotencyKey: String(body["idempotencyKey"] ?? crypto.randomUUID()),
+      intake: {
+        displayName: String(body["displayName"] ?? ""),
+        contactEmail: String(body["contactEmail"] ?? ""),
+        contactPhone: normalizeIndonesianPhone(String(body["contactPhone"] ?? "")),
+        dateOfBirth: String(body["dateOfBirth"] ?? ""),
+        consentVersion: String(body["consentVersion"] ?? "v1-2026-08-31"),
+        crisisAck: body["crisisAck"] === "on" || body["crisisAck"] === "true",
+        topics: Array.isArray(body["topics"]) ? body["topics"].map(String) : body["topics"] ? [String(body["topics"])] : [],
+        problemDescription: String(body["problemDescription"] ?? ""),
+        expectedOutcome: String(body["expectedOutcome"] ?? ""),
+        returningClient: body["returningClient"] === "yes",
+      },
+    });
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : "";
+    if (msg.includes("clinical") || msg.includes("crisis")) {
+      return c.redirect(`/safety/crisis?from=booking`);
+    }
+    throw e;
+  }
 
-  // ADR 0097: After booking is created, the Worker hands the booking off
-  // to the WhatsApp Manual Payment flow:
-  //   - Generate the invoice (text + PDF metadata) for the booking.
-  //   - Render the confirmation page with WhatsApp instructions:
-  //       - WhatsApp message text (copy/paste to Admin number)
-  //       - Invoice PDF download link
-  //       - Admin WhatsApp contact number
-  //   - The booking is now in 'pending_manual_payment'; Admin will verify
-  //     the payment_proof once the client sends the transfer slip.
   const payment = new WhatsAppManualPaymentModule(adapter);
-  const preliminary = await payment.generateInvoice(result.bookingId, "text", "preliminary");
-  const adminWhatsapp = c.env.ADMIN_WHATSAPP_NUMBER ?? "+628****0000";
+  await payment.generateInvoice(result.bookingId, "text", "preliminary");
+  // POST/redirect/GET — refresh-safe confirmation.
+  return c.redirect(`/booking/${result.bookingId}/confirmed`);
+});
 
+app.get("/booking/:bookingId/confirmed", async (c) => {
+  const bookingId = c.req.param("bookingId");
+  const adapter = createAdapter({ DB: c.env.DB });
+  const session = await new ClientAuthModule(adapter).getSession(readCookie(c.req.raw, "seraya_session"));
+  if (!session) return c.redirect(`/auth/login?return_to=${encodeURIComponent(c.req.url)}`);
+  const { rows: owned } = await adapter.query<{ id: string }>({ sql: `SELECT id FROM booking WHERE id = ? AND client_id = ?`, params: [bookingId, session.clientId] });
+  if (!owned[0]) return c.notFound();
+  const payment = new WhatsAppManualPaymentModule(adapter);
+  const { rows } = await adapter.query<{ expires_at: string; price_idr: number }>({
+    sql: `SELECT sh.expires_at, so.price_idr FROM booking b
+          JOIN slot_hold sh ON sh.booking_id = b.id
+          JOIN service_offering so ON so.id = b.offer_snapshot_id
+          WHERE b.id = ? ORDER BY sh.created_at DESC LIMIT 1`,
+    params: [bookingId],
+  });
+  const invoice = await payment.generateInvoice(bookingId, "text", "preliminary");
+  const adminWhatsapp = c.env.ADMIN_WHATSAPP_NUMBER ?? "+628****0000";
   return c.html(renderBookingConfirmation({
-    bookingId: result.bookingId,
-    expiresAt: result.expiresAt,
-    whatsappMessage: preliminary.textMessage,
+    bookingId,
+    expiresAt: rows[0]?.expires_at ?? new Date(Date.now() + 10 * 60 * 1000).toISOString(),
+    whatsappMessage: invoice.textMessage,
     adminWhatsapp,
-    pdfDownloadPath: "",
+    pdfDownloadPath: `/api/booking/${bookingId}/invoice.pdf`,
+    amountLabel: `Rp${(rows[0]?.price_idr ?? 0).toLocaleString("id-ID")}`,
   }));
 });
 
@@ -675,7 +820,13 @@ app.notFound((c) =>
 app.onError((err, c) => {
   console.error(err);
   const message = err instanceof Error ? err.message : String(err);
-  return c.html(`<h1>500</h1><p>Terjadi kesalahan. <a href='/safety/crisis'>Butuh bantuan segera?</a></p><pre style="white-space: pre-wrap; font-size: 0.8rem; background: #fafafa; padding: 1rem; border-radius: 8px;">${message}</pre>`, 500);
+  // Defensive: do not leak the raw error message to clients. Provide a
+  // safe fallback and never mention clinical content in the response.
+  return c.html(
+    `<h1>500</h1>
+     <p>Terjadi kesalahan pada sistem. Silakan coba kembali atau <a href="/safety/crisis">lihat bantuan darurat</a> jika kondisi krisis.</p>`,
+    500,
+  );
 });
 
 export default app;

@@ -44,20 +44,31 @@ export class AvailabilityModule {
     const horizonEnd = new Date(
       args.now.getTime() + BOOKING_HORIZON_DAYS * 24 * 60 * 60 * 1000
     );
+    const cutoffIso = new Date(args.now.getTime() + BOOKING_CUTOFF_MINUTES * 60 * 1000).toISOString();
+    const nowIso = args.now.toISOString();
+    // Use datetime() comparison so slots seeded as 'YYYY-MM-DD HH:MM:SS'
+    // are ordered correctly against ISO strings (the original string-comparison
+    // implementation filtered out same-day slots due to a space-vs-'T' mismatch).
     const { rows } = await this.db.query<AvailabilitySlotRow>({
       sql: `SELECT s.* FROM availability_slot s
             LEFT JOIN capacity_reservation cr
               ON cr.parent_id = s.id
               AND cr.state IN ('hold_active','confirmed')
+            LEFT JOIN slot_hold sh
+              ON sh.slot_id = s.id
+              AND sh.state = 'active'
+              AND sh.expires_at > ?
             WHERE s.offering_id = ?
               AND s.withdrawn = 0
-              AND s.starts_at_utc > ?
-              AND s.ends_at_utc <= ?
+              AND datetime(s.starts_at_utc) > datetime(?)
+              AND datetime(s.ends_at_utc) <= datetime(?)
               AND cr.id IS NULL
-            ORDER BY s.starts_at_utc ASC`,
+              AND sh.id IS NULL
+            ORDER BY datetime(s.starts_at_utc) ASC`,
       params: [
+        nowIso,
         args.offeringId,
-        new Date(args.now.getTime() + BOOKING_CUTOFF_MINUTES * 60 * 1000).toISOString(),
+        cutoffIso,
         horizonEnd.toISOString(),
       ],
     });

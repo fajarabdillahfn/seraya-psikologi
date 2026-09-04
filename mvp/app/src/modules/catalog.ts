@@ -67,6 +67,25 @@ export class CatalogModule {
     return rows[0] ?? null;
   }
 
+  async getPublishedOfferingWithDisplay(
+    id: string
+  ): Promise<(ServiceOfferingRow & { display_name: string; price_idr: number }) | null> {
+    const { rows } = await this.db.query<
+      ServiceOfferingRow & { display_name: string; price_idr: number }
+    >({
+      sql: `SELECT so.*, s.display_name, sor.price_idr
+            FROM service_offering so
+            JOIN psychologist p ON p.id = so.psychologist_id
+            JOIN service s ON s.id = so.service_id
+            JOIN service_offering_revision sor ON sor.offering_id = so.id
+            WHERE so.id = ? AND so.active = 1 AND so.audience = 'individual'
+              AND p.publish_status = 'published'
+              AND sor.version = (SELECT MAX(version) FROM service_offering_revision WHERE offering_id = so.id)`,
+      params: [id],
+    });
+    return rows[0] ?? null;
+  }
+
   async getCurrentPrice(offeringId: string): Promise<number | null> {
     const { rows } = await this.db.query<{ price_idr: number }>({
       sql: `SELECT price_idr FROM service_offering_revision WHERE offering_id = ? ORDER BY version DESC LIMIT 1`,
