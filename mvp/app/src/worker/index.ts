@@ -211,6 +211,8 @@ app.get("/fuja", (c) =>
     ],
     priceOnlineSingle: "Rp125.000",
     priceOfflineSingle: "Rp200.000",
+    priceChat: "Rp99.000",
+    priceCall: "Rp125.000",
   }))
 );
 

@@ -63,6 +63,16 @@ const BASE_STYLES = `
   .step:before { counter-increment:step; content:counter(step); display:grid; place-items:center; width:30px; height:30px; border-radius:50%; background:var(--warm); color:var(--brand-dark); font-weight:800; margin-bottom:12px; }
   .quote-card { background:var(--brand-dark); color:#fff; border-radius:18px; padding:26px; }
   .quote-card h2,.quote-card p { color:#fff; }
+  .profile-hero { display:grid; grid-template-columns:180px 1fr; gap:28px; align-items:center; padding:28px; background:linear-gradient(135deg,#e4f2ed,#f8ead0); border-radius:22px; }
+  .profile-avatar { display:grid; place-items:center; width:180px; height:180px; border-radius:50%; background:#fff; box-shadow:0 14px 30px rgba(49,92,87,.16); overflow:hidden; }
+  .profile-avatar img { width:100%; height:100%; object-fit:cover; }
+  .profile-role { color:var(--brand); font-weight:800; }
+  .profile-bio { max-width:680px; color:var(--muted); font-size:1.05rem; }
+  .profile-layout { display:grid; grid-template-columns:minmax(0,1.4fr) minmax(260px,.6fr); gap:18px; margin-top:18px; }
+  .profile-sidebar { position:sticky; top:20px; align-self:start; }
+  .service-row { display:flex; justify-content:space-between; gap:12px; padding:12px 0; border-bottom:1px solid var(--line); }
+  .profile-credentials { margin-top:18px; }
+  @media (max-width:720px) { .profile-hero{grid-template-columns:1fr;text-align:center;padding:22px}.profile-avatar{width:132px;height:132px;margin:0 auto}.profile-layout{grid-template-columns:1fr}.profile-sidebar{position:static}.profile-hero .cta{width:100%} }
   @media (max-width:720px) { .shell{padding:0 16px} header{position:static} .nav{align-items:flex-start; flex-direction:column; gap:10px} nav{width:100%} .menu-panel{position:static;width:100%;margin-top:8px;display:none} .nav-link:hover .menu-panel,.nav-link:focus-within .menu-panel{display:block} main{padding:28px 0}.grid{grid-template-columns:1fr}.hero{border-radius:16px;padding:24px 18px}.hero-split{grid-template-columns:1fr;gap:24px}.hero-art{min-height:230px}.stepper{grid-template-columns:1fr} table{display:block;overflow-x:auto;white-space:nowrap} }
 `;
 
@@ -163,28 +173,24 @@ export function renderAboutPage(): string {
   expertise: string[];
   priceOnlineSingle: string;
   priceOfflineSingle: string;
+  priceChat?: string;
+  priceCall?: string;
 }): string {
+  const topics = p.expertise.map((topic) => `<span class="trust-pill">${topic}</span>`).join("");
   return base(
-    "Fuja Rahayu Kinanti",
-    `<h1>${p.name}</h1>
-    <p class="lead">Psikolog Umum. Pendekatan hangat, empatik, dan client-centered.</p>
-    <section class="card">
-      <h2>Tentang Fuja</h2>
-      <p>${p.bio}</p>
+    "Profil Psikolog",
+    `<section class="profile-hero">
+      <div class="profile-avatar"><img src="/static/logo.jpeg" alt="Identitas visual Seraya Psikologi"></div>
+      <div><p class="eyebrow">Profil Psikolog · Seraya Psikologi</p><h1>${p.name}</h1><p class="profile-role">Psikolog Umum · Pendekatan client-centered</p><p class="profile-bio">${p.bio}</p><p><a class="cta" href="/book">Cari Jadwal Sesi →</a></p></div>
     </section>
-    <section class="card">
-      <h2>Bidang yang ditangani</h2>
-      <ul>${p.expertise.map((e) => `<li>${e}</li>`).join("")}</ul>
+    <div class="trust-row"><span class="trust-pill">✓ Sesi individual</span><span class="trust-pill">✓ Durasi 60 menit</span><span class="trust-pill">✓ Online & tatap muka</span></div>
+    <section class="profile-layout">
+      <div><section class="card"><p class="eyebrow">Tentang psikolog</p><h2>Ruang percakapan yang hangat dan terarah</h2><p>${p.name} mendampingi klien untuk memahami dinamika diri, emosi, relasi, dan perubahan hidup dengan cara yang empatik dan tidak menghakimi.</p><p>Setiap sesi dimulai dari cerita dan kebutuhanmu. Jika kebutuhan berada di luar cakupan layanan psikolog umum atau membutuhkan bantuan darurat, kamu akan diarahkan ke dukungan yang lebih tepat.</p></section>
+      <section class="card"><p class="eyebrow">Topik keahlian</p><h2>Hal-hal yang bisa kamu bawa ke sesi</h2><div class="trust-row">${topics}</div></section></div>
+      <aside class="card profile-sidebar"><p class="eyebrow">Informasi layanan</p><h2>Format sesi</h2><div class="service-row"><strong>Chat</strong><span>${p.priceChat ?? "Rp99.000"}</span></div><div class="service-row"><strong>Call</strong><span>${p.priceCall ?? "Rp125.000"}</span></div><div class="service-row"><strong>Tatap muka</strong><span>${p.priceOfflineSingle}</span></div><hr><p><strong>Durasi</strong><br>60 menit per sesi</p><p><strong>Lokasi offline</strong><br>Havana Park Blok H-3<br>Kepuharjo, Karangploso, Malang</p><a class="cta" href="/book">Cari Jadwal →</a></aside>
     </section>
-    <section class="card">
-      <h2>Sesi bersama Fuja</h2>
-      <p>Online: <strong>${p.priceOnlineSingle}</strong> per sesi (60 menit)</p>
-      <p>Offline: <strong>${p.priceOfflineSingle}</strong> per sesi (60 menit)</p>
-      <p><a class="cta" href="/book">Booking sesi</a></p>
-    </section>
-    <section class="warning">
-      <p><small class="muted">STR/SILP sudah diverifikasi sebelum publikasi. Placeholder foto: gunakan foto asli setelah proses Admin selesai.</small></p>
-    </section>`
+    <section class="card profile-credentials"><p class="eyebrow">Kepercayaan dan batas layanan</p><h2>Informasi yang jelas sejak awal</h2><div class="grid"><div><h3>Psikolog terverifikasi</h3><p>Profil dan kelayakan praktik ditinjau sebelum ditampilkan di website.</p></div><div><h3>Privasi dihormati</h3><p>Data operasional sesi dibagikan seperlunya. Website tidak menyimpan catatan klinis.</p></div><div><h3>Bukan layanan darurat</h3><p>Untuk kondisi krisis, gunakan bantuan segera melalui halaman <a href="/safety/crisis">Bantuan Darurat</a>.</p></div></div></section>
+    <section class="warning"><p><strong>Catatan:</strong> Seraya melayani konseling individu non-darurat untuk usia 18 tahun ke atas. <a href="/privacy">Baca Kebijakan Privasi</a> sebelum booking.</p></section>`
   );
 }
 
